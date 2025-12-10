@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Employee / Admin Login — TNK Lawncare Plus</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .auth-wrap { min-height: 100dvh; display: grid; place-items: center; background: var(--clr-bg); padding: 2rem 1rem; }
+    .auth-card { width: min(100%, 560px); background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 1.5rem; }
+    .auth-brand { display:grid; place-items:center; gap:.5rem; margin-bottom:.5rem; text-align:center; }
+    .auth-brand img { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; border: 4px solid color-mix(in srgb, var(--clr-accent) 25%, white); box-shadow: var(--shadow-1); }
+    .muted { opacity:.85; text-align:center; }
+    .widget-slot { margin: 1rem 0; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <img src="images/IMG_2713.png" alt="">
+        <h1 class="auth-title">Employee / Admin Login</h1>
+        <p class="muted">Sign in with the email you were invited with. Admins are routed to the Admin Portal.</p>
+      </div>
+
+      <div id="user-badge"></div>
+
+      <div class="widget-slot">
+        <button class="button button--primary button--xl" id="open-login">Log In / Sign Up</button>
+      </div>
+
+      <p class="muted"><a class="link" href="index.html">← Back to Site</a></p>
+    </div>
+  </div>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="js/identity.js"></script>
+  <script>
+    TNK.renderUserBadge('user-badge');
+
+    document.getElementById('open-login').addEventListener('click', () => {
+      netlifyIdentity.open('login');
+    });
+
+    netlifyIdentity.on('login', (user) => {
+      const roles = user?.app_metadata?.roles || [];
+      if (roles.includes('admin')) location.replace('admin.html');
+      else location.replace('employee.html');
+    });
+  </script>
+</body>
+</html>
