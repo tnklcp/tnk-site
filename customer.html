@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Invoices | Neighborhood Kids Lawncare Plus</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom:1px solid #ddd; padding:.6rem; text-align:left; }
+    .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
+    .b-unpaid { background:#fff3cd; color:#9a6a00; }
+    .b-paid { background:#d1f7c4; color:#195d00; }
+    .b-void { background:#eee; color:#777; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <h1>My Invoices</h1>
+    <div class="cta-row">
+      <a class="button" href="index.html">← Back to Site</a>
+      <span id="user-badge"></span>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="container" style="max-width:900px">
+      <table class="table" id="inv-table">
+        <thead>
+          <tr><th>#</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="inv-status" role="status" style="margin-top:10px;"></p>
+    </div>
+  </section>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="js/identity.js"></script>
+  <script>
+    (async function gate() {
+      try {
+        await TNK.requireRole(['customer']); // customers or admins
+        TNK.renderUserBadge('user-badge');
+      } catch {
+        location.replace('login-customer.html');
+      }
+    })();
+
+    const invTbody = document.querySelector('#inv-table tbody');
+
+    function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+
+    function openInvoiceWindow(inv){
+      const styles = `
+        <style>
+          body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; color:#1e2f1e; }
+          h1,h2,h3 { margin:0 0 6px; }
+          .head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+          .brand { display:flex; align-items:center; gap:12px; }
+          .brand img { width:64px; height:64px; border-radius:12px; }
+          .meta { text-align:right; }
+          .muted { opacity:.8; }
+          table { width:100%; border-collapse:collapse; margin-top: 12px; }
+          th, td { border-bottom:1px solid #e8e1d6; padding:8px; text-align:left; }
+          tfoot td { border-top:2px solid #cfc7b6; font-weight:700; }
+          .totals { max-width:360px; margin-left:auto; }
+        </style>
+      `;
+      const rows = (inv.items||[]).map(it=>`
+        <tr><td>${it.desc||''}</td><td>${it.qty||0}</td><td>${money(it.unit||0)}</td><td>${money((it.qty||0)*(it.unit||0))}</td></tr>
+      `).join('');
+
+      const html = `
+        <!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>${styles}</head>
+        <body>
+          <div class="head">
+            <div class="brand">
+              <img src="images/IMG_2713.png" alt="">
+              <div>
+                <h2>The Neighborhood Kids Lawncare Plus</h2>
+                <div class="muted">Serving Pacific City to Depoe Bay • 541-921-4416 • TNKLCP@gmail.com</div>
+              </div>
+            </div>
+            <div class="meta">
+              <h1>${inv.number}</h1>
+              <div>Date: ${inv.date||''}</div>
+              <div>Due: ${inv.due||''}</div>
+              <div>Status: ${inv.status}</div>
+            </div>
+          </div>
+
+          <div><strong>Bill To:</strong> ${inv.customer_email}</div>
+
+          <table>
+            <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4" class="muted">No items</td></tr>'}</tbody>
+          </table>
+
+          <table class="totals">
+            <tbody>
+              <tr><td>Subtotal</td><td style="text-align:right;">${money(inv.subtotal||0)}</td></tr>
+              <tr><td>Tax (${(inv.tax_pct||0).toFixed(2)}%)</td><td style="text-align:right;">${money(inv.tax||0)}</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td>Total</td><td style="text-align:right;">${money(inv.total||0)}</td></tr>
+            </tfoot>
+          </table>
+        </body></html>
+      `;
+      const win = window.open('', '_blank');
+      win.document.open(); win.document.write(html); win.document.close();
+      try { win.focus(); } catch {}
+    }
+
+    function renderInvoices(){
+      invTbody.innerHTML = '';
+      const all = JSON.parse(localStorage.getItem('tnk_invoices') || '[]');
+      const email = TNK.getUser()?.email?.toLowerCase() || '';
+      const mine = all.filter(i => (i.customer_email||'').toLowerCase() === email);
+
+      if (mine.length === 0) {
+        invTbody.innerHTML = '<tr><td colspan="6">No invoices yet.</td></tr>';
+        return;
+      }
+
+      mine.sort((a,b)=> (a.date < b.date ? 1 : -1)).forEach(inv => {
+        const total = inv.total ?? (inv.amount_cents ? inv.amount_cents/100 : 0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${inv.number}</td>
+          <td>${inv.date || ''}</td>
+          <td>${inv.due || ''}</td>
+          <td>${money(total)}</td>
+          <td><span class="badge b-${inv.status}">${inv.status}</span></td>
+          <td><button class="button" data-view="${inv.id}">View</button></td>
+        `;
+        invTbody.appendChild(tr);
+      });
+    }
+
+    invTbody.addEventListener('click', (e) => {
+      const id = e.target?.dataset?.view;
+      if (!id) return;
+      const all = JSON.parse(localStorage.getItem('tnk_invoices') || '[]');
+      const inv = all.find(x => x.id === id);
+      if (inv) openInvoiceWindow(inv);
+    });
+
+    TNK.identityReady.then(renderInvoices);
+  </script>
+</body>
+</html>
