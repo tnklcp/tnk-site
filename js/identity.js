@@ -1,11 +1,10 @@
-<!-- Keep this as a standalone file at js/identity.js and include it after the Netlify widget on pages that need auth. -->
+<!-- js/identity.js -->
 <script>
 /**
  * Netlify Identity helpers for role-gated pages.
- * Usage:
+ * Include AFTER the widget script on pages that need auth:
  *   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
  *   <script src="js/identity.js"></script>
- *   await TNK.requireRole(['admin']); // or ['employee'], ['customer']
  */
 
 window.TNK = window.TNK || {};
@@ -16,7 +15,7 @@ TNK.identityReady = new Promise((resolve) => {
     netlifyIdentity.on('init', onReady);
     netlifyIdentity.on('login', () => location.reload());
     netlifyIdentity.on('logout', () => location.href = 'index.html');
-    netlifyIdentity.init(); // boot the widget
+    netlifyIdentity.init();
   } else {
     setTimeout(onReady, 50);
   }
@@ -39,7 +38,7 @@ TNK.requireRole = async function requireRole(allowed = []) {
     throw new Error('Not signed in');
   }
   if (allowed.length === 0) return user;
-  if (TNK.hasRole(user, 'admin')) return user; // admin bypass
+  if (TNK.hasRole(user, 'admin')) return user; // admins bypass
   const ok = allowed.some(r => TNK.hasRole(user, r));
   if (!ok) throw new Error('Insufficient role');
   return user;
