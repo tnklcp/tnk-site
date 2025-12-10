@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Franchise with The Neighborhood Kids Lawncare Plus</title>
+  <meta name="description" content="Interested in franchising? Tell us where you're located and a little about your background." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+</head>
+<body>
+  <div class="promo-bar">
+    <div class="container promo-inner">
+      <span>🌱 Grow With Us:</span>
+      <strong>Own your market on the Oregon Coast</strong>
+      <a href="#franchise-form" class="promo-link">Apply</a>
+    </div>
+  </div>
+
+  <header class="hero">
+    <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus logo" width="300" height="300" decoding="async"
+         style="border:0; outline:0; box-shadow:none; filter:none;" />
+    <h1>Franchise with Us</h1>
+    <p>Build a local business with hustle, heart, and hometown pride.</p>
+    <div class="cta-row">
+      <a class="button button--accent" href="index.html">← Back to Home</a>
+    </div>
+  </header>
+
+  <section class="section" id="franchise-form">
+    <div class="container" style="max-width:850px">
+      <h2>Tell Us About You & Your Market</h2>
+      <p class="lead" style="text-align:center;max-width:50rem;margin:0 auto var(--space-6);">
+        This page is public—please don’t submit sensitive info (like SSN or bank details).
+      </p>
+
+      <!-- Netlify Form: franchise -->
+      <form name="franchise" method="POST" data-netlify="true" netlify-honeypot="company" action="/thanks.html" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="form-name" value="franchise" />
+        <p hidden aria-hidden="true">
+          <label>Don’t fill this out if you’re human: <input name="company" /></label>
+        </p>
+
+        <h3>Contact</h3>
+        <label for="f_name">Full Name</label>
+        <input id="f_name" name="name" type="text" required autocomplete="name" />
+
+        <label for="f_email">Email</label>
+        <input id="f_email" name="email" type="email" required autocomplete="email" />
+
+        <label for="f_phone">Phone</label>
+        <input id="f_phone" name="phone" type="tel" required autocomplete="tel" pattern="^[0-9\\-\\+\\(\\)\\s]{7,}$" />
+
+        <h3>Location</h3>
+        <label for="f_city">City</label>
+        <input id="f_city" name="city" type="text" required />
+
+        <label for="f_state">State/Region</label>
+        <input id="f_state" name="state" type="text" required />
+
+        <label for="f_zip">ZIP/Postal Code (optional)</label>
+        <input id="f_zip" name="zip" type="text" />
+
+        <h3>Background</h3>
+        <label for="f_experience">Related Experience (brief)</label>
+        <textarea id="f_experience" name="experience" rows="4" placeholder="Any landscaping, home services, sales, or management experience?" required></textarea>
+
+        <label for="f_timeline">Timeline to Start</label>
+        <select id="f_timeline" name="timeline" required>
+          <option value="">Select one…</option>
+          <option>ASAP (0–3 months)</option>
+          <option>3–6 months</option>
+          <option>6–12 months</option>
+          <option>12+ months / just researching</option>
+        </select>
+
+        <label for="f_budget">Estimated Investment/Budget (optional)</label>
+        <input id="f_budget" name="budget" type="text" placeholder="$10k–$25k, etc." />
+
+        <label for="f_hear">How did you hear about us? (optional)</label>
+        <input id="f_hear" name="referral" type="text" placeholder="Search, friend, social, etc." />
+
+        <h3>Anything Else?</h3>
+        <label for="f_notes">Notes (optional)</label>
+        <textarea id="f_notes" name="notes" rows="5" placeholder="Tell us about your market opportunity, seasonality, or questions."></textarea>
+
+        <fieldset class="option-group" style="margin-top:1rem">
+          <legend>Preferred Contact Method</legend>
+          <div class="option-grid">
+            <label class="option"><input type="radio" name="contact_method" value="Email" required /> Email</label>
+            <label class="option"><input type="radio" name="contact_method" value="Phone" /> Phone</label>
+            <label class="option"><input type="radio" name="contact_method" value="Text" /> Text</label>
+          </div>
+        </fieldset>
+
+        <!-- (Optional) Netlify reCAPTCHA -->
+        <!-- <div data-netlify-recaptcha="true"></div> -->
+
+        <button class="button" type="submit">Submit Franchise Inquiry</button>
+        <p role="status" aria-live="polite" style="margin-top:10px;"></p>
+      </form>
+    </div>
+  </section>
+
+  <footer>
+    <p style="text-align:center">&copy; 2025 The Neighborhood Kids Lawncare Plus</p>
+  </footer>
+</body>
+</html>
+
+
