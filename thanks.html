@@ -1,18 +1,26 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Thank You | The Neighborhood Kids Lawncare Plus</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thanks! | The Neighborhood Kids Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .wrap { min-height: 70vh; display:grid; place-items:center; padding:2rem 1rem; }
+    .card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 2rem; max-width: 640px; text-align:center; }
+    .card h1 { margin:0 0 .5rem; color: var(--clr-primary-600); }
+    .card p { margin:.25rem 0; }
+  </style>
 </head>
 <body>
-  <header class="hero">
-    <h1>Thank You!</h1>
-    <p>We received your submission and will follow up shortly.</p>
-    <div class="cta-row">
-      <a class="button button--accent" href="index.html">← Back to Home</a>
+  <div class="wrap">
+    <div class="card">
+      <h1>Thanks — We Got Your Submission!</h1>
+      <p>We’ll review it and get back to you shortly.</p>
+      <p style="margin-top:1rem">
+        <a class="button button--primary" href="index.html">← Back to Home</a>
+      </p>
     </div>
-  </header>
+  </div>
 </body>
 </html>
