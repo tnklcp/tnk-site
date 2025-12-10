@@ -1,0 +1,22 @@
+# Basic config for a static site with Netlify Identity + Forms
+[build]
+  publish = "TNKLCP" # adjust if your repo root differs
+
+# Ensure pretty URLs work (optional — you use .html paths already)
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 301
+
+[[redirects]]
+  from = "/employee"
+  to = "/employee.html"
+  status = 301
+
+[[redirects]]
+  from = "/customer"
+  to = "/customer.html"
+  status = 301
+
+# Netlify Forms success redirect (already using thanks.html)
+# No extra config required; forms submit to /thanks via your form's action.
