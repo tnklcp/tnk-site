@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Portal — TNK Lawncare Plus</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .admin-wrap { max-width: 1200px; margin: 2rem auto; }
+    .muted { opacity:.8; font-size:.95rem; }
+    .admin-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
+    .tab-btn { background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
+    .tab-btn[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .admin-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; }
+    .admin-card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1.0rem; }
+    .admin-card h2, .admin-card h3 { margin:.25rem 0 .65rem; color:var(--clr-primary-600); }
+    .table-wrap { overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; }
+    th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
+    thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
+    tr:hover td { background:#fffdf7; }
+    @media (max-width: 900px){ .admin-grid { grid-template-columns: 1fr; } }
+    body.locked #admin-root { display: none; }
+    .auth-bar { display:flex; justify-content:space-between; align-items:center; gap:.75rem; margin:.5rem 0 1rem; }
+  </style>
+</head>
+<body class="locked">
+  <div class="admin-wrap container" id="admin-root" aria-hidden="true">
+    <div class="auth-bar">
+      <strong>Admin Portal</strong>
+      <div id="user-badge"></div>
+    </div>
+
+    <!-- ADMIN CONTENT START -->
+    <!-- Replace the block below with your full existing admin UI (tabs, forms, tables). 
+         Keep IDs/classes so your existing admin JS continues to work. -->
+
+    <div class="admin-tabs" role="tablist" aria-label="Admin Sections">
+      <button class="tab-btn" role="tab" aria-selected="true" data-tab="invoices">Invoices</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="accounts">Accounts</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="promos">Promotions</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="prices">Pricing</button>
+    </div>
+
+    <section class="tab-panel active" id="panel-invoices">
+      <div class="admin-card">
+        <h2>Invoices</h2>
+        <p class="muted">This is a placeholder. Paste your full invoices UI here (the version you had working with localStorage).</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-timesheets">
+      <div class="admin-card">
+        <h2>Timesheets</h2>
+        <p class="muted">Placeholder. Paste your full timesheets UI here.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-accounts">
+      <div class="admin-card">
+        <h2>Accounts</h2>
+        <p class="muted">Placeholder. Paste your full accounts UI here.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-promos">
+      <div class="admin-card">
+        <h2>Promotions</h2>
+        <p class="muted">Placeholder. Paste your promotions form here.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-prices">
+      <div class="admin-card">
+        <h2>Pricing</h2>
+        <p class="muted">Placeholder. Paste your pricing form here.</p>
+      </div>
+    </section>
+
+    <p style="text-align:center;margin-top:1.25rem;">
+      <a href="index.html" class="button">← Back to Website</a>
+    </p>
+    <!-- ADMIN CONTENT END -->
+  </div>
+
+  <div id="auth-error" class="auth-error" hidden>
+    <h2>Access Denied</h2>
+    <p>You must sign in as Admin via the <a href="login.html">Employee Portal</a>.</p>
+  </div>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="js/identity.js"></script>
+  <script>
+    (async function gate() {
+      try {
+        await TNK.requireRole(['admin']);
+        document.body.classList.remove('locked');
+        document.getElementById('admin-root').removeAttribute('aria-hidden');
+        document.getElementById('auth-error').hidden = true;
+        TNK.renderUserBadge('user-badge');
+      } catch {
+        document.body.classList.remove('locked');
+        document.getElementById('admin-root').setAttribute('aria-hidden','true');
+        document.getElementById('admin-root').style.display = 'none';
+        document.getElementById('auth-error').hidden = false;
+      }
+    })();
+
+    // Simple tabs (works with the placeholders; your original admin.js can replace this)
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panels = {
+      invoices: document.getElementById('panel-invoices'),
+      timesheets: document.getElementById('panel-timesheets'),
+      accounts: document.getElementById('panel-accounts'),
+      promos: document.getElementById('panel-promos'),
+      prices: document.getElementById('panel-prices')
+    };
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        tabs.forEach(b=>b.setAttribute('aria-selected','false'));
+        btn.setAttribute('aria-selected','true');
+        Object.values(panels).forEach(p=>p.classList.remove('active'));
+        panels[btn.dataset.tab].classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
