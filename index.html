@@ -77,7 +77,7 @@
     </div>
   </section>
 
-  <!-- About (ONLY your uploaded photos + video) -->
+  <!-- About (horizontal scrolling gallery + video) -->
   <section id="about" class="section reveal">
     <div class="container">
       <h2>About Us</h2>
@@ -86,17 +86,38 @@
         Now, we're a full-service company delivering quality home care with that same hustle and heart.
       </p>
 
-      <!-- About gallery (your files) -->
-      <div class="about-gallery reveal" style="--reveal-delay:60ms; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0;">
-        <figure class="about-item" style="margin:0;">
-          <img src="images/12.jpg" alt="Neighborhood Kids team in the field" loading="lazy" decoding="async" />
-        </figure>
-        <figure class="about-item" style="margin:0;">
-          <img src="images/1222.jpg" alt="Freshly cut lawn and edging detail" loading="lazy" decoding="async" />
-        </figure>
-        <figure class="about-item" style="margin:0;">
-          <img src="images/123.jpg" alt="Before and after yard improvement" loading="lazy" decoding="async" />
-        </figure>
+      <!-- Horizontal scrolling gallery (uses only your uploaded images) -->
+      <div
+        class="reveal"
+        style="
+          --reveal-delay:60ms;
+          margin: 18px 0 6px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scroll-snap-type: x mandatory;
+          padding-bottom: .25rem;
+        "
+        aria-label="Photo gallery"
+      >
+        <div style="display:flex; gap:12px; min-width:max-content;">
+          <figure style="margin:0; flex:0 0 auto; width:min(420px, 80vw); scroll-snap-align: start;">
+            <img src="images/12.jpg" alt="Neighborhood Kids team in the field" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:12px; box-shadow: var(--shadow-1);" />
+          </figure>
+          <figure style="margin:0; flex:0 0 auto; width:min(420px, 80vw); scroll-snap-align: start;">
+            <img src="images/1222.jpg" alt="Freshly cut lawn and edging detail" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:12px; box-shadow: var(--shadow-1);" />
+          </figure>
+          <figure style="margin:0; flex:0 0 auto; width:min(420px, 80vw); scroll-snap-align: start;">
+            <img src="images/123.jpg" alt="Before and after yard improvement" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:12px; box-shadow: var(--shadow-1);" />
+          </figure>
+          <figure style="margin:0; flex:0 0 auto; width:min(420px, 80vw); scroll-snap-align: start;">
+            <img src="images/124.jpeg" alt="Team equipment ready for service" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:12px; box-shadow: var(--shadow-1);" />
+          </figure>
+          <figure style="margin:0; flex:0 0 auto; width:min(420px, 80vw); scroll-snap-align: start;">
+            <img src="images/125.jpeg" alt="Finished lawn after maintenance" loading="lazy" decoding="async" style="width:100%; height:auto; border-radius:12px; box-shadow: var(--shadow-1);" />
+          </figure>
+        </div>
       </div>
 
       <!-- YouTube video -->
@@ -277,126 +298,6 @@
           <button class="button button--primary button--xl" type="submit">
             <span class="btn-icon" aria-hidden="true">✉️</span>
             <span>Send Referral</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <!-- Estimate / Contact -->
-  <section id="estimate" class="section reveal">
-    <div class="container">
-      <h2>Request a Free Estimate</h2>
-      <form name="estimate" netlify netlify-honeypot="company" action="/thanks.html" method="POST" enctype="multipart/form-data" aria-labelledby="estimate" novalidate>
-        <input type="hidden" name="form-name" value="estimate" />
-        <p class="visually-hidden">
-          <label>Company <input name="company" /></label>
-        </p>
-
-        <!-- Contact -->
-        <div class="form-grid form-grid--2">
-          <div class="field">
-            <label for="name">Your Name</label>
-            <input id="name" type="text" name="name" autocomplete="name" required />
-          </div>
-          <div class="field">
-            <label for="email">Your Email</label>
-            <input id="email" type="email" name="email" autocomplete="email" required />
-          </div>
-          <div class="field">
-            <label for="phone">Your Phone Number</label>
-            <input id="phone" type="tel" name="phone" autocomplete="tel" required pattern="^[0-9\\-\\+\\(\\)\\s]{7,}$" />
-          </div>
-          <div class="field">
-            <label for="address">Your Address</label>
-            <input id="address" type="text" name="address" autocomplete="street-address" required />
-          </div>
-        </div>
-
-        <!-- Prior Experience -->
-        <fieldset class="option-group slim">
-          <legend>Have You Worked With a Landscaping Business Before?</legend>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Yes</span><input type="radio" name="worked_before" value="Yes" required /></label>
-            <label class="option-btn"><span>No</span><input type="radio" name="worked_before" value="No" /></label>
-          </div>
-        </fieldset>
-
-        <!-- Essential -->
-        <details open class="details-card">
-          <summary>Essential Care</summary>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Lawn Mowing (Alternating Patterns)</span><input type="checkbox" name="services" value="Lawn Mowing (Alternating Patterns)" /></label>
-            <label class="option-btn"><span>String Trimming (Edges, Trees, Beds)</span><input type="checkbox" name="services" value="String Trimming (Edges, Trees, Beds)" /></label>
-            <label class="option-btn"><span>Blowing Off Sidewalks, Driveways, Patios</span><input type="checkbox" name="services" value="Blowing Off Sidewalks, Driveways, Patios" /></label>
-            <label class="option-btn"><span>Turf Inspection (Bare Spots, Pests, Water Issues)</span><input type="checkbox" name="services" value="Turf Inspection (Bare Spots, Pests, Water Issues)" /></label>
-          </div>
-        </details>
-
-        <!-- Standard -->
-        <details class="details-card">
-          <summary>Standard Care (Includes Essential +)</summary>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" name="services" value="Shrub & Plant Pruning" /></label>
-            <label class="option-btn"><span>Collect &amp; Bag Debris (Leaves, Branches, Trimmings)</span><input type="checkbox" name="services" value="Collect & Bag Debris (Leaves, Branches, Trimmings)" /></label>
-            <label class="option-btn"><span>Inspect Shrubs/Plants for Disease or Stress</span><input type="checkbox" name="services" value="Inspect Shrubs/Plants for Disease or Stress" /></label>
-            <label class="option-btn"><span>Hand-Pull Weeds From Walkways</span><input type="checkbox" name="services" value="Hand-Pull Weeds From Walkways" /></label>
-          </div>
-        </details>
-
-        <!-- Premium -->
-        <details class="details-card">
-          <summary>Premium Care (Includes Standard +)</summary>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" name="services" value="Hand-Weeding Garden Beds" /></label>
-            <label class="option-btn"><span>Hand-Pull Weeds From Lawn Areas</span><input type="checkbox" name="services" value="Hand-Pull Weeds From Lawn Areas" /></label>
-            <label class="option-btn"><span>Check/Insulate Hose Spigots (Seasonal)</span><input type="checkbox" name="services" value="Check/Insulate Hose Spigots (Seasonal)" /></label>
-            <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" name="services" value="Remove Cobwebs (Entryways/Structures)" /></label>
-            <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" name="services" value="Fertilize Lawn/Gardens (Log Product/Date)" /></label>
-            <label class="option-btn"><span>Inspect Mulch &amp; Soil Condition</span><input type="checkbox" name="services" value="Inspect Mulch & Soil Condition" /></label>
-          </div>
-        </details>
-
-        <!-- Storm Prevention -->
-        <details class="details-card">
-          <summary>Storm Damage Prevention Service</summary>
-          <div class="sublegend">Scheduling Options</div>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>1x Per Month</span><input type="checkbox" name="storm_schedule" value="1x per month" /></label>
-            <label class="option-btn"><span>2x Per Month</span><input type="checkbox" name="storm_schedule" value="2x per month" /></label>
-            <label class="option-btn"><span>Custom: Pre-Storm Only</span><input type="checkbox" name="storm_schedule" value="Custom: Pre-Storm Only" /></label>
-            <label class="option-btn"><span>Custom: Post-Storm Only</span><input type="checkbox" name="storm_schedule" value="Custom: Post-Storm Only" /></label>
-            <label class="option-btn"><span>Custom: Both Pre- &amp; Post-Storm</span><input type="checkbox" name="storm_schedule" value="Custom: Both Pre- & Post-Storm" /></label>
-            <label class="option-btn"><span>Custom: Seasonal (Fall – Spring)</span><input type="checkbox" name="storm_schedule" value="Custom: Seasonal (Fall – Spring)" /></label>
-          </div>
-
-          <div class="sublegend">Regular Checks</div>
-          <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Inspect Gutters and Drains for Clogs</span><input type="checkbox" name="storm_checks" value="Inspect gutters and drains for clogs" /></label>
-            <label class="option-btn"><span>Assess/Remove Hazardous Branches (Light Trimming)</span><input type="checkbox" name="storm_checks" value="Assess/remove hazardous branches near the house (light trimming)" /></label>
-            <label class="option-btn"><span>Identify/Address Other Potential Hazards</span><input type="checkbox" name="storm_checks" value="Identify/address other potential storm hazards" /></label>
-          </div>
-        </details>
-
-        <!-- Notes & Photos -->
-        <div class="form-grid form-grid--2">
-          <div class="field">
-            <label for="description">What Else Would You Like Done?</label>
-            <textarea id="description" name="description" rows="3" required></textarea>
-          </div>
-          <div class="field">
-            <label for="images">Attach Photos (Optional)</label>
-            <input id="images" type="file" name="images" multiple accept="image/*" />
-            <small class="help-text">Up to 8 images, 5MB each.</small>
-          </div>
-        </div>
-
-        <!-- Submit -->
-        <div class="form-actions">
-          <p id="form-status" role="status" aria-live="polite"></p>
-          <button class="button button--primary button--xl" type="submit">
-            <span class="btn-icon" aria-hidden="true">📩</span>
-            <span>Send Request</span>
           </button>
         </div>
       </form>
