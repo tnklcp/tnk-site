@@ -5,47 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Customer Login | Neighborhood Kids Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    .auth-wrap { min-height: 100dvh; display:grid; place-items:center; background:var(--clr-bg); padding:2rem 1rem; }
-    .auth-card { width: min(100%, 560px); background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 1.5rem; }
-    .auth-brand { display:grid; place-items:center; gap:.5rem; margin-bottom:.5rem; text-align:center; }
-    .auth-brand img { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; border: 4px solid color-mix(in srgb, var(--clr-accent) 25%, white); box-shadow: var(--shadow-1); }
-  </style>
 </head>
 <body>
-  <div class="auth-wrap">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <img src="images/IMG_2713.png" alt="" />
-        <h1>Customer Portal</h1>
-        <p class="muted">View invoices and account details.</p>
-      </div>
-
-      <div id="user-badge"></div>
-
-      <div class="widget-slot" style="text-align:center;margin:.75rem 0 1rem;">
-        <button class="button button--primary button--xl" id="open-login">Log In / Sign Up</button>
-      </div>
-
-      <p class="muted"><a class="link" href="index.html">← Back to Home</a></p>
+  <header class="hero">
+    <h1>Customer Portal</h1>
+    <p>View invoices and account details.</p>
+    <div class="cta-row">
+      <a class="button" href="index.html">← Back to Home</a>
+      <a class="button button--accent" href="customer-signup.html">Create Account</a>
     </div>
-  </div>
+  </header>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="js/identity.js"></script>
+  <section class="section">
+    <div class="container" style="max-width:520px">
+      <form id="login-form" novalidate>
+        <label for="l_user">Email</label>
+        <input id="l_user" name="username" type="email" required autocomplete="username" />
+
+        <label for="l_pass">Password</label>
+        <input id="l_pass" type="password" name="password" required autocomplete="current-password" />
+
+        <div class="form-actions">
+          <p id="login-status" role="status" aria-live="polite"></p>
+          <button class="button button--primary button--xl" type="submit">
+            <span class="btn-icon" aria-hidden="true">🔑</span>
+            <span>Sign In</span>
+          </button>
+        </div>
+      </form>
+
+      <p class="muted" style="text-align:center;margin-top:1rem;">
+        Forgot your password? <a id="forgot" href="#">Reset it</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Netlify Identity (GoTrue) -->
+  <script src="https://cdn.jsdelivr.net/npm/gotrue-js@2.3.0/dist/gotrue.min.js"></script>
   <script>
-    TNK.renderUserBadge('user-badge');
-
-    document.getElementById('open-login').addEventListener('click', () => {
-      netlifyIdentity.open('login');
+    const auth = new GoTrue({
+      APIUrl: window.location.origin + '/.netlify/identity',
+      setCookie: true
     });
 
-    netlifyIdentity.on('login', (user) => {
-      const roles = user?.app_metadata?.roles || [];
-      if (roles.includes('customer') || roles.includes('admin')) {
-        location.replace('customer.html');
-      } else {
-        alert('Your account isn’t marked as a customer yet. We’ll grant access shortly.');
+    const form = document.getElementById('login-form');
+    const statusEl = document.getElementById('login-status');
+    const forgotLink = document.getElementById('forgot');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = 'Signing in...';
+      const email = document.getElementById('l_user').value.trim();
+      const password = document.getElementById('l_pass').value;
+
+      try {
+        const user = await auth.login(email, password, true);
+        if (user) {
+          // Store email for your existing UI if needed
+          sessionStorage.setItem('tnk_user_email', email);
+          window.location.replace('customer.html');
+        }
+      } catch (err) {
+        statusEl.textContent = (err && err.message) ? err.message : 'Invalid credentials.';
+      }
+    });
+
+    forgotLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = prompt('Enter your account email to reset password:');
+      if (!email) return;
+      try {
+        await auth.requestPasswordRecovery(email.trim());
+        alert('Check your email for a password reset link.');
+      } catch (err) {
+        alert((err && err.message) ? err.message : 'Unable to send reset email.');
       }
     });
   </script>
