@@ -19,7 +19,7 @@
     <h1>My Invoices</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <span id="user-badge"></span>
+      <button class="button" id="logout">Log Out</button>
     </div>
   </header>
 
@@ -35,21 +35,76 @@
     </div>
   </section>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="js/identity.js"></script>
+  <!-- Netlify Identity (GoTrue) -->
+  <script src="https://cdn.jsdelivr.net/npm/gotrue-js@2.3.0/dist/gotrue.min.js"></script>
   <script>
-    (async function gate() {
-      try {
-        await TNK.requireRole(['customer']); // customers or admins
-        TNK.renderUserBadge('user-badge');
-      } catch {
-        location.replace('login-customer.html');
-      }
-    })();
+    const auth = new GoTrue({
+      APIUrl: window.location.origin + '/.netlify/identity',
+      setCookie: true
+    });
 
-    const invTbody = document.querySelector('#inv-table tbody');
+    const logoutBtn = document.getElementById('logout');
+    const tbody = document.querySelector('#inv-table tbody');
+    const statusEl = document.getElementById('inv-status');
+
+    async function guard() {
+      const user = await auth.currentUser();
+      if (!user) {
+        window.location.replace('login-customer.html');
+        return null;
+      }
+      return user;
+    }
+
+    logoutBtn.addEventListener('click', async () => {
+      const u = await auth.currentUser();
+      if (u) await u.logout();
+      window.location.replace('login-customer.html');
+    });
 
     function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+
+    // Demo data loader (replace with real API later)
+    function loadInvoicesFor(email) {
+      // For now, use any localStorage invoices your admin UI created previously.
+      try {
+        const list = JSON.parse(localStorage.getItem('tnk_invoices')) || [];
+        return list.filter(i => (i.customer_email||'').toLowerCase() === String(email||'').toLowerCase());
+      } catch { return []; }
+    }
+
+    function renderInvoices(email) {
+      const mine = loadInvoicesFor(email);
+      tbody.innerHTML = '';
+      if (mine.length === 0) {
+        statusEl.textContent = 'No invoices yet.';
+        return;
+      }
+      statusEl.textContent = '';
+      mine
+        .sort((a,b)=> (a.date < b.date ? 1 : -1))
+        .forEach(inv => {
+          const tr = document.createElement('tr');
+          const total = inv.total ?? (inv.amount_cents ? inv.amount_cents/100 : 0);
+          tr.innerHTML = `
+            <td>${inv.number}</td>
+            <td>${inv.date || ''}</td>
+            <td>${inv.due || ''}</td>
+            <td>${money(total)}</td>
+            <td><span class="badge b-${inv.status}">${inv.status}</span></td>
+            <td><button class="button" data-view="${inv.id}">View</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+      tbody.addEventListener('click', (e) => {
+        const id = e.target?.dataset?.view;
+        if (!id) return;
+        const all = loadInvoicesFor(email);
+        const inv = all.find(x => x.id === id);
+        if (inv) openInvoiceWindow(inv);
+      });
+    }
 
     function openInvoiceWindow(inv){
       const styles = `
@@ -65,12 +120,18 @@
           th, td { border-bottom:1px solid #e8e1d6; padding:8px; text-align:left; }
           tfoot td { border-top:2px solid #cfc7b6; font-weight:700; }
           .totals { max-width:360px; margin-left:auto; }
+          .actions { margin-top: 18px; }
+          button { padding:.5rem .9rem; border-radius:8px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; }
         </style>
       `;
-      const rows = (inv.items||[]).map(it=>`
-        <tr><td>${it.desc||''}</td><td>${it.qty||0}</td><td>${money(it.unit||0)}</td><td>${money((it.qty||0)*(it.unit||0))}</td></tr>
+      const itemsRows = (inv.items||[]).map(it=>`
+        <tr>
+          <td>${it.desc||''}</td>
+          <td>${it.qty||0}</td>
+          <td>${money(it.unit||0)}</td>
+          <td>${money((it.qty||0)*(it.unit||0))}</td>
+        </tr>
       `).join('');
-
       const html = `
         <!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>${styles}</head>
         <body>
@@ -89,14 +150,11 @@
               <div>Status: ${inv.status}</div>
             </div>
           </div>
-
           <div><strong>Bill To:</strong> ${inv.customer_email}</div>
-
           <table>
             <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="4" class="muted">No items</td></tr>'}</tbody>
+            <tbody>${itemsRows || '<tr><td colspan="4" class="muted">No items</td></tr>'}</tbody>
           </table>
-
           <table class="totals">
             <tbody>
               <tr><td>Subtotal</td><td style="text-align:right;">${money(inv.subtotal||0)}</td></tr>
@@ -106,48 +164,20 @@
               <tr><td>Total</td><td style="text-align:right;">${money(inv.total||0)}</td></tr>
             </tfoot>
           </table>
-        </body></html>
-      `;
+          ${inv.notes ? `<p class="muted">Notes: ${inv.notes}</p>` : ''}
+          <div class="actions"><button onclick="window.print()">Print / Save PDF</button></div>
+        </body></html>`;
       const win = window.open('', '_blank');
       win.document.open(); win.document.write(html); win.document.close();
       try { win.focus(); } catch {}
     }
 
-    function renderInvoices(){
-      invTbody.innerHTML = '';
-      const all = JSON.parse(localStorage.getItem('tnk_invoices') || '[]');
-      const email = TNK.getUser()?.email?.toLowerCase() || '';
-      const mine = all.filter(i => (i.customer_email||'').toLowerCase() === email);
-
-      if (mine.length === 0) {
-        invTbody.innerHTML = '<tr><td colspan="6">No invoices yet.</td></tr>';
-        return;
-      }
-
-      mine.sort((a,b)=> (a.date < b.date ? 1 : -1)).forEach(inv => {
-        const total = inv.total ?? (inv.amount_cents ? inv.amount_cents/100 : 0);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${inv.number}</td>
-          <td>${inv.date || ''}</td>
-          <td>${inv.due || ''}</td>
-          <td>${money(total)}</td>
-          <td><span class="badge b-${inv.status}">${inv.status}</span></td>
-          <td><button class="button" data-view="${inv.id}">View</button></td>
-        `;
-        invTbody.appendChild(tr);
-      });
-    }
-
-    invTbody.addEventListener('click', (e) => {
-      const id = e.target?.dataset?.view;
-      if (!id) return;
-      const all = JSON.parse(localStorage.getItem('tnk_invoices') || '[]');
-      const inv = all.find(x => x.id === id);
-      if (inv) openInvoiceWindow(inv);
-    });
-
-    TNK.identityReady.then(renderInvoices);
+    (async function init() {
+      const user = await guard();
+      if (!user) return;
+      const email = (user.email || '').toLowerCase();
+      renderInvoices(email);
+    })();
   </script>
 </body>
 </html>
