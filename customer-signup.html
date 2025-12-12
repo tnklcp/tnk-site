@@ -18,22 +18,7 @@
 
   <section class="section">
     <div class="container" style="max-width:720px">
-      <!-- Netlify Forms capture; we'll import into your system later -->
-      <form
-        name="customer-signup"
-        netlify
-        netlify-honeypot="company"
-        action="/thanks.html"
-        method="POST"
-        class="form"
-        autocomplete="on"
-        novalidate
-      >
-        <input type="hidden" name="form-name" value="customer-signup" />
-        <p class="visually-hidden">
-          <label>Company <input name="company" /></label>
-        </p>
-
+      <form id="signup-form" class="form" novalidate autocomplete="on">
         <div class="form-grid form-grid--2">
           <div>
             <label for="cs_name">Full Name</label>
@@ -45,23 +30,29 @@
           </div>
           <div>
             <label for="cs_phone">Phone</label>
-            <input id="cs_phone" name="phone" type="tel" required autocomplete="tel" pattern="^[0-9\\-\\+\\(\\)\\s]{7,}$" />
+            <input id="cs_phone" name="phone" type="tel" required autocomplete="tel"
+                   pattern="^[0-9\\-\\+\\(\\)\\s]{7,}$" />
             <small class="help-text">Digits only; parentheses and dashes allowed.</small>
           </div>
           <div>
             <label for="cs_address">Service Address</label>
             <input id="cs_address" name="address" type="text" required autocomplete="street-address" />
           </div>
+          <div>
+            <label for="cs_password">Password</label>
+            <input id="cs_password" name="password" type="password" required autocomplete="new-password" />
+          </div>
+          <div>
+            <label for="cs_password2">Confirm Password</label>
+            <input id="cs_password2" name="password2" type="password" required autocomplete="new-password" />
+          </div>
         </div>
 
-        <!-- Optional note to you -->
         <label for="cs_notes">Anything Else? (Optional)</label>
         <textarea id="cs_notes" name="notes" rows="3" placeholder="Gate code, preferred day, pets on property, etc."></textarea>
 
         <div class="form-actions">
-          <p class="muted" role="status" aria-live="polite">
-            We’ll review and activate your account. You’ll receive an email with next steps.
-          </p>
+          <p id="status" class="muted" role="status" aria-live="polite"></p>
           <button class="button button--primary button--xl" type="submit">
             <span class="btn-icon" aria-hidden="true">📝</span>
             <span>Create Account</span>
@@ -74,5 +65,60 @@
       </p>
     </div>
   </section>
+
+  <!-- Netlify Identity (GoTrue) -->
+  <script src="https://cdn.jsdelivr.net/npm/gotrue-js@2.3.0/dist/gotrue.min.js"></script>
+  <script>
+    const auth = new GoTrue({
+      APIUrl: window.location.origin + '/.netlify/identity',
+      setCookie: true
+    });
+
+    const form = document.getElementById('signup-form');
+    const statusEl = document.getElementById('status');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+
+      const name = document.getElementById('cs_name').value.trim();
+      const email = document.getElementById('cs_email').value.trim();
+      const phone = document.getElementById('cs_phone').value.trim();
+      const address = document.getElementById('cs_address').value.trim();
+      const notes = document.getElementById('cs_notes').value.trim();
+      const password = document.getElementById('cs_password').value;
+      const password2 = document.getElementById('cs_password2').value;
+
+      if (!name || !email || !phone || !address || !password || !password2) {
+        statusEl.textContent = 'Please fill out all required fields.';
+        return;
+      }
+      if (password !== password2) {
+        statusEl.textContent = 'Passwords do not match.';
+        return;
+      }
+
+      try {
+        statusEl.textContent = 'Creating your account...';
+        const user = await auth.signup(email, password, {
+          data: { full_name: name, phone, address, notes }
+        });
+
+        // If email confirmation is enabled, user.confirmation_sent_at will be set.
+        if (user && user.confirmation_sent_at) {
+          statusEl.textContent = 'Success! Check your email to confirm your account.';
+          form.reset();
+          return;
+        }
+
+        // If confirmation is OFF, log in immediately, then go to portal.
+        const logged = await auth.login(email, password, true);
+        if (logged) window.location.replace('customer.html');
+      } catch (err) {
+        const msg = (err && err.message) ? err.message : 'Signup failed.';
+        statusEl.textContent = msg;
+      }
+    });
+  </script>
 </body>
 </html>
