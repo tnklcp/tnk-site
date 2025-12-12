@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Employee Account | Neighborhood Kids Lawncare Plus</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Create Employee Account</h1>
+    <p>Submit your info so we can activate access to the Employee Portal.</p>
+    <div class="cta-row">
+      <a class="button" href="login.html">← Back to Employee Login</a>
+      <a class="button" href="index.html">Home</a>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="container" style="max-width:720px">
+      <!-- Netlify Forms capture -->
+      <form
+        name="employee-signup"
+        netlify
+        netlify-honeypot="company"
+        action="/thanks.html"
+        method="POST"
+        class="form"
+        autocomplete="on"
+        novalidate
+      >
+        <input type="hidden" name="form-name" value="employee-signup" />
+        <p class="visually-hidden">
+          <label>Company <input name="company" /></label>
+        </p>
+
+        <div class="form-grid form-grid--2">
+          <div>
+            <label for="es_name">Full Name</label>
+            <input id="es_name" name="name" type="text" required autocomplete="name" />
+          </div>
+          <div>
+            <label for="es_email">Email</label>
+            <input id="es_email" name="email" type="email" required autocomplete="email" />
+          </div>
+          <div>
+            <label for="es_phone">Phone</label>
+            <input id="es_phone" name="phone" type="tel" required autocomplete="tel" pattern="^[0-9\\-\\+\\(\\)\\s]{7,}$" />
+            <small class="help-text">Digits only; parentheses and dashes allowed.</small>
+          </div>
+          <div>
+            <label for="es_role">Position (Optional)</label>
+            <input id="es_role" name="position" type="text" placeholder="Lawncare Specialist, Crew Lead, etc." />
+          </div>
+        </div>
+
+        <label for="es_notes">Notes (Optional)</label>
+        <textarea id="es_notes" name="notes" rows="3" placeholder="Availability, previous experience, preferred route, etc."></textarea>
+
+        <div class="form-actions">
+          <p class="muted" role="status" aria-live="polite">
+            HR will review and activate your account. You’ll receive an email with next steps.
+          </p>
+          <button class="button button--primary button--xl" type="submit">
+            <span class="btn-icon" aria-hidden="true">📝</span>
+            <span>Submit</span>
+          </button>
+        </div>
+      </form>
+
+      <p class="muted" style="text-align:center;margin-top:1rem;">
+        Already approved? <a href="login.html">Sign in here</a>.
+      </p>
+    </div>
+  </section>
+</body>
+</html>
