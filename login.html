@@ -3,49 +3,104 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Employee / Admin Login — TNK Lawncare Plus</title>
+  <title>Employee Portal — Login</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .auth-wrap { min-height: 100dvh; display: grid; place-items: center; background: var(--clr-bg); padding: 2rem 1rem; }
-    .auth-card { width: min(100%, 560px); background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 1.5rem; }
-    .auth-brand { display:grid; place-items:center; gap:.5rem; margin-bottom:.5rem; text-align:center; }
+    .auth-wrap {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(1200px 400px at 50% -10%, rgba(231,125,4,.12), transparent 60%),
+        var(--clr-bg);
+      padding: 2rem 1rem;
+    }
+    .auth-card {
+      width: min(100%, 560px);
+      background: var(--clr-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-2);
+      padding: 1.5rem 1.25rem;
+    }
+    .auth-brand {
+      display: grid; place-items: center;
+      margin-bottom: .75rem;
+      gap: .5rem;
+      text-align: center;
+    }
     .auth-brand img { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; border: 4px solid color-mix(in srgb, var(--clr-accent) 25%, white); box-shadow: var(--shadow-1); }
-    .muted { opacity:.85; text-align:center; }
-    .widget-slot { margin: 1rem 0; text-align:center; }
+    .auth-title { margin: 0; color: var(--clr-primary-600); }
+    .muted { opacity: .85; font-size: .95rem; margin: 0 0 .5rem; text-align: center; }
+    .auth-actions { display:flex; justify-content: space-between; align-items:center; gap: .75rem; flex-wrap: wrap; }
+    .link { color: var(--clr-primary-600); text-decoration: underline; font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="auth-wrap">
     <div class="auth-card">
       <div class="auth-brand">
-        <img src="images/IMG_2713.png" alt="">
-        <h1 class="auth-title">Employee / Admin Login</h1>
-        <p class="muted">Sign in with the email you were invited with. Admins are routed to the Admin Portal.</p>
+        <img src="images/IMG_2713.png" alt="" />
+        <h1 class="auth-title">Employee Portal</h1>
+        <p class="muted">Admins: sign in with your admin email + password (or the master admin password).</p>
+        <div class="cta-row">
+          <a class="button" href="index.html">← Back to Site</a>
+          <a class="button button--accent" href="employee-signup.html">Create Employee Account</a>
+        </div>
       </div>
 
-      <div id="user-badge"></div>
+      <form id="employee-login-form" action="#" method="POST" novalidate>
+        <label for="e_email">Email</label>
+        <input id="e_email" name="email" type="email" required autocomplete="username" />
 
-      <div class="widget-slot">
-        <button class="button button--primary button--xl" id="open-login">Log In / Sign Up</button>
-      </div>
+        <label for="e_password">Password</label>
+        <input id="e_password" name="password" type="password" required autocomplete="current-password" />
 
-      <p class="muted"><a class="link" href="index.html">← Back to Site</a></p>
+        <div class="form-actions">
+          <p id="emp-status" role="status" aria-live="polite"></p>
+          <button class="button button--primary button--xl" type="submit">
+            <span class="btn-icon" aria-hidden="true">🔐</span>
+            <span>Log In</span>
+          </button>
+        </div>
+
+        <div class="auth-actions" style="margin-top:.5rem;">
+          <a class="link" href="index.html">← Back to Site</a>
+          <span class="muted">Need help? Email <a class="link" href="mailto:TNKLCP@gmail.com">TNKLCP@gmail.com</a></span>
+        </div>
+      </form>
     </div>
   </div>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="js/identity.js"></script>
   <script>
-    TNK.renderUserBadge('user-badge');
+    // ===== TEMP DEMO AUTH (front-end only) =====
+    // Admin options: specific email+password pairs, or master password.
+    const ADMIN_USERS = [
+      { email: 'admin@tnklcp.local', password: 'changeme' }
+    ];
+    const ADMIN_MASTER_PASS = 'letmein';
 
-    document.getElementById('open-login').addEventListener('click', () => {
-      netlifyIdentity.open('login');
-    });
+    const toEmail = (s) => String(s || '').trim().toLowerCase();
+    const isAdminPair = (email, password) =>
+      ADMIN_USERS.some(u => toEmail(u.email) === toEmail(email) && u.password === password);
+    const isAdminByMaster = (password) => password && password === ADMIN_MASTER_PASS;
 
-    netlifyIdentity.on('login', (user) => {
-      const roles = user?.app_metadata?.roles || [];
-      if (roles.includes('admin')) location.replace('admin.html');
-      else location.replace('employee.html');
+    const form = document.getElementById('employee-login-form');
+    const statusEl = document.getElementById('emp-status');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+      const email = document.getElementById('e_email').value.trim();
+      const password = document.getElementById('e_password').value;
+
+      if (!email || !password) {
+        statusEl.textContent = 'Please enter Email and Password.';
+        return;
+      }
+      const admin = isAdminPair(email, password) || isAdminByMaster(password);
+      sessionStorage.setItem('tnk_user_email', email);
+      sessionStorage.setItem('tnk_role', admin ? 'admin' : 'employee');
+      window.location.replace(admin ? 'admin.html' : 'employee.html');
     });
   </script>
 </body>
