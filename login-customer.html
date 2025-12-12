@@ -34,53 +34,66 @@
         </div>
       </form>
 
+      <div class="cta-row" style="justify-content:center;margin-top:1rem;">
+        <button id="btn-widget" class="button">Use Identity Widget</button>
+        <a id="btn-forgot" class="button" href="#">Forgot Password</a>
+      </div>
+
       <p class="muted" style="text-align:center;margin-top:1rem;">
-        Forgot your password? <a id="forgot" href="#">Reset it</a>
+        If login fails, try the widget (it opens Netlify’s built-in panel). Make sure you confirmed your email.
       </p>
     </div>
   </section>
 
-  <!-- Netlify Identity (GoTrue) -->
+  <!-- GoTrue + Identity helper + optional widget -->
   <script src="https://cdn.jsdelivr.net/npm/gotrue-js@2.3.0/dist/gotrue.min.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="js/identity.js"></script>
   <script>
-    const auth = new GoTrue({
-      APIUrl: window.location.origin + '/.netlify/identity',
-      setCookie: true
-    });
-
-    const form = document.getElementById('login-form');
     const statusEl = document.getElementById('login-status');
-    const forgotLink = document.getElementById('forgot');
+    const form = document.getElementById('login-form');
+    const btnWidget = document.getElementById('btn-widget');
+    const btnForgot = document.getElementById('btn-forgot');
 
+    // Form login
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       statusEl.textContent = 'Signing in...';
       const email = document.getElementById('l_user').value.trim();
       const password = document.getElementById('l_pass').value;
-
-      try {
-        const user = await auth.login(email, password, true);
-        if (user) {
-          // Store email for your existing UI if needed
-          sessionStorage.setItem('tnk_user_email', email);
-          window.location.replace('customer.html');
-        }
-      } catch (err) {
-        statusEl.textContent = (err && err.message) ? err.message : 'Invalid credentials.';
+      const res = await TNKIdentity.login(email, password);
+      if (res.ok) {
+        sessionStorage.setItem('tnk_user_email', email);
+        window.location.replace('customer.html');
+      } else {
+        statusEl.textContent = res.error || 'Login failed.';
       }
     });
 
-    forgotLink.addEventListener('click', async (e) => {
+    // Netlify Identity widget fallback (useful to verify setup)
+    btnWidget.addEventListener('click', () => {
+      if (window.netlifyIdentity) {
+        netlifyIdentity.on('login', (user) => {
+          try { sessionStorage.setItem('tnk_user_email', user?.email || ''); } catch {}
+          window.location.replace('customer.html');
+        });
+        netlifyIdentity.open('login');
+      } else {
+        alert('Identity widget not available.');
+      }
+    });
+
+    // Password reset
+    btnForgot.addEventListener('click', async (e) => {
       e.preventDefault();
       const email = prompt('Enter your account email to reset password:');
       if (!email) return;
-      try {
-        await auth.requestPasswordRecovery(email.trim());
-        alert('Check your email for a password reset link.');
-      } catch (err) {
-        alert((err && err.message) ? err.message : 'Unable to send reset email.');
-      }
+      const res = await TNKIdentity.requestPasswordRecovery(email.trim());
+      alert(res.ok ? 'Check your email for a reset link.' : (res.error || 'Unable to send reset email.'));
     });
+
+    // Helpful console breadcrumbs
+    console.log('[Identity] API URL:', TNKIdentity.GoTrueURL);
   </script>
 </body>
 </html>
