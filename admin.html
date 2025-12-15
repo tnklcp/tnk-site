@@ -6,7 +6,18 @@
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .loading { opacity:.85; text-align:center; margin-top:.5rem; }
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
+    .tab { padding:.5rem .8rem; border-radius:999px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
+    .tab[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
+    .grid { display:grid; gap:1rem; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .table { width:100%; border-collapse:collapse; }
+    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
+    .tag { display:inline-block; background:#eef6ee; color:#1e3b1e; padding:.15rem .45rem; border-radius:999px; font-size:.8rem; }
+    @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -19,92 +30,519 @@
   </header>
 
   <section class="section">
-    <div class="container" style="max-width:1000px">
-      <p id="who" class="loading">Checking access…</p>
-      <div id="content" style="display:none">
-        <div class="admin-grid" style="display:grid;grid-template-columns:1fr;gap:1rem;">
-          <div class="admin-card">
-            <h2>Welcome</h2>
-            <p>You are signed in with the <strong>admin</strong> role.</p>
+    <div class="container">
+      <p id="who" style="opacity:.9;margin-top:0;">Checking access…</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="jobs">Jobs</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="accounts">Accounts</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="timeoff">Time Off</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="promos">Specials</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
+      </div>
+
+      <!-- JOBS -->
+      <div class="panel active" id="panel-jobs">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Create / Edit Job</h3>
+            <form id="job-form">
+              <input type="hidden" id="job_id" />
+              <label>Customer Email</label>
+              <input id="j_cust_email" type="email" list="custs" required />
+              <datalist id="custs"></datalist>
+
+              <label>Customer Name</label>
+              <input id="j_cust_name" />
+
+              <label>Address</label>
+              <input id="j_address" />
+
+              <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;">
+                <div><label>Date</label><input id="j_date" type="date" required /></div>
+                <div><label>Start Time</label><input id="j_time" type="time" /></div>
+              </div>
+
+              <label>Title</label>
+              <input id="j_title" placeholder="Mow/Trim + Bed Weeding" />
+
+              <label>Assign To (Employee Email)</label>
+              <input id="j_assign" type="email" list="emps" />
+              <datalist id="emps"></datalist>
+
+              <label>Services</label>
+              <input id="j_services" placeholder="comma separated, e.g. Mowing, Edging, Debris" />
+
+              <div class="inline" style="margin-top:.6rem;">
+                <button class="button button--primary" type="submit" id="job_save">Save Job</button>
+                <button class="button" type="button" id="job_reset">Reset</button>
+                <p id="job_status" role="status" style="margin:0 0 0 .5rem;"></p>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>All Jobs</h3>
+            <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+              <label>Filter</label>
+              <select id="f_job_status">
+                <option value="all">All</option>
+                <option>assigned</option>
+                <option>in_progress</option>
+                <option>pending_review</option>
+                <option>completed</option>
+              </select>
+              <label>From</label><input id="f_from" type="date" />
+              <label>To</label><input id="f_to" type="date" />
+              <button id="f_clear" class="button">Clear</button>
+            </div>
+            <table class="table" id="jobs-table">
+              <thead><tr><th>Date/Time</th><th>Customer</th><th>Work</th><th>Status</th><th>Photos</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
       </div>
+
+      <!-- INVOICES (simple create + list) -->
+      <div class="panel" id="panel-invoices">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Create Invoice</h3>
+            <form id="inv-form">
+              <input type="hidden" id="inv_id" />
+              <label>Customer Email</label>
+              <input id="i_email" type="email" list="custs" required />
+              <label>Invoice #</label>
+              <input id="i_num" placeholder="INV-1001" />
+              <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;">
+                <div><label>Date</label><input id="i_date" type="date" required /></div>
+                <div><label>Due</label><input id="i_due" type="date" /></div>
+                <div><label>Status</label>
+                  <select id="i_status"><option>unpaid</option><option>paid</option></select>
+                </div>
+              </div>
+              <label>Items (JSON)</label>
+              <textarea id="i_items" rows="4" placeholder='[{"desc":"Mowing","qty":1,"unit":35}]'></textarea>
+              <label>Notes</label>
+              <input id="i_notes" />
+              <div class="inline" style="margin-top:.6rem;">
+                <button class="button button--primary" type="submit">Save</button>
+                <p id="i_status_msg" role="status" style="margin:0 0 0 .5rem;"></p>
+              </div>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Invoices</h3>
+            <table class="table" id="inv-table">
+              <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCOUNTS (very light; use Identity for auth) -->
+      <div class="panel" id="panel-accounts">
+        <div class="card">
+          <h3>Accounts (Local)</h3>
+          <p>Lightweight list used only for linking jobs/invoices to names. Identity manages real auth/roles.</p>
+          <form id="acc-form" class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;">
+            <input id="a_name" placeholder="Full Name" />
+            <input id="a_email" type="email" placeholder="Email" />
+            <input id="a_role" placeholder="Role (customer/employee)" />
+            <input id="a_addr" placeholder="Address (optional)" />
+            <button class="button button--primary" type="submit">Add/Update</button>
+          </form>
+          <table class="table" id="acc-table" style="margin-top:.75rem;">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Address</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TIME OFF -->
+      <div class="panel" id="panel-timeoff">
+        <div class="card">
+          <h3>Time Off Requests</h3>
+          <table class="table" id="to-table">
+            <thead><tr><th>Employee</th><th>Dates</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SPECIALS -->
+      <div class="panel" id="panel-promos">
+        <div class="card">
+          <h3>Website Specials</h3>
+          <form id="promo-form">
+            <div class="grid" style="grid-template-columns:1fr 150px;gap:.5rem;">
+              <input id="p_title" placeholder="Title" />
+              <select id="p_active"><option value="true">Active</option><option value="false">Inactive</option></select>
+            </div>
+            <input id="p_sub" placeholder="Subtitle" style="margin-top:.5rem;" />
+            <div class="inline" style="margin-top:.6rem;">
+              <button class="button button--primary" type="submit">Save</button>
+              <p id="p_msg" role="status" style="margin:0 0 0 .5rem;"></p>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- TIMESHEETS (approve) -->
+      <div class="panel" id="panel-timesheets">
+        <div class="card">
+          <h3>Timesheets</h3>
+          <table class="table" id="ts-table">
+            <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </section>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
+    // store + keys
+    const store = {
+      get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
+      set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+    };
+    const K = {
+      accounts: 'tnk_accounts',
+      jobs:     'tnk_jobs',
+      invoices: 'tnk_invoices',
+      promos:   'tnk_promotions',
+      times:    'tnk_timesheets',
+      timeoff:  'tnk_timeoff',
+    };
+    function money(n){ return `$${Number(n||0).toFixed(2)}`; }
+
+    // Auth
     const who = document.getElementById('who');
-    const content = document.getElementById('content');
-
-    function isAdmin(user){
-      const roles = (user && user.app_metadata && Array.isArray(user.app_metadata.roles))
-        ? user.app_metadata.roles
-        : [];
-      return roles.includes('admin');
-    }
-
+    document.getElementById('logout').addEventListener('click', ()=> netlifyIdentity.logout());
+    netlifyIdentity.on('logout', ()=> location.replace('login.html'));
     function waitIdentity(){
-      return new Promise((resolve) => {
-        const cur = window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+      return new Promise((resolve)=>{
+        const cur = netlifyIdentity.currentUser && netlifyIdentity.currentUser();
         if (cur) return resolve(cur);
         netlifyIdentity.on('init', resolve);
         netlifyIdentity.init();
       });
     }
+    function isAdmin(u){ return (u?.app_metadata?.roles||[]).includes('admin'); }
 
-    document.getElementById('logout').addEventListener('click', () => {
-      netlifyIdentity.logout();
+    // Tabs
+    const tabBtns=[...document.querySelectorAll('.tab')];
+    const panels={
+      jobs: document.getElementById('panel-jobs'),
+      invoices: document.getElementById('panel-invoices'),
+      accounts: document.getElementById('panel-accounts'),
+      timeoff: document.getElementById('panel-timeoff'),
+      promos: document.getElementById('panel-promos'),
+      timesheets: document.getElementById('panel-timesheets'),
+    };
+    tabBtns.forEach(b=>b.addEventListener('click', ()=>{
+      tabBtns.forEach(t=>t.setAttribute('aria-selected','false'));
+      b.setAttribute('aria-selected','true');
+      Object.values(panels).forEach(p=>p.classList.remove('active'));
+      panels[b.dataset.tab].classList.add('active');
+    }));
+
+    // ===== Accounts (for names/emails/address linking)
+    const accForm = document.getElementById('acc-form');
+    const accBody = document.querySelector('#acc-table tbody');
+    function renderAccounts(){
+      const list = store.get(K.accounts, []);
+      accBody.innerHTML = list.map(a=>`
+        <tr data-email="${a.email}">
+          <td>${a.name||''}</td><td>${a.email||''}</td><td>${a.role||''}</td><td>${a.address||''}</td>
+          <td><button class="button" data-del="${a.email}">Delete</button></td>
+        </tr>`).join('') || '<tr><td colspan="5" style="opacity:.8;">No accounts</td></tr>';
+      // fill datalists
+      const custs = list.filter(a=>a.role==='customer').map(a=>a.email).sort();
+      const emps = list.filter(a=>a.role==='employee').map(a=>a.email).sort();
+      document.getElementById('custs').innerHTML = custs.map(e=>`<option value="${e}">`).join('');
+      document.getElementById('emps').innerHTML = emps.map(e=>`<option value="${e}">`).join('');
+    }
+    accForm.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const name = document.getElementById('a_name').value.trim();
+      const email = document.getElementById('a_email').value.trim().toLowerCase();
+      if(!email) return;
+      const role = document.getElementById('a_role').value.trim();
+      const address = document.getElementById('a_addr').value.trim();
+      const list = store.get(K.accounts, []);
+      const idx = list.findIndex(a=>a.email===email);
+      const item = { name, email, role, address };
+      if(idx>=0) list[idx]=item; else list.push(item);
+      store.set(K.accounts, list);
+      accForm.reset(); renderAccounts();
+    });
+    accBody.addEventListener('click', (e)=>{
+      const del = e.target?.dataset?.del;
+      if(!del) return;
+      if(confirm('Delete this account link?')){
+        const list = store.get(K.accounts, []).filter(a=>a.email!==del);
+        store.set(K.accounts, list); renderAccounts();
+      }
     });
 
-    netlifyIdentity.on('logout', () => {
-      location.replace('login.html');
+    // ===== Jobs
+    const jobForm = document.getElementById('job-form');
+    const jobStatus = document.getElementById('job_status');
+    const jobsBody = document.querySelector('#jobs-table tbody');
+    const jId = document.getElementById('job_id');
+
+    function renderJobs(){
+      const list = store.get(K.jobs, []);
+      const st = document.getElementById('f_job_status').value;
+      const from = document.getElementById('f_from').value;
+      const to = document.getElementById('f_to').value;
+      const rows = list
+        .filter(j => st==='all' ? true : (j.status||'assigned')===st)
+        .filter(j => (!from || j.date>=from) && (!to || j.date<=to))
+        .sort((a,b)=> (a.date<b.date?-1:1));
+      jobsBody.innerHTML = rows.map(j=>`
+        <tr data-id="${j.id}">
+          <td>${j.date||''} ${j.time||''}</td>
+          <td>${j.customer_name||''}<br/><small>${j.customer_email||''}</small></td>
+          <td>${j.title||''}<br/>${(j.services||[]).map(s=>`<span class="tag">${s}</span>`).join(' ')}</td>
+          <td>${j.status||'assigned'}</td>
+          <td>${(j.photos||[]).slice(0,3).map(()=>`📷`).join(' ')}</td>
+          <td>
+            <button class="button" data-edit="${j.id}">Edit</button>
+            ${j.status==='pending_review' ? `<button class="button button--primary" data-approve="${j.id}">Approve & Complete</button>` : ''}
+            ${j.status!=='completed' ? `<button class="button" data-cancel="${j.id}">Cancel</button>` : ''}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="opacity:.8;">No jobs</td></tr>';
+    }
+    document.getElementById('f_clear').addEventListener('click', ()=>{
+      document.getElementById('f_job_status').value='all';
+      document.getElementById('f_from').value='';
+      document.getElementById('f_to').value='';
+      renderJobs();
     });
 
-    waitIdentity().then((user) => {
-      if (!user) {
-        location.replace('login.html');
-        return;
-      }
-      if (!isAdmin(user)) {
-        location.replace('login.html');
-        return;
-      }
-      who.textContent = `Signed in as ${user.email} (admin)`;
-      content.style.display = 'block';
+    jobForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const id = jId.value || crypto.randomUUID();
+      const data = {
+        id,
+        customer_email: document.getElementById('j_cust_email').value.trim().toLowerCase(),
+        customer_name: document.getElementById('j_cust_name').value.trim(),
+        address: document.getElementById('j_address').value.trim(),
+        date: document.getElementById('j_date').value,
+        time: document.getElementById('j_time').value,
+        title: document.getElementById('j_title').value.trim(),
+        assigned_to: document.getElementById('j_assign').value.trim().toLowerCase(),
+        services: document.getElementById('j_services').value.split(',').map(s=>s.trim()).filter(Boolean),
+        status: jId.value ? store.get(K.jobs, []).find(x=>x.id===jId.value)?.status || 'assigned' : 'assigned',
+        photos: jId.value ? store.get(K.jobs, []).find(x=>x.id===jId.value)?.photos||[] : [],
+        employee_notes: jId.value ? store.get(K.jobs, []).find(x=>x.id===jId.value)?.employee_notes||'' : ''
+      };
+      const list = store.get(K.jobs, []);
+      const idx = list.findIndex(x=>x.id===id);
+      if(idx>=0) list[idx]=data; else list.push(data);
+      store.set(K.jobs, list);
+      jobStatus.textContent='Saved.'; jId.value=''; jobForm.reset(); renderJobs();
     });
-  </script>
-</body>
-</html>
 
-
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script>
-    const who = document.getElementById('who');
-
-    function requireAdmin(user) {
-      const roles = (user && user.app_metadata && user.app_metadata.roles) || [];
-      if (!user || !roles.includes('admin')) {
-        // not admin → go to employee login
-        window.location.replace('login.html');
-        return false;
+    jobsBody.addEventListener('click', (e)=>{
+      const id = e.target?.dataset?.edit || e.target?.dataset?.approve || e.target?.dataset?.cancel;
+      if(!id) return;
+      const list = store.get(K.jobs, []);
+      const j = list.find(x=>x.id===id);
+      if(e.target.dataset.edit){
+        jId.value = j.id;
+        document.getElementById('j_cust_email').value = j.customer_email||'';
+        document.getElementById('j_cust_name').value = j.customer_name||'';
+        document.getElementById('j_address').value = j.address||'';
+        document.getElementById('j_date').value = j.date||'';
+        document.getElementById('j_time').value = j.time||'';
+        document.getElementById('j_title').value = j.title||'';
+        document.getElementById('j_assign').value = j.assigned_to||'';
+        document.getElementById('j_services').value = (j.services||[]).join(', ');
+        window.scrollTo({ top: jobForm.parentElement.offsetTop - 12, behavior: 'smooth' });
       }
-      return true;
+      if(e.target.dataset.approve){
+        j.status = 'completed';
+        // (optional) create a quick invoice if none exists
+        autoInvoiceIfMissing(j);
+        store.set(K.jobs, list);
+        renderJobs();
+      }
+      if(e.target.dataset.cancel){
+        if(confirm('Cancel this job?')){
+          const remain = list.filter(x=>x.id!==id);
+          store.set(K.jobs, remain);
+          renderJobs();
+        }
+      }
+    });
+
+    function autoInvoiceIfMissing(job){
+      const invs = store.get(K.invoices, []);
+      const existing = invs.find(i => i.job_id === job.id);
+      if(existing) return;
+      const total = 35 + Math.max(0, (job.services||[]).length-1) * 10;
+      invs.push({
+        id: crypto.randomUUID(),
+        job_id: job.id,
+        customer_email: job.customer_email,
+        number: 'INV-' + (Math.floor(Math.random()*9000)+1000),
+        date: job.date,
+        due: job.date,
+        status: 'unpaid',
+        items: [{ desc: job.title || 'Service', qty:1, unit: total }],
+        subtotal: total, tax: 0, total
+      });
+      store.set(K.invoices, invs);
     }
 
-    netlifyIdentity.on('init', user => {
-      if (requireAdmin(user)) {
-        who.textContent = `Signed in as ${user.email} (admin)`;
+    // ===== Invoices (simple)
+    const invForm = document.getElementById('inv-form');
+    const invBody = document.querySelector('#inv-table tbody');
+    const invMsg = document.getElementById('i_status_msg');
+
+    function renderInvoices(){
+      const list = store.get(K.invoices, []).sort((a,b)=> (a.date<b.date?1:-1));
+      invBody.innerHTML = list.map(i=>{
+        const total = i.total ?? (Array.isArray(i.items)? i.items.reduce((s,x)=>s+(x.qty||0)*(x.unit||0),0) : 0);
+        return `<tr data-id="${i.id}">
+          <td>${i.number}</td><td>${i.customer_email}</td><td>${i.date||''}</td><td>${i.due||''}</td>
+          <td>${money(total)}</td><td>${i.status||'unpaid'}</td>
+          <td>
+            <button class="button" data-paid="${i.id}">${i.status==='paid'?'Mark Unpaid':'Mark Paid'}</button>
+            <button class="button" data-del="${i.id}">Delete</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7" style="opacity:.8;">No invoices</td></tr>';
+    }
+
+    invForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      let items=[];
+      try{ items = JSON.parse(document.getElementById('i_items').value||'[]'); }catch{}
+      const subtotal = items.reduce((s,i)=> s + (i.qty||0)*(i.unit||0), 0);
+      const data = {
+        id: crypto.randomUUID(),
+        customer_email: document.getElementById('i_email').value.trim().toLowerCase(),
+        number: document.getElementById('i_num').value.trim() || `INV-${Math.floor(Math.random()*9000)+1000}`,
+        date: document.getElementById('i_date').value,
+        due: document.getElementById('i_due').value,
+        status: document.getElementById('i_status').value,
+        items,
+        subtotal, tax:0, total: subtotal,
+        notes: document.getElementById('i_notes').value.trim()
+      };
+      const list = store.get(K.invoices, []);
+      list.push(data); store.set(K.invoices, list);
+      invMsg.textContent = 'Saved.'; invForm.reset(); renderInvoices();
+    });
+
+    invBody.addEventListener('click',(e)=>{
+      const paid = e.target?.dataset?.paid;
+      const del = e.target?.dataset?.del;
+      if(!paid && !del) return;
+      const list = store.get(K.invoices, []);
+      const i = list.find(x=>x.id===paid || x.id===del);
+      if(paid){
+        i.status = (i.status==='paid'?'unpaid':'paid');
+        store.set(K.invoices, list); renderInvoices();
+      } else if(del){
+        if(confirm('Delete invoice?')){
+          store.set(K.invoices, list.filter(x=>x.id!==i.id)); renderInvoices();
+        }
       }
     });
-    netlifyIdentity.init();
 
-    document.getElementById('logout').addEventListener('click', () => {
-      netlifyIdentity.logout();
+    // ===== Specials (promos)
+    const promoForm = document.getElementById('promo-form');
+    const pMsg = document.getElementById('p_msg');
+    promoForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      store.set(K.promos, {
+        title: document.getElementById('p_title').value.trim(),
+        subtitle: document.getElementById('p_sub').value.trim(),
+        active: document.getElementById('p_active').value==='true'
+      });
+      pMsg.textContent = 'Saved.';
+    });
+    (function loadPromos(){
+      const p = store.get(K.promos, null);
+      if(!p) return;
+      document.getElementById('p_title').value = p.title||'';
+      document.getElementById('p_sub').value = p.subtitle||'';
+      document.getElementById('p_active').value = p.active?'true':'false';
+    })();
+
+    // ===== Timesheets (approve)
+    const tsBody = document.querySelector('#ts-table tbody');
+    function hoursDiff(a,b){
+      if(!a||!b) return 0;
+      const [ah,am]=a.split(':').map(Number); const [bh,bm]=b.split(':').map(Number);
+      return Math.max(0, Math.round(((bh+bm/60)-(ah+am/60))*100)/100);
+    }
+    function renderTimes(){
+      const list = store.get(K.times, []).sort((a,b)=> (a.date<b.date?1:-1));
+      tsBody.innerHTML = list.map(t=>`
+        <tr data-id="${t.id}">
+          <td>${t.date}</td><td>${t.employee_email}</td><td>${t.start}</td><td>${t.end}</td>
+          <td>${hoursDiff(t.start,t.end).toFixed(2)}</td>
+          <td>${t.status||'pending'}</td>
+          <td>
+            <button class="button" data-approve="${t.id}">Approve</button>
+            <button class="button" data-reject="${t.id}">Reject</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" style="opacity:.8;">No entries</td></tr>';
+    }
+    tsBody.addEventListener('click',(e)=>{
+      const id = e.target?.dataset?.approve || e.target?.dataset?.reject;
+      if(!id) return;
+      const list = store.get(K.times, []);
+      const t = list.find(x=>x.id===id);
+      t.status = e.target.dataset.approve ? 'approved' : 'rejected';
+      store.set(K.times, list); renderTimes();
     });
 
-    netlifyIdentity.on('logout', () => {
-      window.location.replace('login.html');
+    // ===== Time off review
+    const toBody = document.querySelector('#to-table tbody');
+    function renderTO(){
+      const list = store.get(K.timeoff, []).sort((a,b)=> (a.start<b.start?1:-1));
+      toBody.innerHTML = list.map(r=>`
+        <tr data-id="${r.id}">
+          <td>${r.employee_email}</td>
+          <td>${r.start} → ${r.end}</td>
+          <td>${r.reason}</td>
+          <td>${r.status}</td>
+          <td>
+            <button class="button" data-approve="${r.id}">Approve</button>
+            <button class="button" data-reject="${r.id}">Reject</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="opacity:.8;">No requests</td></tr>';
+    }
+    toBody.addEventListener('click',(e)=>{
+      const id = e.target?.dataset?.approve || e.target?.dataset?.reject;
+      if(!id) return;
+      const list = store.get(K.timeoff, []);
+      const r = list.find(x=>x.id===id);
+      r.status = e.target.dataset.approve ? 'approved' : 'rejected';
+      store.set(K.timeoff, list); renderTO();
+    });
+
+    // ===== Boot
+    waitIdentity().then(user=>{
+      if(!user || !isAdmin(user)) return location.replace('login.html');
+      who.textContent = `Signed in as ${user.email} (admin)`;
+      renderAccounts(); renderJobs(); renderInvoices(); renderTimes(); renderTO();
     });
   </script>
 </body>
