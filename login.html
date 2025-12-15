@@ -6,9 +6,28 @@
   <title>Employee Portal — Login</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .auth-wrap { min-height: 100dvh; display: grid; place-items: center; background: radial-gradient(1200px 400px at 50% -10%, rgba(231,125,4,.12), transparent 60%), var(--clr-bg); padding: 2rem 1rem; }
-    .auth-card { width: min(100%, 560px); background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 1.5rem 1.25rem; }
-    .auth-brand { display: grid; place-items: center; margin-bottom: .75rem; gap: .5rem; text-align: center; }
+    .auth-wrap {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(1200px 400px at 50% -10%, rgba(231,125,4,.12), transparent 60%),
+        var(--clr-bg);
+      padding: 2rem 1rem;
+    }
+    .auth-card {
+      width: min(100%, 560px);
+      background: var(--clr-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-2);
+      padding: 1.5rem 1.25rem;
+    }
+    .auth-brand {
+      display: grid; place-items: center;
+      margin-bottom: .75rem;
+      gap: .5rem;
+      text-align: center;
+    }
     .auth-brand img { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; border: 4px solid color-mix(in srgb, var(--clr-accent) 25%, white); box-shadow: var(--shadow-1); }
     .auth-title { margin: 0; color: var(--clr-primary-600); }
     .muted { opacity: .85; font-size: .95rem; margin: 0 0 .5rem; text-align: center; }
@@ -49,12 +68,62 @@
   </div>
 
   <script>
-    // ===== TEMP CONFIG (front-end only; replace with real auth later) =====
+    /* ===== Single redirect controller (prevents ping-pong) ===== */
+    function redirectOnce(url) {
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
+      if (now - last < 1500) return;            // ignore if a redirect just happened (<1.5s)
+      sessionStorage.setItem('tnk_redirect_lock', String(now));
+      window.location.replace(url);
+    }
+
+    // ===== CONFIG (TEMP — FRONT-END ONLY) =====
     const ADMIN_USERS = [{ email: 'admin@tnklcp.local', password: 'changeme' }];
     const ADMIN_MASTER_PASS = 'letmein';
 
-    function toEmail(s){ return String(s||'').trim().toLowerCase(); }
-    function isAdminPair(email, pass){ return ADMIN_USERS.some(u => toEmail(u.email)===toEmail(email) && u.password===pass); }
-    function isAdminByMaster(pass){ return !!pass && pass === ADMIN_MASTER_PASS; }
+    // ===== Helpers =====
+    const toEmail = s => String(s || '').trim().toLowerCase();
+    const isAdminPair = (email, pwd) => ADMIN_USERS.some(u => toEmail(u.email) === toEmail(email) && u.password === pwd);
+    const isAdminByMaster = pwd => !!pwd && pwd === ADMIN_MASTER_PASS;
 
-    // ===== Login handler (no auto-redirect on load) =====
+    // If already logged in, send away from login page safely
+    (function autoBounceIfLoggedIn() {
+      const role = sessionStorage.getItem('tnk_role');
+      if (role === 'admin') return redirectOnce('admin.html');
+      if (role === 'employee') return redirectOnce('employee.html');
+    })();
+
+    // ===== Login Handler =====
+    const form = document.getElementById('employee-login-form');
+    const statusEl = document.getElementById('emp-status');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+
+      const email = document.getElementById('e_email').value.trim();
+      const password = document.getElementById('e_password').value;
+
+      if (!email || !password) {
+        statusEl.textContent = 'Please enter Email and Password.';
+        return;
+      }
+
+      const isAdmin = isAdminPair(email, password) || isAdminByMaster(password);
+
+      // Write session once
+      sessionStorage.setItem('tnk_user_email', email);
+      sessionStorage.setItem('tnk_role', isAdmin ? 'admin' : 'employee');
+
+      // Single controlled redirect
+      redirectOnce(isAdmin ? 'admin.html' : 'employee.html');
+    });
+
+    // Neutralize any external identity widget's auto-redirects (if present).
+    if (window.netlifyIdentity) {
+      netlifyIdentity.off && netlifyIdentity.off('login');
+      netlifyIdentity.on('login', () => { /* no-op; we control redirects */ });
+    }
+  </script>
+</body>
+</html>
