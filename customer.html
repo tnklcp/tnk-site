@@ -6,16 +6,25 @@
   <title>Customer Portal | TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
+    /* Tabbed layout + cards to match Admin */
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
+    .tab { padding:.5rem .8rem; border-radius:999px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
+    .tab[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
     .grid { display:grid; gap:1rem; }
     .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
     .table { width:100%; border-collapse: collapse; }
-    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; }
+    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
     .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
     .b-unpaid { background:#fff3cd; color:#9a6a00; }
     .b-paid { background:#d1f7c4; color:#195d00; }
-    .thumbs { display:flex; flex-wrap:wrap; gap:.5rem; }
-    .thumbs img { width:88px; height:66px; object-fit:cover; border-radius:8px; box-shadow:var(--shadow-1); }
+    .option-grid { display:grid; gap:.6rem; }
+    .option-grid--2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .option-btn { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:.6rem; padding:.55rem .7rem; border:1.5px solid #d8d3c8; border-radius:999px; background:#fff; }
+    .option-btn input { width:20px; height:20px; accent-color: var(--clr-primary); }
+    .muted { opacity:.85; }
     @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -30,107 +39,201 @@
 
   <section class="section">
     <div class="container">
-      <p id="hello" style="opacity:.9;margin-top:0;">Checking session…</p>
+      <p id="hello" class="muted" style="margin-top:0;">Checking session…</p>
 
-      <div class="grid grid-2">
-        <!-- Account Balance -->
-        <div class="card">
-          <h3>Account Balance</h3>
-          <p>Use this wallet to pay ahead for upcoming services.</p>
-          <p><strong>Balance: <span id="balance">$0.00</span></strong></p>
-          <form id="balance-form" class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-            <label>Add Funds ($)</label>
-            <input id="bal_amount" type="number" min="0" step="1" style="max-width:140px" required />
-            <button class="button button--primary" type="submit">Add</button>
-          </form>
-          <p id="bal_status" role="status" style="margin-top:.35rem;opacity:.9;"></p>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="preferences">Service Preferences</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="extras">Request Extra Service</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="history">Service History & Feedback</button>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="panel active" id="panel-overview">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Account Balance</h3>
+            <p>Pay ahead for upcoming services.</p>
+            <p><strong>Balance: <span id="balance">$0.00</span></strong></p>
+            <form id="balance-form" class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+              <label>Add Funds ($)</label>
+              <input id="bal_amount" type="number" min="0" step="1" style="max-width:140px" required />
+              <button class="button button--primary" type="submit">Add</button>
+            </form>
+            <p id="bal_status" role="status" class="muted" style="margin-top:.35rem;"></p>
+          </div>
+
+          <div class="card">
+            <h3>Summary</h3>
+            <div id="summary">
+              <p class="muted">We’ll show a quick snapshot of your current tier, add-ons, and next scheduled job (if any).</p>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- Service Preferences -->
+      <!-- PREFERENCES -->
+      <div class="panel" id="panel-preferences">
         <div class="card">
           <h3>My Service Preferences</h3>
           <form id="prefs-form">
-            <label><strong>Tier</strong></label>
+            <label><strong>Service Tier</strong></label>
             <select id="pref_tier" required>
               <option value="">Select…</option>
-              <option>Essential</option>
-              <option>Standard</option>
-              <option>Premium</option>
+              <option value="Essential">Essential</option>
+              <option value="Standard">Standard</option>
+              <option value="Premium">Premium</option>
             </select>
+            <p class="muted" style="margin:.35rem 0 .5rem;">
+              Selecting a higher tier automatically includes all services from lower tiers.
+            </p>
 
-            <label style="margin-top:.5rem;"><strong>Add-Ons</strong></label>
-            <div class="option-grid option-grid--2">
-              <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" value="Pruning" /></label>
-              <label class="option-btn"><span>Collect &amp; Bag Debris</span><input type="checkbox" value="Debris" /></label>
-              <label class="option-btn"><span>Hand-Weeding Beds</span><input type="checkbox" value="Bed Weeding" /></label>
-              <label class="option-btn"><span>Fertilization</span><input type="checkbox" value="Fertilization" /></label>
-            </div>
+            <details class="card" style="padding:.75rem;">
+              <summary style="cursor:pointer;font-weight:700;">Essential Care</summary>
+              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
+                <label class="option-btn"><span>Lawn Mowing (Alternating Patterns)</span><input type="checkbox" data-tier="Essential" value="Lawn Mowing (Alternating Patterns)"></label>
+                <label class="option-btn"><span>String Trimming (Edges)</span><input type="checkbox" data-tier="Essential" value="String Trimming (Edges)"></label>
+                <label class="option-btn"><span>Blowing Off Sidewalks/Driveways/Patios</span><input type="checkbox" data-tier="Essential" value="Blowing Off Sidewalks/Driveways/Patios"></label>
+                <label class="option-btn"><span>Turf Inspection (Bare Spots, Pests, Water Issues)</span><input type="checkbox" data-tier="Essential" value="Turf Inspection (Bare Spots, Pests, Water Issues)"></label>
+              </div>
+            </details>
+
+            <details class="card" style="padding:.75rem; margin-top:.75rem;">
+              <summary style="cursor:pointer;font-weight:700;">Standard Care (Includes Essential +)</summary>
+              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
+                <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" data-tier="Standard" value="Shrub & Plant Pruning"></label>
+                <label class="option-btn"><span>Collect &amp; Bag Debris (Leaves, Branches, Trimmings)</span><input type="checkbox" data-tier="Standard" value="Collect & Bag Debris (Leaves, Branches, Trimmings)"></label>
+                <label class="option-btn"><span>Inspect Shrubs/Plants for Disease or Stress</span><input type="checkbox" data-tier="Standard" value="Inspect Shrubs/Plants for Disease or Stress"></label>
+                <label class="option-btn"><span>Hand-Pull Weeds From Walkways</span><input type="checkbox" data-tier="Standard" value="Hand-Pull Weeds From Walkways"></label>
+              </div>
+            </details>
+
+            <details class="card" style="padding:.75rem; margin-top:.75rem;">
+              <summary style="cursor:pointer;font-weight:700;">Premium Care (Includes Standard +)</summary>
+              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
+                <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" data-tier="Premium" value="Hand-Weeding Garden Beds"></label>
+                <label class="option-btn"><span>Hand-Pull Weeds From Lawn Areas</span><input type="checkbox" data-tier="Premium" value="Hand-Pull Weeds From Lawn Areas"></label>
+                <label class="option-btn"><span>Check/Insulate Hose Spigots (Seasonal)</span><input type="checkbox" data-tier="Premium" value="Check/Insulate Hose Spigots (Seasonal)"></label>
+                <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" data-tier="Premium" value="Remove Cobwebs (Entryways/Structures)"></label>
+                <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" data-tier="Premium" value="Fertilize Lawn/Gardens (Log Product/Date)"></label>
+                <label class="option-btn"><span>Inspect Mulch Condition</span><input type="checkbox" data-tier="Premium" value="Inspect Mulch Condition"></label>
+              </div>
+            </details>
+
+            <details class="card" style="padding:.75rem; margin-top:.75rem;">
+              <summary style="cursor:pointer;font-weight:700;">Storm Damage Prevention Service</summary>
+              <div style="margin-top:.5rem;">
+                <div class="muted" style="margin-bottom:.35rem;">Scheduling Options</div>
+                <div class="option-grid option-grid--2">
+                  <label class="option-btn"><span>1x Per Month</span><input type="checkbox" data-tier="Storm" value="1x per month"></label>
+                  <label class="option-btn"><span>2x Per Month</span><input type="checkbox" data-tier="Storm" value="2x per month"></label>
+                  <label class="option-btn"><span>Custom: Pre-Storm Only</span><input type="checkbox" data-tier="Storm" value="Custom: Pre-Storm Only"></label>
+                  <label class="option-btn"><span>Custom: Post-Storm Only</span><input type="checkbox" data-tier="Storm" value="Custom: Post-Storm Only"></label>
+                  <label class="option-btn"><span>Custom: Both Pre- &amp; Post-Storm</span><input type="checkbox" data-tier="Storm" value="Custom: Both Pre- & Post-Storm"></label>
+                  <label class="option-btn"><span>Custom: Seasonal (Fall – Spring)</span><input type="checkbox" data-tier="Storm" value="Custom: Seasonal (Fall – Spring)"></label>
+                </div>
+
+                <div class="muted" style="margin:.6rem 0 .35rem;">Regular Checks</div>
+                <div class="option-grid option-grid--2">
+                  <label class="option-btn"><span>Inspect Gutters & Drains for Clogs</span><input type="checkbox" data-tier="Storm" value="Inspect gutters and drains for clogs"></label>
+                  <label class="option-btn"><span>Assess/Remove Hazardous Branches (Light Trimming)</span><input type="checkbox" data-tier="Storm" value="Assess/remove hazardous branches near the house (light trimming)"></label>
+                  <label class="option-btn"><span>Identify/Address Other Potential Storm Hazards</span><input type="checkbox" data-tier="Storm" value="Identify/address other potential storm hazards"></label>
+                </div>
+              </div>
+            </details>
 
             <div class="inline" style="margin-top:.75rem;">
               <button class="button button--primary" type="submit">Save Preferences</button>
-              <p id="pref_status" role="status" style="margin:0 0 0 .5rem;"></p>
+              <p id="pref_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
             </div>
           </form>
         </div>
+      </div>
 
-        <!-- Invoices -->
-        <div class="card" style="grid-column: 1 / -1;">
+      <!-- INVOICES -->
+      <div class="panel" id="panel-invoices">
+        <div class="card">
           <h3>My Invoices</h3>
           <table class="table" id="inv-table">
             <thead><tr><th>#</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
             <tbody></tbody>
           </table>
-          <p id="inv_status" role="status" style="margin-top:.35rem;"></p>
+          <p id="inv_status" role="status" class="muted" style="margin-top:.35rem;"></p>
         </div>
+      </div>
 
-        <!-- Request Extra Service -->
+      <!-- EXTRAS -->
+      <div class="panel" id="panel-extras">
         <div class="card">
           <h3>Request Additional Service</h3>
           <form id="extra-form">
             <label for="x_service">Service</label>
-            <input id="x_service" required placeholder="e.g., One-time Cleanup" />
-            <label for="x_date">Preferred Date</label>
-            <input id="x_date" type="date" />
-            <label for="x_notes">Notes</label>
+            <input id="x_service" required placeholder="e.g., One-Time Cleanup" />
+            <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
+              <div><label for="x_date">Preferred Date</label><input id="x_date" type="date" /></div>
+              <div><label for="x_window">Time Window (optional)</label><input id="x_window" placeholder="Morning / Afternoon" /></div>
+            </div>
+            <label for="x_notes" style="margin-top:.5rem;">Notes</label>
             <textarea id="x_notes" rows="3" placeholder="Access, pets, gate code, etc."></textarea>
             <div class="inline" style="margin-top:.6rem;">
               <button class="button button--primary" type="submit">Send Request</button>
-              <p id="extra_status" role="status" style="margin:0 0 0 .5rem;"></p>
-            </div>
-          </form>
-        </div>
-
-        <!-- Service History + Leave Feedback -->
-        <div class="card">
-          <h3>Service History</h3>
-          <div id="history"><p style="opacity:.8">No completed services yet.</p></div>
-          <hr style="margin:1rem 0;border:none;border-top:1px solid #e6dfcc;" />
-          <h4>Leave Feedback</h4>
-          <form id="fb-form">
-            <label for="fb_job">Job</label>
-            <select id="fb_job" required></select>
-            <label for="fb_text">Your Comment</label>
-            <textarea id="fb_text" rows="3" required placeholder="How did we do?"></textarea>
-            <div class="inline" style="margin-top:.6rem;">
-              <button class="button" type="submit">Submit Feedback</button>
-              <p id="fb_status" role="status" style="margin:0 0 0 .5rem;"></p>
+              <p id="extra_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
             </div>
           </form>
         </div>
       </div>
+
+      <!-- HISTORY + FEEDBACK -->
+      <div class="panel" id="panel-history">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Service History</h3>
+            <div id="history"><p class="muted">No completed services yet.</p></div>
+          </div>
+          <div class="card">
+            <h3>Leave Feedback</h3>
+            <form id="fb-form">
+              <label for="fb_job">Job</label>
+              <select id="fb_job" required></select>
+              <label for="fb_text" style="margin-top:.5rem;">Your Comment</label>
+              <textarea id="fb_text" rows="3" required placeholder="How did we do?"></textarea>
+              <div class="inline" style="margin-top:.6rem;">
+                <button class="button" type="submit">Submit Feedback</button>
+                <p id="fb_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
 
   <!-- Netlify Identity -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    // === tiny store helpers
-    const store = {
-      get(k, f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
-      set(k, v){ localStorage.setItem(k, JSON.stringify(v)); },
+    // ====== Tabs
+    const tabBtns=[...document.querySelectorAll('.tab')];
+    const panels={
+      overview: document.getElementById('panel-overview'),
+      preferences: document.getElementById('panel-preferences'),
+      invoices: document.getElementById('panel-invoices'),
+      extras: document.getElementById('panel-extras'),
+      history: document.getElementById('panel-history'),
     };
+    tabBtns.forEach(b=>b.addEventListener('click', ()=>{
+      tabBtns.forEach(t=>t.setAttribute('aria-selected','false'));
+      b.setAttribute('aria-selected','true');
+      Object.values(panels).forEach(p=>p.classList.remove('active'));
+      panels[b.dataset.tab].classList.add('active');
+    }));
 
-    // keys
+    // ====== store + keys
+    const store = {
+      get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
+      set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+    };
     const K = {
       invoices: 'tnk_invoices',
       balances: 'tnk_balances',
@@ -142,9 +245,9 @@
 
     const hello = document.getElementById('hello');
     const balanceEl = document.getElementById('balance');
-
     function money(n){ return `$${Number(n||0).toFixed(2)}`; }
 
+    // Netlify Identity boot
     function waitIdentity(){
       return new Promise((resolve)=>{
         const cur = netlifyIdentity.currentUser && netlifyIdentity.currentUser();
@@ -153,19 +256,26 @@
         netlifyIdentity.init();
       });
     }
-
     function userEmail(u){ return (u?.email || '').toLowerCase(); }
 
-    function loadBalance(email){
-      const all = store.get(K.balances, {});
-      return Number(all[email] || 0);
-    }
-    function saveBalance(email, amt){
-      const all = store.get(K.balances, {});
-      all[email] = Number(amt||0);
-      store.set(K.balances, all);
+    // Overview summary
+    function renderSummary(email){
+      const prefs = store.get(K.prefs, {})[email] || {};
+      const jobs = store.get(K.jobs, []).filter(j => (j.customer_email||'').toLowerCase()===email);
+      const next = jobs.filter(j => (j.status!=='completed')).sort((a,b)=> (a.date<b.date? -1:1))[0];
+      const wrap = document.getElementById('summary');
+      wrap.innerHTML = `
+        <div><strong>Tier:</strong> ${prefs.tier || '—'}</div>
+        <div><strong>Add-Ons:</strong> ${(prefs.addons||[]).join(', ') || '—'}</div>
+        <div style="margin-top:.35rem;"><strong>Next Visit:</strong> ${ next ? `${next.date||''} ${next.time||''} — ${next.title||'Service'}` : '—' }</div>
+      `;
     }
 
+    // Balance helpers
+    function loadBalance(email){ const all = store.get(K.balances, {}); return Number(all[email]||0); }
+    function saveBalance(email, amt){ const all = store.get(K.balances, {}); all[email]=Number(amt||0); store.set(K.balances, all); }
+
+    // Invoices
     function renderInvoices(email){
       const tbody = document.querySelector('#inv-table tbody');
       const status = document.getElementById('inv_status');
@@ -174,14 +284,14 @@
                       .sort((a,b)=> (a.date<b.date?1:-1));
       tbody.innerHTML = '';
       if(rows.length===0){ status.textContent = 'No invoices yet.'; return; }
-      status.textContent = '';
+      status.textContent='';
       rows.forEach(i=>{
-        const total = i.total ?? (i.amount_cents ? i.amount_cents/100 : 0);
+        const total = i.total ?? (Array.isArray(i.items)? i.items.reduce((s,x)=>s+(x.qty||0)*(x.unit||0),0) : 0);
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${i.number}</td>
-          <td>${i.date || ''}</td>
-          <td>${i.due || ''}</td>
+          <td>${i.date||''}</td>
+          <td>${i.due||''}</td>
           <td>${money(total)}</td>
           <td><span class="badge ${i.status==='paid'?'b-paid':'b-unpaid'}">${i.status||'unpaid'}</span></td>
         `;
@@ -189,44 +299,54 @@
       });
     }
 
-    function renderPrefs(email){
-      const p = store.get(K.prefs, {});
-      const my = p[email] || {};
-      document.getElementById('pref_tier').value = my.tier || '';
-      const checks = [...document.querySelectorAll('#prefs-form input[type="checkbox"]')];
-      checks.forEach(c => c.checked = (my.addons||[]).includes(c.value));
+    // Preferences (cascade)
+    function setTierCascade(tier){
+      const allChecks = [...document.querySelectorAll('#prefs-form input[type="checkbox"]')];
+      const tiers = { Essential:1, Standard:2, Premium:3 };
+      const rank = tiers[tier] || 0;
+      allChecks.forEach(c=>{
+        const t = c.getAttribute('data-tier');
+        const r = (t==='Essential'?1 : t==='Standard'?2 : t==='Premium'?3 : t==='Storm'?99 : 0);
+        // Storm is independent; keep as-is
+        if (t==='Storm') return;
+        if (rank>=r) c.checked = true;
+      });
     }
 
+    function loadPrefs(email){
+      const p = store.get(K.prefs, {})[email] || {};
+      document.getElementById('pref_tier').value = p.tier || '';
+      const checks = [...document.querySelectorAll('#prefs-form input[type="checkbox"]')];
+      checks.forEach(c => c.checked = (p.addons||[]).includes(c.value));
+      if (p.tier) setTierCascade(p.tier);
+    }
+
+    // History + feedback
     function renderHistory(email){
       const wrap = document.getElementById('history');
-      const jobs = store.get(K.jobs, []).filter(j => (j.customer_email||'').toLowerCase()===email && j.status==='completed');
       const select = document.getElementById('fb_job');
+      const jobs = store.get(K.jobs, []).filter(j => (j.customer_email||'').toLowerCase()===email && j.status==='completed');
       select.innerHTML = '<option value="">Select a completed job…</option>';
-
-      if(jobs.length===0){ wrap.innerHTML = '<p style="opacity:.8">No completed services yet.</p>'; return; }
-
+      if(jobs.length===0){ wrap.innerHTML = '<p class="muted">No completed services yet.</p>'; return; }
       wrap.innerHTML = '';
       jobs.forEach(j=>{
         const div = document.createElement('div');
         div.style.marginBottom = '.75rem';
-        const imgs = (j.photos||[]).map(src => `<img src="${src}" alt="" />`).join('');
+        const imgs = (j.photos||[]).slice(0,6).map(src => `<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;margin-right:.35rem;box-shadow:var(--shadow-1)">`).join('');
         div.innerHTML = `
           <div><strong>${j.date || ''}</strong> — ${j.title || 'Service'}</div>
-          <div class="thumbs">${imgs || ''}</div>
-          ${j.employee_notes ? `<div style="opacity:.85;margin-top:.25rem;"><em>Tech note:</em> ${j.employee_notes}</div>` : ''}
+          <div style="margin:.35rem 0;">${imgs || ''}</div>
+          ${j.employee_notes ? `<div class="muted"><em>Tech note:</em> ${j.employee_notes}</div>` : ''}
         `;
         wrap.appendChild(div);
-
         const opt = document.createElement('option');
-        opt.value = j.id;
-        opt.textContent = `${j.date || ''} — ${j.title || 'Service'}`;
+        opt.value = j.id; opt.textContent = `${j.date||''} — ${j.title||'Service'}`;
         select.appendChild(opt);
       });
     }
 
-    // ===== main
-    const logoutBtn = document.getElementById('btn-logout');
-    logoutBtn.addEventListener('click', ()=> netlifyIdentity.logout());
+    // ===== Boot
+    document.getElementById('btn-logout').addEventListener('click', ()=> netlifyIdentity.logout());
     netlifyIdentity.on('logout', ()=> location.replace('login-customer.html'));
 
     waitIdentity().then(user=>{
@@ -234,74 +354,72 @@
       const email = userEmail(user);
       hello.textContent = `Welcome, ${user.user_metadata?.full_name || user.email}`;
 
-      // balance
-      const bal = loadBalance(email);
-      balanceEl.textContent = money(bal);
+      // Overview
+      balanceEl.textContent = money(loadBalance(email));
+      renderSummary(email);
 
-      // invoices / prefs / history
+      // Invoices / Prefs / History
       renderInvoices(email);
-      renderPrefs(email);
+      loadPrefs(email);
       renderHistory(email);
 
-      // add funds
+      // Balance form
       const balForm = document.getElementById('balance-form');
-      const balAmt = document.getElementById('bal_amount');
-      const balStatus = document.getElementById('bal_status');
       balForm.addEventListener('submit', (e)=>{
         e.preventDefault();
-        const add = Number(balAmt.value || 0);
-        const newTotal = Number(loadBalance(email) + add);
-        saveBalance(email, newTotal);
-        balanceEl.textContent = money(newTotal);
-        balStatus.textContent = 'Updated.';
+        const add = Number(document.getElementById('bal_amount').value || 0);
+        const newBal = loadBalance(email) + add;
+        saveBalance(email, newBal);
+        balanceEl.textContent = money(newBal);
+        document.getElementById('bal_status').textContent = 'Updated.';
         balForm.reset();
       });
 
-      // save prefs
+      // Prefs: cascade on tier change + save
+      document.getElementById('pref_tier').addEventListener('change', (e)=>{
+        setTierCascade(e.target.value);
+      });
+
       const prefForm = document.getElementById('prefs-form');
-      const prefStatus = document.getElementById('pref_status');
       prefForm.addEventListener('submit', (e)=>{
         e.preventDefault();
         const tier = document.getElementById('pref_tier').value;
         const addons = [...document.querySelectorAll('#prefs-form input[type="checkbox"]:checked')].map(i=>i.value);
-        const p = store.get(K.prefs, {});
-        p[email] = { tier, addons };
-        store.set(K.prefs, p);
-        prefStatus.textContent = 'Saved.';
+        const all = store.get(K.prefs, {});
+        all[email] = { tier, addons };
+        store.set(K.prefs, all);
+        document.getElementById('pref_status').textContent = 'Saved.';
+        renderSummary(email);
       });
 
-      // extra service request
-      const extraForm = document.getElementById('extra-form');
-      const extraStatus = document.getElementById('extra_status');
-      extraForm.addEventListener('submit', (e)=>{
+      // Extra request
+      document.getElementById('extra-form').addEventListener('submit', (e)=>{
         e.preventDefault();
         const data = {
           id: crypto.randomUUID(),
           email,
           service: document.getElementById('x_service').value.trim(),
           date: document.getElementById('x_date').value || '',
+          window: document.getElementById('x_window').value.trim(),
           notes: document.getElementById('x_notes').value.trim(),
           created_at: new Date().toISOString()
         };
-        const list = store.get(K.extras, []);
-        list.push(data); store.set(K.extras, list);
-        extraStatus.textContent = 'Request sent (saved locally for now).';
-        extraForm.reset();
+        const list = store.get(K.extras, []); list.push(data); store.set(K.extras, list);
+        document.getElementById('extra_status').textContent = 'Request sent (demo).';
+        e.target.reset();
       });
 
-      // feedback
-      const fbForm = document.getElementById('fb-form');
-      const fbStatus = document.getElementById('fb_status');
-      fbForm.addEventListener('submit', (e)=>{
+      // Feedback
+      document.getElementById('fb-form').addEventListener('submit', (e)=>{
         e.preventDefault();
         const jobId = document.getElementById('fb_job').value;
         const text = document.getElementById('fb_text').value.trim();
-        if(!jobId){ fbStatus.textContent='Pick a job.'; return; }
+        if(!jobId) return (document.getElementById('fb_status').textContent='Pick a job.');
         const list = store.get(K.feedback, []);
         list.push({ id: crypto.randomUUID(), job_id: jobId, email, text, created_at: new Date().toISOString() });
         store.set(K.feedback, list);
-        fbStatus.textContent = 'Thanks for the feedback!';
-        fbForm.reset();
+        document.getElementById('fb_status').textContent = 'Thanks for the feedback!';
+        e.target.reset();
       });
     });
   </script>
