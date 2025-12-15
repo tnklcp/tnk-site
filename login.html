@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Employee/Admin Login | TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .loading { opacity:.85; text-align:center; margin-top:.5rem; }
+  </style>
 </head>
 <body>
   <header class="hero">
@@ -18,33 +21,62 @@
 
   <section class="section">
     <div class="container" style="max-width:560px">
-      <p>Use your invitation email. Admins and employees are assigned roles in the dashboard.</p>
-      <p id="msg" role="status"></p>
+      <p>Use your invitation email. Roles are assigned in Netlify Identity.</p>
+      <p id="msg" class="loading" role="status">Checking session…</p>
     </div>
   </section>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
     const msg = document.getElementById('msg');
+    const btn = document.getElementById('btn-open');
 
-    function routeByRole(user) {
-      const roles = (user && user.app_metadata && user.app_metadata.roles) || [];
-      if (roles.includes('admin')) window.location.replace('admin.html');
-      else if (roles.includes('employee')) window.location.replace('employee.html');
-      else msg.textContent = 'You are signed in but do not have employee/admin access.';
+    function rolesOf(user){
+      return (user && user.app_metadata && Array.isArray(user.app_metadata.roles))
+        ? user.app_metadata.roles
+        : [];
     }
 
-    netlifyIdentity.on('init', user => {
-      if (user) routeByRole(user);
-    });
-    netlifyIdentity.init();
+    function routeByRole(user){
+      const roles = rolesOf(user);
+      if (roles.includes('admin')) {
+        location.replace('admin.html');
+      } else if (roles.includes('employee')) {
+        location.replace('employee.html');
+      } else {
+        msg.textContent = 'Signed in, but no employee/admin role on this account.';
+      }
+    }
 
-    document.getElementById('btn-open').addEventListener('click', () => {
+    // Wait for identity to initialize before doing anything
+    function waitIdentity(){
+      return new Promise((resolve) => {
+        if (window.netlifyIdentity.currentUser()) {
+          return resolve(window.netlifyIdentity.currentUser());
+        }
+        netlifyIdentity.on('init', resolve);
+        netlifyIdentity.init();
+      });
+    }
+
+    btn.addEventListener('click', () => {
       netlifyIdentity.open('login');
     });
 
-    netlifyIdentity.on('login', user => routeByRole(user));
-    netlifyIdentity.on('logout', () => { /* stay here */ });
+    // Single, definitive redirect after login
+    netlifyIdentity.on('login', (user) => {
+      routeByRole(user);
+    });
+
+    // Initialize once and decide
+    waitIdentity().then((user) => {
+      if (user) {
+        msg.textContent = 'Welcome back. Redirecting…';
+        routeByRole(user);
+      } else {
+        msg.textContent = 'Not signed in.';
+      }
+    });
   </script>
 </body>
 </html>
