@@ -30,6 +30,8 @@
     .b-queued{ background:#e9f4ff; color:#004b86; }
     @media (max-width: 900px){ .grid-2,.grid-3{ grid-template-columns: 1fr; } }
   </style>
+  <!-- Optional: Netlify Identity widget (safe if already globally included) -->
+  <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
   <header class="hero">
@@ -268,20 +270,43 @@
   </div>
 
   <script>
-    // ===== Gate =====
+    // ===== Role Gate =====
     (function gate(){
       const role = sessionStorage.getItem('tnk_role');
       const email = sessionStorage.getItem('tnk_user_email');
       if (role !== 'admin' || !email) window.location.replace('login.html');
     })();
 
-    // ===== Logout =====
-    document.getElementById('logout').addEventListener('click', async ()=>{
-      try{ await fetch('/.netlify/identity/logout',{method:'POST'});}catch{}
+    // ===== Robust Logout =====
+    async function hardLogoutRedirect() {
+      try { await fetch('/.netlify/identity/logout', { method:'POST' }); } catch {}
+      // Clear our app session
       sessionStorage.removeItem('tnk_user_email');
       sessionStorage.removeItem('tnk_role');
+      // Clear possible GoTrue/Identity local state
+      try { localStorage.removeItem('gotrue.user'); } catch {}
+      try { localStorage.removeItem('netlify-cms-user'); } catch {}
+      // Force navigation
       window.location.replace('login.html');
-    });
+    }
+
+    async function handleLogout() {
+      // If widget exists, prefer its logout (fires async)
+      try {
+        if (window.netlifyIdentity && typeof window.netlifyIdentity.logout === 'function') {
+          await new Promise(resolve => {
+            const done = () => { window.netlifyIdentity.off('logout', done); resolve(); };
+            window.netlifyIdentity.on('logout', done);
+            window.netlifyIdentity.logout();
+            // Safety timeout in case event doesn't fire
+            setTimeout(done, 1500);
+          });
+        }
+      } catch {}
+      await hardLogoutRedirect();
+    }
+
+    document.getElementById('logout').addEventListener('click', handleLogout);
 
     // ===== Tabs =====
     const tabs = document.querySelectorAll('.tab');
@@ -720,8 +745,6 @@
       setTimeout(()=>invStatus.textContent='',1200);
     });
     document.getElementById('inv_reset').addEventListener('click', ()=>{ invForm.reset(); invItems.innerHTML=''; addLine(); invStatus.textContent=''; });
-
-    // ===== Timesheets form events already above =====
 
     // ===== Prices / Promos =====
     const priceForm = document.getElementById('price-form');
