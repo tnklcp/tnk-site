@@ -8,56 +8,17 @@
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
 
-  <!-- Inline styles just for the horizontal gallery -->
-  <style>
-    .hscroll {
-      margin: 18px 0 6px;
-      position: relative;
-      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-              mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-    }
-    .hscroll__track {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x mandatory;
-      padding-bottom: .25rem;
-    }
-    .hscroll__item {
-      flex: 0 0 auto;
-      width: min(420px, 80vw);
-      height: 260px;
-      border-radius: 12px;
-      box-shadow: var(--shadow-1);
-      overflow: hidden;
-      scroll-snap-align: start;
-      background: #eee;
-    }
-    .hscroll__img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
-      display: block;
-    }
-    @media (max-width: 560px) {
-      .hscroll__item { height: 220px; }
-    }
-  </style>
-
   <!-- LocalBusiness SEO (update URLs when you get a domain) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "HomeAndConstructionBusiness",
     "name": "The Neighborhood Kids Lawncare Plus",
-    "image": "https://example.com/images/IMG_2713.png",
+    "image": "images/IMG_2713.png",
     "telephone": "+1-541-921-4416",
     "email": "TNKLCP@gmail.com",
     "areaServed": ["Pacific City","Neskowin","Otis","Rose Lodge","Lincoln City","Gleneden Beach","Depoe Bay"],
-    "url": "https://example.com",
+    "url": "https://theneighborhoodkidslawncare.com/",
     "address": { "@type": "PostalAddress", "addressRegion": "OR", "addressCountry": "US" },
     "sameAs": [
       "https://www.facebook.com/the.neighborhood.kids.lawn.care.plus",
@@ -83,7 +44,7 @@
 
   <!-- Hero -->
   <header class="hero">
-    <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus Logo" width="350" height="350" decoding="async" />
+    <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus Logo" width="350" height="350" decoding="async" style="border:0; outline:none;" />
     <h1>The Neighborhood Kids Lawncare Plus</h1>
     <p>
       Service From Pacific City to Depoe Bay •
@@ -116,7 +77,7 @@
     </div>
   </section>
 
-  <!-- About (gallery + video) -->
+  <!-- About -->
   <section id="about" class="section reveal">
     <div class="container">
       <h2>About Us</h2>
@@ -125,28 +86,34 @@
         Now, we're a full-service company delivering quality home care with that same hustle and heart.
       </p>
 
-      <!-- Horizontal scrolling gallery -->
-      <div class="hscroll reveal" style="--reveal-delay:60ms" aria-label="Photo gallery">
-        <div class="hscroll__track">
-          <figure class="hscroll__item"><img class="hscroll__img" src="images/12.jpg"   alt="Neighborhood Kids team in the field" /></figure>
-          <figure class="hscroll__item"><img class="hscroll__img" src="images/1222.jpg" alt="Freshly cut lawn and edging detail" /></figure>
-          <figure class="hscroll__item"><img class="hscroll__img" src="images/123.jpg"  alt="Before and after yard improvement" /></figure>
-          <figure class="hscroll__item"><img class="hscroll__img" src="images/124.jpeg" alt="Team equipment ready for service" /></figure>
-          <figure class="hscroll__item"><img class="hscroll__img" src="images/125.jpeg" alt="Finished lawn after maintenance" /></figure>
-        </div>
+      <!-- Horizontal scrolling gallery (REAL files only, scaled evenly) -->
+      <div class="media-scroller" id="about-gallery" aria-label="Work photos">
+        <figure class="media-item">
+          <img src="images/12.jpg?v=4" alt="Neighborhood Kids Lawncare — work photo 12" loading="lazy" decoding="async" />
+        </figure>
+        <figure class="media-item">
+          <img src="images/1222.jpg?v=4" alt="Neighborhood Kids Lawncare — work photo 1222" loading="lazy" decoding="async" />
+        </figure>
+        <figure class="media-item">
+          <img src="images/123.jpg?v=4" alt="Neighborhood Kids Lawncare — work photo 123" loading="lazy" decoding="async" />
+        </figure>
+        <figure class="media-item">
+          <img src="images/124.jpg?v=4" alt="Neighborhood Kids Lawncare — work photo 124" loading="lazy" decoding="async" />
+        </figure>
+        <figure class="media-item">
+          <img src="images/125.jpg?v=4" alt="Neighborhood Kids Lawncare — work photo 125" loading="lazy" decoding="async" />
+        </figure>
       </div>
 
       <!-- YouTube video -->
-      <div class="reveal" style="--reveal-delay:120ms; margin-top: 1rem;">
+      <div style="margin-top:1.5rem;">
         <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;box-shadow:var(--shadow-1);">
           <iframe
             src="https://www.youtube.com/embed/YMEqbq_geSQ"
-            title="Neighborhood Kids Lawncare — Video"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerpolicy="strict-origin-when-cross-origin"
-            allowfullscreen
+            title="Neighborhood Kids Lawncare Video"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;border:0"
             loading="lazy"
-            style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
+            allowfullscreen
           ></iframe>
         </div>
       </div>
@@ -167,11 +134,11 @@
           <div class="price">From <span>$35</span></div>
           <ul>
             <li>Mow With Alternating Patterns</li>
-            <li>String Trim Edges/Beds</li>
+            <li>String Trimming (Edges &amp; Beds)</li>
             <li>Blow Off Sidewalks/Driveways/Patios</li>
             <li>Basic Turf Inspection</li>
           </ul>
-          <a class="button button--accent" href="#estimate" data-select-tier="essential">Pick Essential</a>
+          <a class="button button--accent" href="#estimate">Pick Essential</a>
         </div>
         <div class="price-card reveal" style="--reveal-delay:120ms">
           <h3>Standard</h3>
@@ -182,7 +149,7 @@
             <li>Collect &amp; Bag Debris</li>
             <li>Walkway Weed Pull</li>
           </ul>
-          <a class="button button--accent" href="#estimate" data-select-tier="standard">Pick Standard</a>
+          <a class="button button--accent" href="#estimate">Pick Standard</a>
         </div>
         <div class="price-card reveal" style="--reveal-delay:240ms">
           <h3>Premium</h3>
@@ -193,7 +160,7 @@
             <li>Spigot Insulation (Seasonal)</li>
             <li>Remove Cobwebs • Fertilization</li>
           </ul>
-          <a class="button button--accent" href="#estimate" data-select-tier="premium">Pick Premium</a>
+          <a class="button button--accent" href="#estimate">Pick Premium</a>
         </div>
       </div>
       <p style="text-align:center;margin-top:var(--space-4);opacity:.85;">Need Commercial Service or Storm Prevention? <a href="#services">See Services</a> or <a href="#estimate">Request a Custom Quote</a>.</p>
@@ -211,22 +178,43 @@
     </div>
   </section>
 
-  <!-- Testimonials (updated) -->
+  <!-- Partners -->
+  <section id="partners" class="section reveal">
+    <div class="container">
+      <h2>Local Partners</h2>
+      <div class="partners-grid">
+        <div class="partner-card reveal" style="--reveal-delay:0ms">
+          <img src="images/partner1.png" alt="Coastal Hardware" />
+          <div class="partner-name">Coastal Hardware</div>
+        </div>
+        <div class="partner-card reveal" style="--reveal-delay:120ms">
+          <img src="images/partner2.png" alt="Driftwood Nursery" />
+          <div class="partner-name">Driftwood Nursery</div>
+        </div>
+        <div class="partner-card reveal" style="--reveal-delay:240ms">
+          <img src="images/partner3.png" alt="Seaside Hauling" />
+          <div class="partner-name">Seaside Hauling</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials (updated quotes) -->
   <section id="testimonials" class="section reveal">
     <div class="container">
       <h2>What Our Neighbors Say</h2>
       <div class="testi-grid">
         <blockquote class="testi reveal" style="--reveal-delay:0ms">
-          <p>“It’s refreshing to see such dedication and work ethic, and the results speak for themselves—my yard has never looked better!”</p>
-          <footer>— Gus C.</footer>
+          <p>“Its refreshing to see such dedication and work ethic, and the results speak for themselves—my yard has never looked better!”</p>
+          <footer>— Gus C</footer>
         </blockquote>
         <blockquote class="testi reveal" style="--reveal-delay:120ms">
           <p>“Absolutely awesome cleanup job by Malachi!!! Would highly recommend this business!”</p>
-          <footer>— Joyce S.</footer>
+          <footer>— Joyce S</footer>
         </blockquote>
         <blockquote class="testi reveal" style="--reveal-delay:240ms">
-          <p>“They were punctual, fast, and my friend’s lawn never looked so good! They also recently helped during a flood. They go above and beyond! They are the only service I would use!”</p>
-          <footer>— Sharon L.</footer>
+          <p>“They were punctual, fast and my friend’s lawn never looked so good! They also recently helped during a flood. They go above and beyond! They are the only service I would use!”</p>
+          <footer>— Sharon L</footer>
         </blockquote>
       </div>
     </div>
@@ -282,12 +270,11 @@
         Love our work? Refer a neighbor. You’ll get <strong>15% off</strong> your next service for each referral who books.
       </p>
 
-      <form name="referral" netlify netlify-honeypot="company" action="/thanks.html" method="POST" class="ref-form" novalidate>
+      <form name="referral" netlify netlify-honeypot="company" action="/thank-you" method="POST" class="ref-form" novalidate>
         <input type="hidden" name="form-name" value="referral" />
-        <p class="visually-hidden">
+        <p style="display:none;">
           <label>Company <input name="company" /></label>
         </p>
-
         <div class="ref-grid form-grid form-grid--2">
           <div>
             <label for="r_your_name">Your Name</label>
@@ -320,14 +307,16 @@
     </div>
   </section>
 
-  <!-- Estimate / Contact -->
+  <!-- Estimate / Contact (Netlify-enabled) -->
   <section id="estimate" class="section reveal">
     <div class="container">
       <h2>Request a Free Estimate</h2>
 
-      <form name="estimate" netlify netlify-honeypot="company" action="/thanks.html" method="POST" enctype="multipart/form-data" aria-labelledby="estimate" novalidate>
+      <form name="estimate" netlify netlify-honeypot="company" action="/thank-you" method="POST" enctype="multipart/form-data" aria-labelledby="estimate" novalidate>
         <input type="hidden" name="form-name" value="estimate" />
-        <p class="visually-hidden"><label>Company <input name="company" /></label></p>
+        <p style="display:none;">
+          <label>Company <input name="company" /></label>
+        </p>
 
         <!-- Contact -->
         <div class="form-grid form-grid--2">
@@ -359,18 +348,18 @@
         </fieldset>
 
         <!-- Essential -->
-        <details id="details-essential" open class="details-card">
+        <details open class="details-card">
           <summary>Essential Care</summary>
           <div class="option-grid option-grid--2">
             <label class="option-btn"><span>Lawn Mowing (Alternating Patterns)</span><input type="checkbox" name="services" value="Lawn Mowing (Alternating Patterns)" /></label>
-            <label class="option-btn"><span>String Trimming (Edges, Beds)</span><input type="checkbox" name="services" value="String Trimming (Edges, Trees, Beds)" /></label>
+            <label class="option-btn"><span>String Trimming (Edges &amp; Beds)</span><input type="checkbox" name="services" value="String Trimming (Edges & Beds)" /></label>
             <label class="option-btn"><span>Blowing Off Sidewalks, Driveways, Patios</span><input type="checkbox" name="services" value="Blowing Off Sidewalks, Driveways, Patios" /></label>
             <label class="option-btn"><span>Turf Inspection (Bare Spots, Pests, Water Issues)</span><input type="checkbox" name="services" value="Turf Inspection (Bare Spots, Pests, Water Issues)" /></label>
           </div>
         </details>
 
         <!-- Standard -->
-        <details id="details-standard" class="details-card">
+        <details class="details-card">
           <summary>Standard Care (Includes Essential +)</summary>
           <div class="option-grid option-grid--2">
             <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" name="services" value="Shrub & Plant Pruning" /></label>
@@ -381,7 +370,7 @@
         </details>
 
         <!-- Premium -->
-        <details id="details-premium" class="details-card">
+        <details class="details-card">
           <summary>Premium Care (Includes Standard +)</summary>
           <div class="option-grid option-grid--2">
             <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" name="services" value="Hand-Weeding Garden Beds" /></label>
@@ -389,7 +378,7 @@
             <label class="option-btn"><span>Check/Insulate Hose Spigots (Seasonal)</span><input type="checkbox" name="services" value="Check/Insulate Hose Spigots (Seasonal)" /></label>
             <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" name="services" value="Remove Cobwebs (Entryways/Structures)" /></label>
             <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" name="services" value="Fertilize Lawn/Gardens (Log Product/Date)" /></label>
-            <label class="option-btn"><span>Inspect Mulch Condition </span><input type="checkbox" name="services" value="Inspect Mulch & Soil Condition" /></label>
+            <label class="option-btn"><span>Inspect Mulch Condition</span><input type="checkbox" name="services" value="Inspect Mulch Condition" /></label>
           </div>
         </details>
 
@@ -414,7 +403,7 @@
           </div>
         </details>
 
-        <!-- Hidden fields -->
+        <!-- Hidden fields for capturing selections (filled by script.js) -->
         <input type="hidden" name="selected_services" />
         <input type="hidden" name="selected_storm_schedule" />
         <input type="hidden" name="selected_storm_checks" />
@@ -450,10 +439,10 @@
       <h2>Portals</h2>
       <div class="portal-grid">
         <article class="portal-card reveal" style="--reveal-delay:0ms">
-          <div class="portal-icon" aria-hidden="true">🏷️</div>
+          <div class="portal-icon" aria-hidden="true">💼</div>
           <h3 class="portal-title">Franchise Opportunities</h3>
-          <p class="portal-text">Build a local business with hustle and heart. Learn how to start a Neighborhood Kids Lawncare location in your area.</p>
-          <a class="button button--accent" href="franchise.html" aria-label="Franchise Opportunities">Explore Franchise</a>
+          <p class="portal-text">Own your market on the Oregon Coast. Learn more and apply.</p>
+          <a class="button button--primary" href="franchise.html" aria-label="Open Franchise Page">Explore Franchise</a>
         </article>
         <article class="portal-card reveal" style="--reveal-delay:120ms">
           <div class="portal-icon" aria-hidden="true">🧰</div>
@@ -473,9 +462,11 @@
       <h3 id="area-modal-title">Tell Us Where You Are</h3>
       <p class="lead">We’re always planning new service areas. Share your location and we’ll take a look.</p>
 
-      <form name="area-request" netlify netlify-honeypot="company" action="/thanks.html" method="POST" enctype="multipart/form-data" novalidate>
+      <form name="area-request" netlify netlify-honeypot="company" action="/thank-you" method="POST" novalidate>
         <input type="hidden" name="form-name" value="area-request" />
-        <p class="visually-hidden"><label>Company <input name="company" /></label></p>
+        <p style="display:none;">
+          <label>Company <input name="company" /></label>
+        </p>
 
         <label for="ar_name">Your Name</label>
         <input id="ar_name" name="name" type="text" required autocomplete="name" />
@@ -500,7 +491,7 @@
     </div>
   </div>
 
-  <!-- Footer -->
+  <!-- Footer (centered) -->
   <footer class="site-footer">
     <div class="container">
       <div class="footer-grid centered">
@@ -535,5 +526,3 @@
 
 </body>
 </html>
-
-
