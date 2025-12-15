@@ -6,14 +6,17 @@
   <title>Employee Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
+    .tab { padding:.5rem .8rem; border-radius:999px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
+    .tab[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
     .grid { display:grid; gap:1rem; }
     .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
     .table { width:100%; border-collapse: collapse; }
     .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
     .tag { display:inline-block; background:#eef6ee; color:#1e3b1e; padding:.15rem .45rem; border-radius:999px; font-size:.8rem; }
-    .thumbs { display:flex; flex-wrap:wrap; gap:.5rem; }
-    .thumbs img { width:90px; height:70px; object-fit:cover; border-radius:8px; box-shadow:var(--shadow-1); }
     @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -28,102 +31,147 @@
 
   <section class="section">
     <div class="container">
-      <p id="who" style="opacity:.9;margin-top:0;">Checking access…</p>
+      <p id="who" class="muted" style="margin-top:0;">Checking access…</p>
 
-      <div class="grid grid-2">
-        <!-- Jobs (today/week) -->
-        <div class="card">
-          <h3>My Jobs</h3>
-          <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-            <label for="range">Range</label>
-            <select id="range">
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="all">All Assigned</option>
-            </select>
-          </div>
-          <table class="table" id="jobs-table">
-            <thead><tr><th>Date/Time</th><th>Customer</th><th>Work</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody></tbody>
-          </table>
-          <p id="jobs_status" role="status" style="margin-top:.35rem;"></p>
-        </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" aria-selected="true" data-tab="jobs">Jobs</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="hours">Hours</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="timeoff">Time Off</button>
+      </div>
 
-        <!-- Attach images / complete -->
-        <div class="card">
-          <h3>Job Details</h3>
-          <p id="job_title" style="font-weight:700;margin:.25rem 0 .5rem;"></p>
-          <div id="job_meta" style="opacity:.9;margin-bottom:.5rem;"></div>
-          <div class="thumbs" id="job_photos"></div>
-
-          <label for="job_notes" style="margin-top:.5rem;">Completion Notes</label>
-          <textarea id="job_notes" rows="3" placeholder="What was done, any issues?"></textarea>
-
-          <label for="job_images" style="margin-top:.5rem;">Attach Photos</label>
-          <input id="job_images" type="file" accept="image/*" multiple />
-
-          <div class="inline" style="margin-top:.6rem;">
-            <button id="btn-complete" class="button button--primary" disabled>Mark Complete (Send for Review)</button>
-            <p id="complete_status" role="status" style="margin:0 0 0 .5rem;"></p>
-          </div>
-        </div>
-
-        <!-- Hours -->
-        <div class="card">
-          <h3>Track Hours</h3>
-          <form id="hours-form">
-            <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem;">
-              <div><label>Date</label><input id="h_date" type="date" required /></div>
-              <div><label>Start</label><input id="h_start" type="time" required /></div>
-              <div><label>End</label><input id="h_end" type="time" required /></div>
+      <!-- JOBS -->
+      <div class="panel active" id="panel-jobs">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>My Jobs</h3>
+            <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+              <label for="range">Range</label>
+              <select id="range">
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="all">All Assigned</option>
+              </select>
             </div>
-            <label style="margin-top:.5rem;">Notes</label>
-            <input id="h_notes" placeholder="Optional" />
+            <table class="table" id="jobs-table">
+              <thead><tr><th>Date/Time</th><th>Customer</th><th>Work</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p id="jobs_status" role="status" class="muted" style="margin-top:.35rem;"></p>
+          </div>
+
+          <div class="card">
+            <h3>Job Details</h3>
+            <p id="job_title" style="font-weight:700;margin:.25rem 0 .5rem;"></p>
+            <div id="job_meta" class="muted" style="margin-bottom:.5rem;"></div>
+            <div id="job_photos" style="display:flex;gap:.5rem;flex-wrap:wrap;"></div>
+
+            <label for="job_notes" style="margin-top:.5rem;">Completion Notes</label>
+            <textarea id="job_notes" rows="3" placeholder="What was done, any issues?"></textarea>
+
+            <label for="job_images" style="margin-top:.5rem;">Attach Photos</label>
+            <input id="job_images" type="file" accept="image/*" multiple />
+
             <div class="inline" style="margin-top:.6rem;">
-              <button class="button button--primary" type="submit">Save</button>
-              <p id="h_status" role="status" style="margin:0 0 0 .5rem;"></p>
+              <button id="btn-complete" class="button button--primary" disabled>Mark Complete (Send for Review)</button>
+              <p id="complete_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
             </div>
-          </form>
-          <h4 style="margin-top:1rem;">Recent Entries</h4>
-          <table class="table" id="hours-table">
-            <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Status</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <!-- Paystubs + Time Off -->
-        <div class="card">
-          <h3>Paystubs</h3>
-          <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-            <label>Period</label>
-            <input id="ps_from" type="date" />–<input id="ps_to" type="date" />
-            <button id="ps_gen" class="button">Generate</button>
           </div>
-          <div id="ps_result" style="margin-top:.5rem;opacity:.9;"></div>
-
-          <hr style="margin:1rem 0;border:none;border-top:1px solid #e6dfcc;" />
-
-          <h3>Request Time Off</h3>
-          <form id="to-form">
-            <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
-              <div><label>From</label><input id="to_from" type="date" required /></div>
-              <div><label>To</label><input id="to_to" type="date" required /></div>
-            </div>
-            <label style="margin-top:.5rem;">Reason</label>
-            <input id="to_reason" required />
-            <div class="inline" style="margin-top:.6rem;">
-              <button class="button" type="submit">Submit Request</button>
-              <p id="to_status" role="status" style="margin:0 0 0 .5rem;"></p>
-            </div>
-          </form>
         </div>
       </div>
+
+      <!-- HOURS -->
+      <div class="panel" id="panel-hours">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Add Hours</h3>
+            <form id="hours-form">
+              <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem;">
+                <div><label>Date</label><input id="h_date" type="date" required /></div>
+                <div><label>Start</label><input id="h_start" type="time" required /></div>
+                <div><label>End</label><input id="h_end" type="time" required /></div>
+              </div>
+              <label style="margin-top:.5rem;">Notes</label>
+              <input id="h_notes" placeholder="Optional" />
+              <div class="inline" style="margin-top:.6rem;">
+                <button class="button button--primary" type="submit">Save</button>
+                <p id="h_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>Recent Entries</h3>
+            <table class="table" id="hours-table">
+              <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Status</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAYSTUBS (read-only) -->
+      <div class="panel" id="panel-paystubs">
+        <div class="card">
+          <h3>My Paystubs</h3>
+          <p class="muted">Generated by Admin. You can view/download when available.</p>
+          <table class="table" id="ps-table">
+            <thead><tr><th>Period</th><th>Hours</th><th>Gross</th><th>Notes</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TIME OFF -->
+      <div class="panel" id="panel-timeoff">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Request Time Off</h3>
+            <form id="to-form">
+              <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
+                <div><label>From</label><input id="to_from" type="date" required /></div>
+                <div><label>To</label><input id="to_to" type="date" required /></div>
+              </div>
+              <label style="margin-top:.5rem;">Reason</label>
+              <input id="to_reason" required />
+              <div class="inline" style="margin-top:.6rem;">
+                <button class="button" type="submit">Submit Request</button>
+                <p id="to_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>My Requests</h3>
+            <table class="table" id="to-table">
+              <thead><tr><th>Dates</th><th>Reason</th><th>Status</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    // === store helpers
+    // Tabs
+    const tabBtns=[...document.querySelectorAll('.tab')];
+    const panels={
+      jobs: document.getElementById('panel-jobs'),
+      hours: document.getElementById('panel-hours'),
+      paystubs: document.getElementById('panel-paystubs'),
+      timeoff: document.getElementById('panel-timeoff'),
+    };
+    tabBtns.forEach(b=>b.addEventListener('click', ()=>{
+      tabBtns.forEach(t=>t.setAttribute('aria-selected','false'));
+      b.setAttribute('aria-selected','true');
+      Object.values(panels).forEach(p=>p.classList.remove('active'));
+      panels[b.dataset.tab].classList.add('active');
+    }));
+
+    // store
     const store = {
       get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
       set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
@@ -147,12 +195,11 @@
     function emailOf(u){ return (u?.email||'').toLowerCase(); }
     function money(n){ return `$${Number(n||0).toFixed(2)}`; }
 
-    // ===== Auth
+    // Auth
     const who = document.getElementById('who');
     document.getElementById('logout').addEventListener('click', ()=> netlifyIdentity.logout());
     netlifyIdentity.on('logout', ()=> location.replace('login.html'));
 
-    let ME = null;
     let MY_EMAIL = '';
 
     // ===== Jobs
@@ -173,8 +220,7 @@
       if(mode==='today') return dt.getTime()===today.getTime();
       if(mode==='week'){
         const start = new Date(today); const end = new Date(today);
-        const day = today.getDay();           // 0=Sun
-        const diffToMon = (day+6)%7;          // Monday as start
+        const day = today.getDay(); const diffToMon = (day+6)%7;
         start.setDate(today.getDate()-diffToMon);
         end.setDate(start.getDate()+6);
         return dt>=start && dt<=end;
@@ -219,36 +265,34 @@
         <div><strong>Services:</strong> ${(j.services||[]).join(', ')}</div>
         <div><strong>Status:</strong> ${j.status||'assigned'}</div>
       `;
-      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="">`).join('');
+      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;box-shadow:var(--shadow-1)">`).join('');
       jobNotes.value = j.employee_notes || '';
       btnComplete.disabled = false;
     });
 
-    // collect chosen images → dataURLs (demo)
     jobImages.addEventListener('change', async (e)=>{
       if(!selectedJobId) return;
       const files = [...e.target.files].slice(0,12);
       const urls = [];
       for (const f of files) {
-        const dataUrl = await fToDataURL(f);
+        const dataUrl = await new Promise(res=>{ const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
         urls.push(dataUrl);
       }
       const all = store.get(K.jobs, []);
       const j = all.find(x=>x.id===selectedJobId);
       j.photos = (j.photos||[]).concat(urls);
       store.set(K.jobs, all);
-      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="">`).join('');
+      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;box-shadow:var(--shadow-1)">`).join('');
       e.target.value = '';
     });
-    function fToDataURL(file){ return new Promise(res=>{ const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); }); }
 
-    btnComplete.addEventListener('click', ()=>{
+    document.getElementById('btn-complete').addEventListener('click', ()=>{
       if(!selectedJobId) return;
-      const all = store.get(K.jobs, []);
-      const j = all.find(x=>x.id===selectedJobId);
+      const list = store.get(K.jobs, []);
+      const j = list.find(x=>x.id===selectedJobId);
       j.employee_notes = jobNotes.value.trim();
-      j.status = 'pending_review'; // admin will review/approve + send invoice
-      store.set(K.jobs, all);
+      j.status = 'pending_review';
+      store.set(K.jobs, list);
       document.getElementById('complete_status').textContent = 'Submitted for admin review.';
       renderJobs();
     });
@@ -262,19 +306,17 @@
 
     function parseHours(a,b){
       if(!a||!b) return 0;
-      const [ah,am] = a.split(':').map(Number);
-      const [bh,bm] = b.split(':').map(Number);
-      const diff = (bh+bm/60) - (ah+am/60);
-      return Math.max(0, Math.round(diff*100)/100);
+      const [ah,am]=a.split(':').map(Number); const [bh,bm]=b.split(':').map(Number);
+      return Math.max(0, Math.round(((bh+bm/60)-(ah+am/60))*100)/100);
     }
 
     function renderHours(){
       const list = store.get(K.times, []);
       const mine = list.filter(t => (t.employee_email||'').toLowerCase()===MY_EMAIL)
                        .sort((a,b)=> (a.date < b.date ? 1 : -1))
-                       .slice(0,10);
+                       .slice(0,12);
       htBody.innerHTML = '';
-      if(mine.length===0){ htBody.innerHTML = '<tr><td colspan="5" style="opacity:.8;">No entries</td></tr>'; return; }
+      if(mine.length===0){ htBody.innerHTML = '<tr><td colspan="5" class="muted">No entries</td></tr>'; return; }
       mine.forEach(t=>{
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -302,28 +344,36 @@
       const list = store.get(K.times, []);
       list.push(row); store.set(K.times, list);
       hStatus.textContent = 'Saved.';
-      hForm.reset();
+      e.target.reset();
       renderHours();
     });
 
-    // ===== Paystubs (demo calc = approved hours * $18/hr)
-    document.getElementById('ps_gen').addEventListener('click', ()=>{
-      const from = document.getElementById('ps_from').value;
-      const to = document.getElementById('ps_to').value;
-      const list = store.get(K.times, []);
-      const mine = list.filter(t => (t.employee_email||'').toLowerCase()===MY_EMAIL)
-                       .filter(t => (!from || t.date>=from) && (!to || t.date<=to))
-                       .filter(t => t.status==='approved');
-      const totalHrs = mine.reduce((s,t)=> s + parseHours(t.start,t.end), 0);
-      const rate = 18;
-      const gross = totalHrs * rate;
-      document.getElementById('ps_result').textContent = `Hours: ${totalHrs.toFixed(2)} • Gross: ${money(gross)} (demo)`;
-    });
+    // ===== Paystubs (READ ONLY; provided by Admin)
+    function renderPaystubs(){
+      const tbody = document.querySelector('#ps-table tbody');
+      const list = store.get(K.stubs, []).filter(s => (s.employee_email||'').toLowerCase()===MY_EMAIL)
+                                          .sort((a,b)=> (a.period_from < b.period_from ? 1 : -1));
+      tbody.innerHTML = list.map(s=>`
+        <tr>
+          <td>${s.period_from} → ${s.period_to}</td>
+          <td>${(s.hours||0).toFixed(2)}</td>
+          <td>${money(s.gross||0)}</td>
+          <td>${s.notes||''}</td>
+          <td>${ s.url ? `<a class="button" href="${s.url}" target="_blank" rel="noopener">Open</a>` : '<span class="muted">No file</span>' }</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="muted">No paystubs yet.</td></tr>';
+    }
 
     // ===== Time off
-    const toForm = document.getElementById('to-form');
-    const toStatus = document.getElementById('to_status');
-    toForm.addEventListener('submit', (e)=>{
+    function renderTO(){
+      const tbody = document.querySelector('#to-table tbody');
+      const list = store.get(K.timeoff, []).filter(r => (r.employee_email||'').toLowerCase()===MY_EMAIL)
+                                           .sort((a,b)=> (a.start<b.start?1:-1));
+      tbody.innerHTML = list.map(r=>`
+        <tr><td>${r.start} → ${r.end}</td><td>${r.reason}</td><td>${r.status}</td></tr>
+      `).join('') || '<tr><td colspan="3" class="muted">No requests</td></tr>';
+    }
+    document.getElementById('to-form').addEventListener('submit', (e)=>{
       e.preventDefault();
       const row = {
         id: crypto.randomUUID(),
@@ -334,21 +384,19 @@
         status: 'pending',
         created_at: new Date().toISOString()
       };
-      const list = store.get(K.timeoff, []);
-      list.push(row); store.set(K.timeoff, list);
-      toStatus.textContent = 'Request submitted.';
-      toForm.reset();
+      const list = store.get(K.timeoff, []); list.push(row); store.set(K.timeoff, list);
+      document.getElementById('to_status').textContent = 'Submitted.';
+      e.target.reset();
+      renderTO();
     });
 
     // ===== Boot
     waitIdentity().then(user=>{
       const roles = rolesOf(user||{});
-      if(!user || !(roles.includes('employee') || roles.includes('admin'))){
-        return location.replace('login.html');
-      }
-      ME = user; MY_EMAIL = emailOf(user);
-      who.textContent = `Signed in as ${ME.email}`;
-      renderJobs(); renderHours();
+      if(!user || !(roles.includes('employee') || roles.includes('admin'))) return location.replace('login.html');
+      MY_EMAIL = emailOf(user);
+      who.textContent = `Signed in as ${user.email}`;
+      renderJobs(); renderHours(); renderPaystubs(); renderTO();
     });
   </script>
 </body>
