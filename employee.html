@@ -6,7 +6,15 @@
   <title>Employee Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .loading { opacity:.85; text-align:center; margin-top:.5rem; }
+    .grid { display:grid; gap:1rem; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
+    .tag { display:inline-block; background:#eef6ee; color:#1e3b1e; padding:.15rem .45rem; border-radius:999px; font-size:.8rem; }
+    .thumbs { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .thumbs img { width:90px; height:70px; object-fit:cover; border-radius:8px; box-shadow:var(--shadow-1); }
+    @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -19,14 +27,95 @@
   </header>
 
   <section class="section">
-    <div class="container" style="max-width:1000px">
-      <p id="who" class="loading">Checking access…</p>
-      <div id="content" style="display:none">
-        <div class="admin-grid" style="display:grid;grid-template-columns:1fr;gap:1rem;">
-          <div class="admin-card">
-            <h2>Welcome</h2>
-            <p>You are signed in with <strong>employee</strong> (or <strong>admin</strong>) role.</p>
+    <div class="container">
+      <p id="who" style="opacity:.9;margin-top:0;">Checking access…</p>
+
+      <div class="grid grid-2">
+        <!-- Jobs (today/week) -->
+        <div class="card">
+          <h3>My Jobs</h3>
+          <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+            <label for="range">Range</label>
+            <select id="range">
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="all">All Assigned</option>
+            </select>
           </div>
+          <table class="table" id="jobs-table">
+            <thead><tr><th>Date/Time</th><th>Customer</th><th>Work</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <p id="jobs_status" role="status" style="margin-top:.35rem;"></p>
+        </div>
+
+        <!-- Attach images / complete -->
+        <div class="card">
+          <h3>Job Details</h3>
+          <p id="job_title" style="font-weight:700;margin:.25rem 0 .5rem;"></p>
+          <div id="job_meta" style="opacity:.9;margin-bottom:.5rem;"></div>
+          <div class="thumbs" id="job_photos"></div>
+
+          <label for="job_notes" style="margin-top:.5rem;">Completion Notes</label>
+          <textarea id="job_notes" rows="3" placeholder="What was done, any issues?"></textarea>
+
+          <label for="job_images" style="margin-top:.5rem;">Attach Photos</label>
+          <input id="job_images" type="file" accept="image/*" multiple />
+
+          <div class="inline" style="margin-top:.6rem;">
+            <button id="btn-complete" class="button button--primary" disabled>Mark Complete (Send for Review)</button>
+            <p id="complete_status" role="status" style="margin:0 0 0 .5rem;"></p>
+          </div>
+        </div>
+
+        <!-- Hours -->
+        <div class="card">
+          <h3>Track Hours</h3>
+          <form id="hours-form">
+            <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem;">
+              <div><label>Date</label><input id="h_date" type="date" required /></div>
+              <div><label>Start</label><input id="h_start" type="time" required /></div>
+              <div><label>End</label><input id="h_end" type="time" required /></div>
+            </div>
+            <label style="margin-top:.5rem;">Notes</label>
+            <input id="h_notes" placeholder="Optional" />
+            <div class="inline" style="margin-top:.6rem;">
+              <button class="button button--primary" type="submit">Save</button>
+              <p id="h_status" role="status" style="margin:0 0 0 .5rem;"></p>
+            </div>
+          </form>
+          <h4 style="margin-top:1rem;">Recent Entries</h4>
+          <table class="table" id="hours-table">
+            <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Paystubs + Time Off -->
+        <div class="card">
+          <h3>Paystubs</h3>
+          <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+            <label>Period</label>
+            <input id="ps_from" type="date" />–<input id="ps_to" type="date" />
+            <button id="ps_gen" class="button">Generate</button>
+          </div>
+          <div id="ps_result" style="margin-top:.5rem;opacity:.9;"></div>
+
+          <hr style="margin:1rem 0;border:none;border-top:1px solid #e6dfcc;" />
+
+          <h3>Request Time Off</h3>
+          <form id="to-form">
+            <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
+              <div><label>From</label><input id="to_from" type="date" required /></div>
+              <div><label>To</label><input id="to_to" type="date" required /></div>
+            </div>
+            <label style="margin-top:.5rem;">Reason</label>
+            <input id="to_reason" required />
+            <div class="inline" style="margin-top:.6rem;">
+              <button class="button" type="submit">Submit Request</button>
+              <p id="to_status" role="status" style="margin:0 0 0 .5rem;"></p>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -34,51 +123,232 @@
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    const who = document.getElementById('who');
-    const content = document.getElementById('content');
+    // === store helpers
+    const store = {
+      get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
+      set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+    };
+    const K = {
+      jobs: 'tnk_jobs',
+      times: 'tnk_timesheets',
+      stubs: 'tnk_paystubs',
+      timeoff: 'tnk_timeoff',
+    };
 
-    function rolesOf(user){
-      return (user && user.app_metadata && Array.isArray(user.app_metadata.roles))
-        ? user.app_metadata.roles
-        : [];
-    }
-
-    function allowEmployee(user){
-      const roles = rolesOf(user);
-      return roles.includes('employee') || roles.includes('admin');
-    }
-
+    function rolesOf(u){ return (u?.app_metadata?.roles)||[]; }
     function waitIdentity(){
-      return new Promise((resolve) => {
-        const cur = window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+      return new Promise((resolve)=>{
+        const cur = netlifyIdentity.currentUser && netlifyIdentity.currentUser();
         if (cur) return resolve(cur);
         netlifyIdentity.on('init', resolve);
         netlifyIdentity.init();
       });
     }
+    function emailOf(u){ return (u?.email||'').toLowerCase(); }
+    function money(n){ return `$${Number(n||0).toFixed(2)}`; }
 
-    document.getElementById('logout').addEventListener('click', () => {
-      netlifyIdentity.logout();
+    // ===== Auth
+    const who = document.getElementById('who');
+    document.getElementById('logout').addEventListener('click', ()=> netlifyIdentity.logout());
+    netlifyIdentity.on('logout', ()=> location.replace('login.html'));
+
+    let ME = null;
+    let MY_EMAIL = '';
+
+    // ===== Jobs
+    const rangeSel = document.getElementById('range');
+    const jobsTbody = document.querySelector('#jobs-table tbody');
+    const jobsStatus = document.getElementById('jobs_status');
+    const jobTitle = document.getElementById('job_title');
+    const jobMeta = document.getElementById('job_meta');
+    const jobPhotos = document.getElementById('job_photos');
+    const jobNotes = document.getElementById('job_notes');
+    const jobImages = document.getElementById('job_images');
+    const btnComplete = document.getElementById('btn-complete');
+    let selectedJobId = null;
+
+    function isInRange(d, mode){
+      const today = new Date(); today.setHours(0,0,0,0);
+      const dt = new Date(d); dt.setHours(0,0,0,0);
+      if(mode==='today') return dt.getTime()===today.getTime();
+      if(mode==='week'){
+        const start = new Date(today); const end = new Date(today);
+        const day = today.getDay();           // 0=Sun
+        const diffToMon = (day+6)%7;          // Monday as start
+        start.setDate(today.getDate()-diffToMon);
+        end.setDate(start.getDate()+6);
+        return dt>=start && dt<=end;
+      }
+      return true;
+    }
+
+    function renderJobs(){
+      const all = store.get(K.jobs, []);
+      const mine = all.filter(j => (j.assigned_to||'').toLowerCase()===MY_EMAIL);
+      const r = rangeSel.value;
+      const rows = mine.filter(j => !j.status || j.status==='assigned' || j.status==='in_progress' || j.status==='pending_review')
+                       .filter(j => j.date ? isInRange(j.date, r) : true)
+                       .sort((a,b)=> (a.date < b.date ? -1 : 1));
+      jobsTbody.innerHTML = '';
+      if(rows.length===0){ jobsStatus.textContent='No jobs for selected range.'; return; }
+      jobsStatus.textContent='';
+      rows.forEach(j=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${j.date || ''} ${j.time || ''}</td>
+          <td>${j.customer_name||''}<br/><small>${j.customer_email||''}</small></td>
+          <td>${j.title||''}<br/>${(j.services||[]).map(s=>`<span class="tag">${s}</span>`).join(' ')}</td>
+          <td>${j.status||'assigned'}</td>
+          <td><button class="button" data-open="${j.id}">Open</button></td>
+        `;
+        jobsTbody.appendChild(tr);
+      });
+    }
+
+    jobsTbody.addEventListener('click', (e)=>{
+      const id = e.target?.dataset?.open;
+      if(!id) return;
+      const all = store.get(K.jobs, []);
+      const j = all.find(x=>x.id===id);
+      selectedJobId = id;
+      jobTitle.textContent = j.title || 'Service';
+      jobMeta.innerHTML = `
+        <div><strong>When:</strong> ${j.date||''} ${j.time||''}</div>
+        <div><strong>Where:</strong> ${j.address||''}</div>
+        <div><strong>Customer:</strong> ${j.customer_name||''} • ${j.customer_email||''}</div>
+        <div><strong>Services:</strong> ${(j.services||[]).join(', ')}</div>
+        <div><strong>Status:</strong> ${j.status||'assigned'}</div>
+      `;
+      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="">`).join('');
+      jobNotes.value = j.employee_notes || '';
+      btnComplete.disabled = false;
     });
 
-    netlifyIdentity.on('logout', () => {
-      location.replace('login.html');
+    // collect chosen images → dataURLs (demo)
+    jobImages.addEventListener('change', async (e)=>{
+      if(!selectedJobId) return;
+      const files = [...e.target.files].slice(0,12);
+      const urls = [];
+      for (const f of files) {
+        const dataUrl = await fToDataURL(f);
+        urls.push(dataUrl);
+      }
+      const all = store.get(K.jobs, []);
+      const j = all.find(x=>x.id===selectedJobId);
+      j.photos = (j.photos||[]).concat(urls);
+      store.set(K.jobs, all);
+      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="">`).join('');
+      e.target.value = '';
+    });
+    function fToDataURL(file){ return new Promise(res=>{ const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(file); }); }
+
+    btnComplete.addEventListener('click', ()=>{
+      if(!selectedJobId) return;
+      const all = store.get(K.jobs, []);
+      const j = all.find(x=>x.id===selectedJobId);
+      j.employee_notes = jobNotes.value.trim();
+      j.status = 'pending_review'; // admin will review/approve + send invoice
+      store.set(K.jobs, all);
+      document.getElementById('complete_status').textContent = 'Submitted for admin review.';
+      renderJobs();
     });
 
-    // Main flow
-    waitIdentity().then((user) => {
-      if (!user) {
-        // Not logged in → go to login once (no loop)
-        location.replace('login.html');
-        return;
+    rangeSel.addEventListener('change', renderJobs);
+
+    // ===== Hours
+    const hForm = document.getElementById('hours-form');
+    const hStatus = document.getElementById('h_status');
+    const htBody = document.querySelector('#hours-table tbody');
+
+    function parseHours(a,b){
+      if(!a||!b) return 0;
+      const [ah,am] = a.split(':').map(Number);
+      const [bh,bm] = b.split(':').map(Number);
+      const diff = (bh+bm/60) - (ah+am/60);
+      return Math.max(0, Math.round(diff*100)/100);
+    }
+
+    function renderHours(){
+      const list = store.get(K.times, []);
+      const mine = list.filter(t => (t.employee_email||'').toLowerCase()===MY_EMAIL)
+                       .sort((a,b)=> (a.date < b.date ? 1 : -1))
+                       .slice(0,10);
+      htBody.innerHTML = '';
+      if(mine.length===0){ htBody.innerHTML = '<tr><td colspan="5" style="opacity:.8;">No entries</td></tr>'; return; }
+      mine.forEach(t=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${t.date}</td>
+          <td>${t.start}</td>
+          <td>${t.end}</td>
+          <td>${parseHours(t.start,t.end).toFixed(2)}</td>
+          <td>${t.status||'pending'}</td>
+        `;
+        htBody.appendChild(tr);
+      });
+    }
+
+    hForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const row = {
+        id: crypto.randomUUID(),
+        employee_email: MY_EMAIL,
+        date: document.getElementById('h_date').value,
+        start: document.getElementById('h_start').value,
+        end: document.getElementById('h_end').value,
+        notes: document.getElementById('h_notes').value.trim(),
+        status: 'pending'
+      };
+      const list = store.get(K.times, []);
+      list.push(row); store.set(K.times, list);
+      hStatus.textContent = 'Saved.';
+      hForm.reset();
+      renderHours();
+    });
+
+    // ===== Paystubs (demo calc = approved hours * $18/hr)
+    document.getElementById('ps_gen').addEventListener('click', ()=>{
+      const from = document.getElementById('ps_from').value;
+      const to = document.getElementById('ps_to').value;
+      const list = store.get(K.times, []);
+      const mine = list.filter(t => (t.employee_email||'').toLowerCase()===MY_EMAIL)
+                       .filter(t => (!from || t.date>=from) && (!to || t.date<=to))
+                       .filter(t => t.status==='approved');
+      const totalHrs = mine.reduce((s,t)=> s + parseHours(t.start,t.end), 0);
+      const rate = 18;
+      const gross = totalHrs * rate;
+      document.getElementById('ps_result').textContent = `Hours: ${totalHrs.toFixed(2)} • Gross: ${money(gross)} (demo)`;
+    });
+
+    // ===== Time off
+    const toForm = document.getElementById('to-form');
+    const toStatus = document.getElementById('to_status');
+    toForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const row = {
+        id: crypto.randomUUID(),
+        employee_email: MY_EMAIL,
+        start: document.getElementById('to_from').value,
+        end: document.getElementById('to_to').value,
+        reason: document.getElementById('to_reason').value.trim(),
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      const list = store.get(K.timeoff, []);
+      list.push(row); store.set(K.timeoff, list);
+      toStatus.textContent = 'Request submitted.';
+      toForm.reset();
+    });
+
+    // ===== Boot
+    waitIdentity().then(user=>{
+      const roles = rolesOf(user||{});
+      if(!user || !(roles.includes('employee') || roles.includes('admin'))){
+        return location.replace('login.html');
       }
-      if (!allowEmployee(user)) {
-        // Logged in but not employee/admin → back to login with widget
-        location.replace('login.html');
-        return;
-      }
-      who.textContent = `Signed in as ${user.email}`;
-      content.style.display = 'block';
+      ME = user; MY_EMAIL = emailOf(user);
+      who.textContent = `Signed in as ${ME.email}`;
+      renderJobs(); renderHours();
     });
   </script>
 </body>
