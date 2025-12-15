@@ -1,5 +1,5 @@
 /* =========================================================
-   UI interactions + Scroll Reveal + Form helpers
+   UI interactions + Scroll Reveal + Form helpers + Tier cascade
    ========================================================= */
 
 // ===== Modal open/close =====
@@ -62,7 +62,7 @@ document.addEventListener("submit", (e) => {
   }
 
   // For estimate form, populate hidden fields
-  if (form.matches("form[name='estimate']")) {
+  if (form.matches("form[action='/api/estimate'], form[netlify][name='estimate']")) {
     collectSelections(form);
   }
 });
@@ -90,90 +90,76 @@ document.addEventListener("submit", (e) => {
   items.forEach(el => io.observe(el));
 })();
 
-// ===== Tier preselection + smooth scroll to form =====
-(function initTierSelection() {
-  const buttons = document.querySelectorAll("[data-select-tier]");
-  if (!buttons.length) return;
+/* ===== Tier cascade for Estimate form =====
+   If a user checks anything in:
+   - Standard  -> auto-check all Essential
+   - Premium   -> auto-check all Standard + Essential
+   We only auto-CHECK lower tiers (never auto-uncheck).
+*/
+(function initTierCascade() {
+  // Find the estimate form (works whether you're posting to /api/estimate or using Netlify)
+  const estForm = document.querySelector("#estimate form");
+  if (!estForm) return;
 
-  const estimateSection = document.querySelector("#estimate");
-  const estimateForm = document.querySelector("form[name='estimate']");
-  if (!estimateForm) return;
+  // We’ll identify the three <details> blocks by order:
+  //  0: Essential Care
+  //  1: Standard Care (Includes Essential +)
+  //  2: Premium Care  (Includes Standard +)
+  const groups = [...estForm.querySelectorAll(".details-card")];
+  if (groups.length < 3) return;
 
-  // exact checkbox values in the form:
-  const ESSENTIAL = [
-    "Lawn Mowing (Alternating Patterns)",
-    "String Trimming (Edges, Trees, Beds)",
-    "Blowing Off Sidewalks, Driveways, Patios",
-    "Turf Inspection (Bare Spots, Pests, Water Issues)"
-  ];
-  const STANDARD_ONLY = [
-    "Shrub & Plant Pruning",
-    "Collect & Bag Debris (Leaves, Branches, Trimmings)",
-    "Inspect Shrubs/Plants for Disease or Stress",
-    "Hand-Pull Weeds From Walkways"
-  ];
-  const PREMIUM_ONLY = [
-    "Hand-Weeding Garden Beds",
-    "Hand-Pull Weeds From Lawn Areas",
-    "Check/Insulate Hose Spigots (Seasonal)",
-    "Remove Cobwebs (Entryways/Structures)",
-    "Fertilize Lawn/Gardens (Log Product/Date)",
-    "Inspect Mulch & Soil Condition"
-  ];
+  const essential = groups[0];
+  const standard  = groups[1];
+  const premium   = groups[2];
 
-  function setOpenStates(tier) {
-    // Open relevant <details> blocks for visibility
-    const dEssential = document.getElementById("details-essential");
-    const dStandard  = document.getElementById("details-standard");
-    const dPremium   = document.getElementById("details-premium");
-    if (dEssential) dEssential.open = true;
-    if (dStandard)  dStandard.open  = tier !== "essential";
-    if (dPremium)   dPremium.open   = tier === "premium";
+  function checkAllIn(container, selector = "input[type='checkbox']") {
+    container.querySelectorAll(selector).forEach(cb => { cb.checked = true; });
   }
 
-  function preselectTier(tier) {
-    // clear all first
-    estimateForm.querySelectorAll("input[name='services'][type='checkbox']").forEach(cb => cb.checked = false);
+  // When any Standard checkbox is checked -> ensure Essential all checked
+  standard.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t && t.matches("input[type='checkbox']") && t.checked) {
+      checkAllIn(essential);
+    }
+  });
 
-    // pick list(s)
-    let list = [];
-    if (tier === "essential") {
-      list = [...ESSENTIAL];
-    } else if (tier === "standard") {
-      list = [...ESSENTIAL, ...STANDARD_ONLY];
-    } else if (tier === "premium") {
-      list = [...ESSENTIAL, ...STANDARD_ONLY, ...PREMIUM_ONLY];
+  // When any Premium checkbox is checked -> ensure Standard + Essential all checked
+  premium.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t && t.matches("input[type='checkbox']") && t.checked) {
+      checkAllIn(standard);
+      checkAllIn(essential);
+    }
+  });
+
+  // Bonus: If user clicks the “Pick Standard / Pick Premium” buttons in pricing cards,
+  // pre-check tiers and scroll to the form (these buttons link to #estimate already).
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href*='#estimate']");
+    if (!a) return;
+
+    // Detect which pricing card they clicked from (based on text)
+    const card = e.target.closest(".price-card");
+    if (!card) return;
+
+    const title = (card.querySelector("h3")?.textContent || "").toLowerCase();
+
+    // Clear all first (so it’s deterministic)
+    estForm.querySelectorAll("input[type='checkbox'][name='services']").forEach(cb => { cb.checked = false; });
+
+    if (title.includes("premium")) {
+      checkAllIn(premium);
+      checkAllIn(standard);
+      checkAllIn(essential);
+    } else if (title.includes("standard")) {
+      checkAllIn(standard);
+      checkAllIn(essential);
+    } else if (title.includes("essential")) {
+      checkAllIn(essential);
     }
 
-    // check matching boxes
-    list.forEach(val => {
-      const el = estimateForm.querySelector(`input[name="services"][value="${CSS.escape(val)}"]`);
-      if (el) el.checked = true;
-    });
-
-    setOpenStates(tier);
-  }
-
-  function scrollToForm() {
-    if (!estimateSection) return;
-    estimateSection.scrollIntoView({ behavior: "smooth", block: "start" });
-    // focus first field after a brief delay so the scroll can start
-    setTimeout(() => {
-      const first = estimateForm.querySelector("input, textarea, select");
-      if (first) first.focus({ preventScroll: true });
-    }, 300);
-  }
-
-  buttons.forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const tier = btn.getAttribute("data-select-tier");
-      if (tier) {
-        // we still let the #estimate anchor work, but ensure preselect happens before
-        preselectTier(tier);
-      }
-      // prevent default jump to avoid double-scroll jerk, we scroll ourselves
-      e.preventDefault();
-      scrollToForm();
-    });
+    // Make sure hidden fields reflect current selection if the user submits immediately
+    collectSelections(estForm);
   });
 })();
