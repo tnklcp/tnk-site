@@ -3,24 +3,57 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Employee Portal | TNK Lawncare Plus</title>
+  <title>Employee Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    /* Keep it consistent with your site */
-    .table { width:100%; border-collapse: collapse; background:#fff; }
-    .table th, .table td { border-bottom:1px solid #eee5d3; padding:.6rem; text-align:left; }
+    /* Match Admin look/feel */
+    body.locked { visibility: hidden; } /* hide until auth gate passes */
+
+    .employee-wrap { max-width: 1200px; margin: 2rem auto; }
+    .muted { opacity:.85; font-size:.95rem; }
+
+    .emp-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
+    .tab-btn {
+      background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer;
+      font-weight:700; color:var(--clr-primary-600);
+    }
+    .tab-btn[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .emp-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; }
+    .card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1rem; }
+    .card h2, .card h3 { margin:.25rem 0 .65rem; color:var(--clr-primary-600); }
+
+    .table-wrap { overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; }
+    th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
+    thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
+    tr:hover td { background:#fffdf7; }
+
     .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
     .b-pending { background:#fff3cd; color:#9a6a00; }
     .b-approved { background:#d1f7c4; color:#195d00; }
-    .muted { opacity:.85; }
+    .b-denied { background:#ffd6d6; color:#a30000; }
+    .b-submitted { background:#e7f0ff; color:#003e92; }
 
-    /* Hide the page until auth gate finishes to avoid flicker / race */
-    body.locked { visibility: hidden; }
-    .card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1rem; }
-    .grid-2 { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:1rem; }
-    @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
+    .grid-2 { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:.9rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:.9rem; }
+    .stack { display:grid; gap:.6rem; }
+
+    .btn-small { padding:.35rem .6rem; border-radius:8px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:600; }
+    .btn-small--danger { border-color:#e6b6b6; color:#7b1f1f; background:#fff; }
+
+    .thumbs { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.4rem; }
+    .thumbs img { width:64px; height:64px; object-fit:cover; border-radius:8px; box-shadow: var(--shadow-1); border:1px solid #eee5d3; }
+
+    @media (max-width: 900px){
+      .emp-grid { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
   </style>
-  <!-- Identity widget (safe to include; no-op if Identity not enabled) -->
+  <!-- Identity widget (safe; no-op if not enabled) -->
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body class="locked">
@@ -32,67 +65,171 @@
     </div>
   </header>
 
-  <section class="section">
-    <div class="container" style="max-width:1100px">
-      <div class="grid-2">
-        <!-- ===== Today's Jobs (read-only) ===== -->
+  <div class="employee-wrap container">
+    <!-- Tabs -->
+    <div class="emp-tabs" role="tablist" aria-label="Employee Sections">
+      <button class="tab-btn" role="tab" aria-selected="true" data-tab="schedule">Schedule</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="timeoff">Time Off</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="completed">Completed Jobs</button>
+    </div>
+
+    <!-- ============== Schedule Panel ============== -->
+    <section class="tab-panel active" id="panel-schedule">
+      <div class="emp-grid">
+        <!-- Today’s Jobs -->
         <div class="card">
           <h2>Today’s Jobs</h2>
-          <p class="muted" id="jobs-note">These are the jobs assigned to you.</p>
-          <div class="table-wrap" style="overflow:auto;border:1px solid #e6e1d6;border-radius:12px;">
-            <table class="table">
+          <p class="muted">Attach photos and mark job complete to send for admin review.</p>
+          <div class="table-wrap">
+            <table>
               <thead><tr><th>Date</th><th>Customer</th><th>Service</th><th>Start</th><th>Status</th><th>Action</th></tr></thead>
-              <tbody id="jobs-tbody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+              <tbody id="jobs-today"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
 
-        <!-- ===== Submit Hours ===== -->
+        <!-- Next 7 Days -->
+        <div class="card">
+          <h2>Next 7 Days</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Customer</th><th>Service</th><th>Start</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="jobs-week"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== Timesheets Panel ============== -->
+    <section class="tab-panel" id="panel-timesheets">
+      <div class="emp-grid">
         <div class="card">
           <h2>Add Hours</h2>
-          <form id="hours-form" novalidate>
-            <label>Date</label>
-            <input type="date" name="work_date" required />
-
-            <label>Hours</label>
-            <input type="number" name="hours" min="0" max="24" step="0.25" required />
-
-            <label>Notes (optional)</label>
-            <textarea name="notes" rows="3" placeholder="Tasks performed, locations, etc."></textarea>
-
+          <form id="hours-form" class="stack" novalidate>
+            <div class="grid-3">
+              <div>
+                <label>Date</label>
+                <input type="date" name="work_date" required />
+              </div>
+              <div>
+                <label>Hours</label>
+                <input type="number" name="hours" min="0" max="24" step="0.25" required />
+              </div>
+              <div>
+                <label>Notes (optional)</label>
+                <input type="text" name="notes" placeholder="Tasks performed, locations, etc." />
+              </div>
+            </div>
             <div class="form-actions">
-              <p id="status" role="status" class="muted"></p>
+              <p id="ts-status" role="status" class="muted"></p>
               <button class="button button--primary" type="submit">Save Entry</button>
             </div>
           </form>
         </div>
-      </div>
 
-      <!-- ===== Your Recent Hours ===== -->
-      <h2 style="text-align:center;margin-top:2rem">Your Recent Entries</h2>
-      <div class="table-wrap" style="overflow:auto;border:1px solid #e6e1d6;border-radius:12px;">
-        <table class="table" id="hours-table">
-          <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <div class="card">
+          <h2>Your Recent Entries</h2>
+          <div class="table-wrap">
+            <table id="hours-table">
+              <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+
+    <!-- ============== Time Off Panel ============== -->
+    <section class="tab-panel" id="panel-timeoff">
+      <div class="emp-grid">
+        <div class="card">
+          <h2>Request Time Off</h2>
+          <form id="pto-form" class="stack" novalidate>
+            <div class="grid-3">
+              <div>
+                <label>Start Date</label>
+                <input type="date" id="pto_start" required />
+              </div>
+              <div>
+                <label>End Date</label>
+                <input type="date" id="pto_end" required />
+              </div>
+              <div>
+                <label>Reason</label>
+                <input type="text" id="pto_reason" placeholder="Optional" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <p id="pto-status" role="status" class="muted"></p>
+              <button class="button button--primary" type="submit">Submit Request</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Your Requests</h2>
+          <div class="table-wrap">
+            <table id="pto-table">
+              <thead><tr><th>From</th><th>To</th><th>Status</th><th>Reason</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== Paystubs Panel ============== -->
+    <section class="tab-panel" id="panel-paystubs">
+      <div class="card">
+        <h2>Paystubs</h2>
+        <p class="muted">Read-only. Admin issues paystubs here when payroll is run.</p>
+        <div class="table-wrap">
+          <table id="pay-table">
+            <thead><tr><th>Period</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Issued</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== Completed Jobs Panel ============== -->
+    <section class="tab-panel" id="panel-completed">
+      <div class="card">
+        <h2>Completed Jobs (Submitted)</h2>
+        <p class="muted">Add comments for admin review (e.g., challenges, extra work performed).</p>
+        <div class="table-wrap">
+          <table id="completed-table">
+            <thead><tr><th>Date</th><th>Customer</th><th>Service</th><th>Photos</th><th>Your Comment</th><th>Save</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <p style="text-align:center;margin-top:1.25rem;">
+      <a href="index.html" class="button">← Back to Website</a>
+    </p>
+  </div>
 
   <script>
-    /***************
-     * AUTH GATE
-     * - Only allow role === 'employee' or 'admin'
-     * - Uses (1) Netlify Identity (if enabled) and your Accounts list,
-     *   with (2) sessionStorage fallbacks used elsewhere in your site.
-     ***************/
+    /* =================== AUTH GATE (Employee/Admin only) =================== */
     const store = {
       get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
       set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
     };
-    const KEYS = { accounts: 'tnk_accounts', jobs: 'tnk_jobs', jobQueue:'tnk_job_queue', timesheets:'tnk_timesheets' };
+    const KEYS = {
+      accounts: 'tnk_accounts',
+      jobs: 'tnk_jobs',
+      jobQueue: 'tnk_job_queue',
+      timesheets: 'tnk_timesheets',
+      pto: 'tnk_timeoff',
+      paystubs: 'tnk_paystubs'
+    };
 
-    function currentIdentityEmail(){
+    function identityEmail(){
       try {
         if (window.netlifyIdentity) {
           const u = window.netlifyIdentity.currentUser();
@@ -102,32 +239,30 @@
       const se = sessionStorage.getItem('tnk_user_email');
       return se ? String(se).toLowerCase() : null;
     }
-
     function roleFromAccounts(email){
       if (!email) return null;
       const acc = store.get(KEYS.accounts, []);
       const hit = acc.find(a => (a.email||'').toLowerCase() === email);
       return hit ? hit.role : null;
     }
+    function roleFromSession(){ return sessionStorage.getItem('tnk_role') || null; }
 
-    function roleFromSession(){
-      const r = sessionStorage.getItem('tnk_role');
-      return r || null;
-    }
-
-    function allowEmployee(){
-      const email = currentIdentityEmail();
-      const roleAcc = roleFromAccounts(email);
-      const roleSess = roleFromSession();
-
-      // Priority: a real account role if present, else session fallback.
-      const role = roleAcc || roleSess;
-
-      if (role === 'employee' || role === 'admin') return true;
+    async function ensureAuth(){
+      // allow Identity to init but cap wait
+      const start = Date.now();
+      while (window.netlifyIdentity && !window.netlifyIdentity.currentUser() && Date.now()-start < 1000) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      const email = identityEmail();
+      const role = roleFromAccounts(email) || roleFromSession();
+      if (role === 'employee' || role === 'admin') {
+        document.body.classList.remove('locked');
+        return true;
+      }
+      window.location.replace('login.html?for=employee');
       return false;
     }
-
-    async function robustLogoutAndToLogin() {
+    async function robustLogout(){
       try { await fetch('/.netlify/identity/logout', { method:'POST' }); } catch {}
       sessionStorage.removeItem('tnk_user_email');
       sessionStorage.removeItem('tnk_role');
@@ -135,72 +270,80 @@
       try { localStorage.removeItem('netlify-cms-user'); } catch {}
       window.location.replace('login.html?for=employee');
     }
+    document.getElementById('logout').addEventListener('click', robustLogout);
 
-    async function ensureAuth(){
-      // Delay until identity initializes (if present), but cap to avoid races
-      const start = Date.now();
-      while (window.netlifyIdentity && !window.netlifyIdentity.currentUser() && Date.now() - start < 1000) {
-        await new Promise(r => setTimeout(r, 50));
-      }
+    /* =================== Tabs =================== */
+    const tabs = document.querySelectorAll('.tab-btn');
+    const panels = {
+      schedule: document.getElementById('panel-schedule'),
+      timesheets: document.getElementById('panel-timesheets'),
+      timeoff: document.getElementById('panel-timeoff'),
+      paystubs: document.getElementById('panel-paystubs'),
+      completed: document.getElementById('panel-completed')
+    };
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        tabs.forEach(b=>b.setAttribute('aria-selected','false'));
+        btn.setAttribute('aria-selected','true');
+        Object.values(panels).forEach(p=>p.classList.remove('active'));
+        panels[btn.dataset.tab].classList.add('active');
+      });
+    });
 
-      if (!allowEmployee()) {
-        // Not authorized → kick to employee login
-        window.location.replace('login.html?for=employee');
-        return false;
-      }
-      // Authorized → show page
-      document.body.classList.remove('locked');
-      return true;
-    }
-
-    /***************
-     * LOGOUT (robust)
-     ***************/
-    document.getElementById('logout').addEventListener('click', robustLogoutAndToLogin);
-
-    /***************
-     * PAGE LOGIC (only runs after auth passes)
-     ***************/
-    function meEmail(){
-      return currentIdentityEmail();
-    }
+    /* =================== Helpers =================== */
+    function meEmail(){ return identityEmail(); }
+    function todayISO(){ return new Date().toISOString().slice(0,10); }
+    function addDays(d, n){ const dt = new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); }
 
     function renderJobs(){
       const email = meEmail();
-      const tbody = document.getElementById('jobs-tbody');
-      const all = store.get(KEYS.jobs, []);
-      const today = new Date().toISOString().slice(0,10);
-      const mine = all
-        .filter(j => (j.assignee_email||'').toLowerCase() === email)
-        .filter(j => j.date >= today)            // show today and upcoming
-        .sort((a,b)=> (a.date < b.date ? -1 : 1) || (a.start||'') < (b.start||'') ? -1 : 1);
+      const jobs = store.get(KEYS.jobs, []);
+      const tdy = todayISO();
+      const next7 = addDays(tdy, 7);
 
-      if (mine.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="muted">No jobs assigned.</td></tr>';
-        return;
-      }
+      const mine = jobs.filter(j => (j.assignee_email||'').toLowerCase() === email);
 
-      tbody.innerHTML = mine.map(j => `
+      const todayRows = mine
+        .filter(j => j.date === tdy)
+        .sort((a,b)=> (a.start||'') < (b.start||'') ? -1 : 1)
+        .map(jobRowHTML)
+        .join('') || '<tr><td colspan="6" class="muted">No jobs today.</td></tr>';
+
+      const weekRows = mine
+        .filter(j => j.date > tdy && j.date <= next7)
+        .sort((a,b)=> (a.date < b.date ? -1 : 1) || ((a.start||'') < (b.start||'') ? -1 : 1))
+        .map(jobRowHTML)
+        .join('') || '<tr><td colspan="6" class="muted">No upcoming jobs in next 7 days.</td></tr>';
+
+      document.getElementById('jobs-today').innerHTML = todayRows;
+      document.getElementById('jobs-week').innerHTML = weekRows;
+    }
+
+    function jobRowHTML(j){
+      const photos = (j.photos||[]).slice(-4).map(src=>`<img src="${src}" alt="" />`).join('');
+      const photoThumbs = photos ? `<div class="thumbs">${photos}</div>` : '';
+      const action = j.status === 'submitted'
+        ? '<span class="badge b-submitted">Submitted</span>'
+        : `
+          <button class="btn-small" data-complete="${j.id}">Mark Complete</button>
+          <label class="btn-small" style="margin-left:.25rem;">
+            Upload Photos
+            <input type="file" accept="image/*" data-photos="${j.id}" multiple style="display:none" />
+          </label>
+        `;
+      return `
         <tr data-id="${j.id}">
           <td>${j.date}</td>
-          <td>${j.customer_name || j.customer_email}</td>
+          <td>${j.customer_name || j.customer_email || ''}</td>
           <td>${j.service || ''}</td>
           <td>${j.start || ''}</td>
           <td>${j.status || 'scheduled'}</td>
-          <td>
-            ${j.status === 'submitted' ? '<span class="muted">Pending approval</span>' : `
-              <button class="button" data-complete="${j.id}">Mark Complete</button>
-              <label class="button" style="margin-left:.25rem;">
-                Upload Photos
-                <input type="file" accept="image/*" data-photos="${j.id}" multiple style="display:none" />
-              </label>
-            `}
-          </td>
+          <td>${action}${photoThumbs}</td>
         </tr>
-      `).join('');
+      `;
     }
 
-    // Handle complete + photos
+    // Photos + Complete
     document.addEventListener('change', (e) => {
       const id = e.target?.dataset?.photos;
       if (!id) return;
@@ -212,13 +355,9 @@
       if (!j) return;
       j.photos = j.photos || [];
 
-      const readerPromises = files.map(f => new Promise(res => {
-        const r = new FileReader();
-        r.onload = () => res(r.result); // base64 data URL (demo only)
-        r.readAsDataURL(f);
-      }));
-
-      Promise.all(readerPromises).then(imgs => {
+      Promise.all(files.map(file => new Promise(res=>{
+        const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file);
+      }))).then(imgs => {
         j.photos.push(...imgs);
         store.set(KEYS.jobs, jobs);
         renderJobs();
@@ -232,7 +371,7 @@
       const j = jobs.find(x => x.id === id);
       if (!j) return;
 
-      // Move a snapshot into the admin queue
+      // Queue for admin review
       const queue = store.get(KEYS.jobQueue, []);
       queue.push({
         id: j.id,
@@ -242,61 +381,62 @@
         customer_name: j.customer_name,
         assignee_email: j.assignee_email,
         notes: j.notes || '',
-        photos: j.photos || []
+        photos: j.photos || [],
+        employee_comment: j.employee_comment || ''
       });
       store.set(KEYS.jobQueue, queue);
 
-      // Mark job as submitted
+      // Mark submitted
       j.status = 'submitted';
       store.set(KEYS.jobs, jobs);
       renderJobs();
-      alert('Job submitted for admin review.');
+      alert('Job submitted to Admin for review.');
+      renderCompleted(); // show up in Completed tab, too
     });
 
-    // ===== Timesheets (local demo) =====
-    function renderHours(){
+    /* =================== Timesheets =================== */
+    function renderTimesheets(){
       const email = meEmail();
       const tbody = document.querySelector('#hours-table tbody');
-      const all = store.get(KEYS.timesheets, []).filter(r => (r.employee_email||'').toLowerCase() === email);
-      if (all.length === 0) {
+      const rows = store.get(KEYS.timesheets, []).filter(r => (r.employee_email||'').toLowerCase() === email);
+      if (rows.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="muted">No entries yet.</td></tr>';
         return;
       }
-      tbody.innerHTML = all
+      tbody.innerHTML = rows
         .sort((a,b)=> (a.date < b.date ? 1 : -1))
         .map(r => `
           <tr data-id="${r.id}">
             <td>${r.date}</td>
-            <td>${Number(r.hours || ((timeToHrs(r.end_time) - timeToHrs(r.start_time))||0)).toFixed(2)}</td>
-            <td><span class="badge ${r.approved ? 'b-approved':'b-pending'}">${r.approved?'approved':'pending'}</span></td>
+            <td>${Number(r.hours ?? 0).toFixed(2)}</td>
+            <td><span class="badge ${r.approved ? 'b-approved':'b-pending'}">${r.approved ? 'approved' : 'pending'}</span></td>
             <td>${(r.notes||'').replace(/</g,'&lt;')}</td>
-            <td>${r.approved ? '' : '<button class="button" data-edit="'+r.id+'">Edit</button>'}</td>
+            <td>${r.approved ? '' : '<button class="btn-small" data-edit="'+r.id+'">Edit</button>'}</td>
           </tr>
         `).join('');
     }
-    function timeToHrs(t){ if(!t) return 0; const [h,m]=t.split(':').map(Number); return h+(m||0)/60; }
 
     document.querySelector('#hours-table tbody').addEventListener('click', (e) => {
       const id = e.target?.dataset?.edit;
       if (!id) return;
       const email = meEmail();
-      const rows = store.get(KEYS.timesheets, []);
-      const i = rows.findIndex(r => r.id === id && (r.employee_email||'').toLowerCase() === email);
-      if (i < 0) return;
-      const h = prompt('New hours (0–24):', rows[i].hours ?? '');
+      const list = store.get(KEYS.timesheets, []);
+      const idx = list.findIndex(r => r.id === id && (r.employee_email||'').toLowerCase() === email);
+      if (idx < 0) return;
+      const h = prompt('New hours (0–24):', list[idx].hours ?? '');
       if (h === null) return;
-      const notes = prompt('Notes (optional):', rows[i].notes || '');
-      rows[i].hours = Number(h);
-      rows[i].notes = notes || '';
-      store.set(KEYS.timesheets, rows);
-      renderHours();
+      const notes = prompt('Notes (optional):', list[idx].notes || '');
+      list[idx].hours = Number(h);
+      list[idx].notes = notes || '';
+      store.set(KEYS.timesheets, list);
+      renderTimesheets();
     });
 
     document.getElementById('hours-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const email = meEmail();
-      const statusEl = document.getElementById('status');
-      statusEl.textContent = 'Saving…';
+      const status = document.getElementById('ts-status');
+      status.textContent = 'Saving…';
 
       const fd = new FormData(e.target);
       const rec = {
@@ -311,17 +451,134 @@
       rows.push(rec);
       store.set(KEYS.timesheets, rows);
       e.target.reset();
-      statusEl.textContent = 'Saved.';
-      renderHours();
-      setTimeout(()=> statusEl.textContent = '', 1200);
+      status.textContent = 'Saved.';
+      renderTimesheets();
+      setTimeout(()=> status.textContent = '', 1200);
     });
 
-    // ===== Boot
+    /* =================== Time Off =================== */
+    function renderPTO(){
+      const email = meEmail();
+      const tbody = document.querySelector('#pto-table tbody');
+      const rows = store.get(KEYS.pto, []).filter(r => (r.employee_email||'').toLowerCase() === email);
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">No requests yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows
+        .sort((a,b)=> (a.start < b.start ? 1 : -1))
+        .map(r => `
+          <tr>
+            <td>${r.start}</td>
+            <td>${r.end}</td>
+            <td><span class="badge ${r.status==='approved'?'b-approved': r.status==='denied'?'b-denied':'b-pending'}">${r.status}</span></td>
+            <td>${(r.reason||'').replace(/</g,'&lt;')}</td>
+          </tr>
+        `).join('');
+    }
+
+    document.getElementById('pto-form').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const email = meEmail();
+      const start = document.getElementById('pto_start').value;
+      const end = document.getElementById('pto_end').value;
+      const reason = document.getElementById('pto_reason').value.trim();
+      const status = document.getElementById('pto-status');
+
+      if (!start || !end) { status.textContent = 'Start and End are required.'; return; }
+      const rec = {
+        id: crypto.randomUUID(),
+        employee_email: email,
+        start, end,
+        reason,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      const rows = store.get(KEYS.pto, []);
+      rows.push(rec);
+      store.set(KEYS.pto, rows);
+      status.textContent = 'Request submitted.';
+      e.target.reset();
+      renderPTO();
+      setTimeout(()=> status.textContent = '', 1200);
+    });
+
+    /* =================== Paystubs (read-only) =================== */
+    function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+    function renderPaystubs(){
+      const email = meEmail();
+      const tbody = document.querySelector('#pay-table tbody');
+      const rows = store.get(KEYS.paystubs, []).filter(p => (p.employee_email||'').toLowerCase() === email);
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">No paystubs yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows
+        .sort((a,b)=> (a.issued_at < b.issued_at ? 1 : -1))
+        .map(p => `
+          <tr>
+            <td>${p.period || ''}</td>
+            <td>${money(p.gross)}</td>
+            <td>${money(p.deductions)}</td>
+            <td><strong>${money(p.net)}</strong></td>
+            <td>${p.issued_at ? String(p.issued_at).slice(0,10) : ''}</td>
+          </tr>
+        `).join('');
+    }
+
+    /* =================== Completed Jobs (with employee comments) =================== */
+    function renderCompleted(){
+      const email = meEmail();
+      const tbody = document.querySelector('#completed-table tbody');
+      const queue = store.get(KEYS.jobQueue, []).filter(j => (j.assignee_email||'').toLowerCase() === email);
+      if (queue.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">No submitted jobs yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = queue
+        .sort((a,b)=> (a.date < b.date ? 1 : -1))
+        .map(j => {
+          const photos = (j.photos||[]).slice(0,4).map(src=>`<img src="${src}" alt="" />`).join('') || '<span class="muted">None</span>';
+          const comment = (j.employee_comment||'').replace(/</g,'&lt;');
+          return `
+            <tr data-id="${j.id}">
+              <td>${j.date}</td>
+              <td>${j.customer_name || j.customer_email || ''}</td>
+              <td>${j.service || ''}</td>
+              <td><div class="thumbs">${photos}</div></td>
+              <td><input type="text" class="emp-comment" value="${comment}" placeholder="Add a note for admin…" style="width:100%"/></td>
+              <td><button class="btn-small" data-save-comment="${j.id}">Save</button></td>
+            </tr>
+          `;
+        }).join('');
+    }
+
+    document.addEventListener('click', (e)=>{
+      const id = e.target?.dataset?.saveComment;
+      if (!id) return;
+      const tr = e.target.closest('tr');
+      const input = tr?.querySelector('.emp-comment');
+      const val = (input?.value || '').trim();
+
+      const queue = store.get(KEYS.jobQueue, []);
+      const j = queue.find(x => x.id === id);
+      if (!j) return;
+      j.employee_comment = val;
+      store.set(KEYS.jobQueue, queue);
+      e.target.textContent = 'Saved';
+      setTimeout(()=> e.target.textContent = 'Save', 1000);
+    });
+
+    /* =================== Boot =================== */
     (async () => {
       const ok = await ensureAuth();
       if (!ok) return;
+
       renderJobs();
-      renderHours();
+      renderTimesheets();
+      renderPTO();
+      renderPaystubs();
+      renderCompleted();
     })();
   </script>
 </body>
