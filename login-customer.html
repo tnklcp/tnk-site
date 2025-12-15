@@ -3,49 +3,118 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Customer Login | Neighborhood Kids Lawncare Plus</title>
+  <title>Customer Portal — Login | Neighborhood Kids Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
-  <header class="hero">
-    <h1>Customer Portal</h1>
-    <p>View invoices and account details.</p>
-    <div class="cta-row">
-      <a class="button" href="index.html">← Back to Home</a>
-      <button id="btn-open" class="button button--accent">Sign In / Sign Up</button>
-    </div>
-  </header>
-
-  <section class="section">
-    <div class="container" style="max-width:560px">
-      <p>Click “Sign In / Sign Up” to use our secure Netlify Identity login.</p>
-    </div>
-  </section>
+  <style>
+    .auth-wrap {
+      min-height: 100dvh;
+      display:grid;
+      place-items:center;
+      background:
+        radial-gradient(1200px 400px at 50% -10%, rgba(231,125,4,.12), transparent 60%),
+        var(--clr-bg);
+      padding: 2rem 1rem;
+    }
+    .auth-card {
+      width: min(100%, 560px);
+      background: var(--clr-surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-2);
+      padding: 1.5rem 1.25rem;
+      text-align:center;
+    }
+    .auth-brand { display:grid; place-items:center; gap:.5rem; margin-bottom:.75rem; }
+    .auth-brand img { width:86px; height:86px; border-radius:50%; object-fit:cover; border:4px solid color-mix(in srgb, var(--clr-accent) 25%, white); box-shadow: var(--shadow-1); }
+    .auth-title { margin:0; color: var(--clr-primary-600); }
+    .muted { opacity:.85; font-size:.95rem; }
+    .stack { display:grid; gap:.75rem; }
+  </style>
 
   <!-- Netlify Identity Widget -->
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
   <script>
-    // If already logged in, go straight to customer page
-    netlifyIdentity.on('init', user => {
-      console.log('[Identity] init user:', user);
-      if (user) window.location.replace('customer.html');
-    });
-    netlifyIdentity.init();
+    // Prevent redirect ping-pong
+    function redirectOnce(url) {
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
+      if (now - last < 1500) return;
+      sessionStorage.setItem('tnk_redirect_lock', String(now));
+      window.location.replace(url);
+    }
 
-    // Open widget on button click
-    document.getElementById('btn-open').addEventListener('click', () => {
-      netlifyIdentity.open('login');
-    });
+    function getRole(user) {
+      const appRoles = user?.app_metadata?.roles;
+      if (Array.isArray(appRoles) && appRoles.length) {
+        if (appRoles.includes('customer')) return 'customer';
+        if (appRoles.includes('admin')) return 'admin';
+        if (appRoles.includes('employee')) return 'employee';
+      }
+      const metaRole = (user?.user_metadata?.role || '').toLowerCase();
+      if (metaRole) return metaRole;
+      return 'customer';
+    }
 
-    // After login, go to customer portal
-    netlifyIdentity.on('login', user => {
-      window.location.replace('customer.html');
-    });
+    function routeAfter(user) {
+      const role = getRole(user);
+      sessionStorage.setItem('tnk_user_email', (user?.email || '').toLowerCase());
+      sessionStorage.setItem('tnk_role', role);
+      if (role === 'admin') return redirectOnce('admin.html');
+      if (role === 'employee') return redirectOnce('employee.html');
+      return redirectOnce('customer.html');
+    }
 
-    // Optional: close widget on logout
-    netlifyIdentity.on('logout', () => {
-      // stay here
+    function clearSession() {
+      sessionStorage.removeItem('tnk_user_email');
+      sessionStorage.removeItem('tnk_role');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.netlifyIdentity) return;
+
+      netlifyIdentity.on('init', user => {
+        // Already logged in? Route immediately
+        if (user) routeAfter(user);
+      });
+
+      // Ensure role for self-signups (front-end hint; real roles should be managed in Identity)
+      netlifyIdentity.on('signup', user => {
+        try {
+          const meta = user.user_metadata || {};
+          meta.role = meta.role || 'customer';
+          sessionStorage.setItem('tnk_user_email', (user?.email || '').toLowerCase());
+          sessionStorage.setItem('tnk_role', meta.role);
+        } catch {}
+      });
+
+      netlifyIdentity.on('login', user => routeAfter(user));
+      netlifyIdentity.on('logout', () => { clearSession(); redirectOnce('login-customer.html'); });
+
+      netlifyIdentity.init();
     });
   </script>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <img src="images/IMG_2713.png" alt="Neighborhood Kids Lawncare Plus logo" />
+        <h1 class="auth-title">Customer Portal</h1>
+        <p class="muted">View invoices, request services, and manage your account.</p>
+      </div>
+
+      <div class="stack" style="margin-top:1rem">
+        <button class="button button--primary button--xl" onclick="netlifyIdentity && netlifyIdentity.open('login')">
+          <span class="btn-icon" aria-hidden="true">🔐</span>
+          <span>Log In</span>
+        </button>
+        <button class="button" onclick="netlifyIdentity && netlifyIdentity.open('signup')">
+          <span class="btn-icon" aria-hidden="true">✨</span>
+          <span>Create Account</span>
+        </button>
+        <a class="button" href="index.html">← Back to Home</a>
+        <p class="muted">No verification email? Check spam or try again.</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
