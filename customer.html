@@ -3,29 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Customer Portal | TNK Lawncare Plus</title>
+  <title>Customer Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    /* Tabbed layout + cards to match Admin */
-    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
-    .tab { padding:.5rem .8rem; border-radius:999px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
-    .tab[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
-    .panel { display:none; }
-    .panel.active { display:block; }
-    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
-    .grid { display:grid; gap:1rem; }
-    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .table { width:100%; border-collapse: collapse; }
-    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
-    .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
-    .b-unpaid { background:#fff3cd; color:#9a6a00; }
-    .b-paid { background:#d1f7c4; color:#195d00; }
-    .option-grid { display:grid; gap:.6rem; }
-    .option-grid--2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-    .option-btn { display:grid; grid-template-columns: 1fr auto; align-items:center; gap:.6rem; padding:.55rem .7rem; border:1.5px solid #d8d3c8; border-radius:999px; background:#fff; }
-    .option-btn input { width:20px; height:20px; accent-color: var(--clr-primary); }
-    .muted { opacity:.85; }
-    @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
+    .wrap { max-width: 1200px; margin: 2rem auto; }
+    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
+    .tab { background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
+    .tab[aria-selected="true"]{ background:var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .panel{ display:none; }
+    .panel.active{ display:block; }
+    .grid-2{ display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:1rem; }
+    .grid-3{ display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:1rem; }
+    .card{ background:var(--clr-surface); border-radius:var(--radius); box-shadow:var(--shadow-1); padding:1rem; }
+    .muted{ opacity:.85; font-size:.95rem; }
+    .table-wrap{ overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
+    table{ width:100%; border-collapse:collapse; background:#fff; }
+    th,td{ padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
+    thead th{ background:#faf6ec; position:sticky; top:0; z-index:1; }
+    .inline{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .badge{ padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
+    .b-unpaid{ background:#fff3cd; color:#9a6a00; }
+    .b-paid{ background:#d1f7c4; color:#195d00; }
+    .totals{ display:grid; grid-template-columns:1fr auto; gap:.3rem 1rem; max-width:420px; margin-left:auto; }
+    @media (max-width: 900px){ .grid-2,.grid-3{ grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -33,395 +33,414 @@
     <h1>Customer Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button id="btn-logout" class="button">Log Out</button>
+      <button id="logout" class="button">Log Out</button>
     </div>
   </header>
 
-  <section class="section">
-    <div class="container">
-      <p id="hello" class="muted" style="margin-top:0;">Checking session…</p>
+  <div class="wrap container">
+    <nav class="tabs" role="tablist" aria-label="Customer sections">
+      <button class="tab" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="preferences">Service Preferences</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="payments">Payments / Balance</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="requests">Requests</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="history">Service History</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="comments">Comments</button>
+    </nav>
 
-      <div class="tabs" role="tablist">
-        <button class="tab" role="tab" aria-selected="true" data-tab="overview">Overview</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="preferences">Service Preferences</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="extras">Request Extra Service</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="history">Service History & Feedback</button>
-      </div>
-
-      <!-- OVERVIEW -->
-      <div class="panel active" id="panel-overview">
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>Account Balance</h3>
-            <p>Pay ahead for upcoming services.</p>
-            <p><strong>Balance: <span id="balance">$0.00</span></strong></p>
-            <form id="balance-form" class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-              <label>Add Funds ($)</label>
-              <input id="bal_amount" type="number" min="0" step="1" style="max-width:140px" required />
-              <button class="button button--primary" type="submit">Add</button>
-            </form>
-            <p id="bal_status" role="status" class="muted" style="margin-top:.35rem;"></p>
-          </div>
-
-          <div class="card">
-            <h3>Summary</h3>
-            <div id="summary">
-              <p class="muted">We’ll show a quick snapshot of your current tier, add-ons, and next scheduled job (if any).</p>
-            </div>
-          </div>
+    <!-- Overview -->
+    <section id="panel-overview" class="panel active">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Welcome</h2>
+          <p class="muted">Signed in as <span id="me-email"></span></p>
+          <p>From here you can view invoices, manage your service preferences, add funds to your balance, and request extra services.</p>
+        </div>
+        <div class="card">
+          <h2>Next Visit</h2>
+          <p id="next-visit" class="muted">No upcoming job scheduled.</p>
         </div>
       </div>
+    </section>
 
-      <!-- PREFERENCES -->
-      <div class="panel" id="panel-preferences">
+    <!-- Invoices -->
+    <section id="panel-invoices" class="panel">
+      <div class="card">
+        <h2>Invoices</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="inv-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Preferences -->
+    <section id="panel-preferences" class="panel">
+      <div class="card">
+        <h2>Service Preferences</h2>
+        <p class="muted">These reflect the options you prefer for recurring service. We’ll use them when scheduling and quoting.</p>
+
+        <form id="prefs-form">
+          <h3>Essential</h3>
+          <label class="option-btn"><span>Lawn Mowing (Alternating Patterns)</span><input type="checkbox" name="services" value="Lawn Mowing (Alternating Patterns)" /></label>
+          <label class="option-btn"><span>String Trimming (Edges/Beds Only)</span><input type="checkbox" name="services" value="String Trimming (Edges/Beds)" /></label>
+          <label class="option-btn"><span>Blow Off Sidewalks/Driveways/Patios</span><input type="checkbox" name="services" value="Blow Off Hard Surfaces" /></label>
+          <label class="option-btn"><span>Turf Inspection</span><input type="checkbox" name="services" value="Turf Inspection" /></label>
+
+          <h3 style="margin-top:1rem">Standard (Includes Essential +)</h3>
+          <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" name="services" value="Shrub & Plant Pruning" /></label>
+          <label class="option-btn"><span>Collect &amp; Bag Debris</span><input type="checkbox" name="services" value="Collect & Bag Debris" /></label>
+          <label class="option-btn"><span>Inspect Shrubs/Plants for Disease/Stress</span><input type="checkbox" name="services" value="Inspect Shrubs/Plants" /></label>
+          <label class="option-btn"><span>Hand-Pull Walkway Weeds</span><input type="checkbox" name="services" value="Walkway Weeds" /></label>
+
+          <h3 style="margin-top:1rem">Premium (Includes Standard +)</h3>
+          <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" name="services" value="Hand-Weeding Beds" /></label>
+          <label class="option-btn"><span>Hand-Pull Weeds From Lawn Spots</span><input type="checkbox" name="services" value="Hand-Pull Lawn Weeds" /></label>
+          <label class="option-btn"><span>Spigot Insulation (Seasonal)</span><input type="checkbox" name="services" value="Spigot Insulation" /></label>
+          <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" name="services" value="Remove Cobwebs" /></label>
+          <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" name="services" value="Fertilization Logged" /></label>
+          <label class="option-btn"><span>Inspect Mulch Condition</span><input type="checkbox" name="services" value="Inspect Mulch" /></label>
+
+          <div class="inline" style="margin-top:1rem">
+            <button class="button button--primary" type="submit">Save Preferences</button>
+            <p id="prefs-status" class="muted" role="status"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Payments / Balance -->
+    <section id="panel-payments" class="panel">
+      <div class="grid-2">
         <div class="card">
-          <h3>My Service Preferences</h3>
-          <form id="prefs-form">
-            <label><strong>Service Tier</strong></label>
-            <select id="pref_tier" required>
-              <option value="">Select…</option>
-              <option value="Essential">Essential</option>
-              <option value="Standard">Standard</option>
-              <option value="Premium">Premium</option>
-            </select>
-            <p class="muted" style="margin:.35rem 0 .5rem;">
-              Selecting a higher tier automatically includes all services from lower tiers.
-            </p>
-
-            <details class="card" style="padding:.75rem;">
-              <summary style="cursor:pointer;font-weight:700;">Essential Care</summary>
-              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
-                <label class="option-btn"><span>Lawn Mowing (Alternating Patterns)</span><input type="checkbox" data-tier="Essential" value="Lawn Mowing (Alternating Patterns)"></label>
-                <label class="option-btn"><span>String Trimming (Edges)</span><input type="checkbox" data-tier="Essential" value="String Trimming (Edges)"></label>
-                <label class="option-btn"><span>Blowing Off Sidewalks/Driveways/Patios</span><input type="checkbox" data-tier="Essential" value="Blowing Off Sidewalks/Driveways/Patios"></label>
-                <label class="option-btn"><span>Turf Inspection (Bare Spots, Pests, Water Issues)</span><input type="checkbox" data-tier="Essential" value="Turf Inspection (Bare Spots, Pests, Water Issues)"></label>
-              </div>
-            </details>
-
-            <details class="card" style="padding:.75rem; margin-top:.75rem;">
-              <summary style="cursor:pointer;font-weight:700;">Standard Care (Includes Essential +)</summary>
-              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
-                <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" data-tier="Standard" value="Shrub & Plant Pruning"></label>
-                <label class="option-btn"><span>Collect &amp; Bag Debris (Leaves, Branches, Trimmings)</span><input type="checkbox" data-tier="Standard" value="Collect & Bag Debris (Leaves, Branches, Trimmings)"></label>
-                <label class="option-btn"><span>Inspect Shrubs/Plants for Disease or Stress</span><input type="checkbox" data-tier="Standard" value="Inspect Shrubs/Plants for Disease or Stress"></label>
-                <label class="option-btn"><span>Hand-Pull Weeds From Walkways</span><input type="checkbox" data-tier="Standard" value="Hand-Pull Weeds From Walkways"></label>
-              </div>
-            </details>
-
-            <details class="card" style="padding:.75rem; margin-top:.75rem;">
-              <summary style="cursor:pointer;font-weight:700;">Premium Care (Includes Standard +)</summary>
-              <div class="option-grid option-grid--2" style="margin-top:.5rem;">
-                <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" data-tier="Premium" value="Hand-Weeding Garden Beds"></label>
-                <label class="option-btn"><span>Hand-Pull Weeds From Lawn Areas</span><input type="checkbox" data-tier="Premium" value="Hand-Pull Weeds From Lawn Areas"></label>
-                <label class="option-btn"><span>Check/Insulate Hose Spigots (Seasonal)</span><input type="checkbox" data-tier="Premium" value="Check/Insulate Hose Spigots (Seasonal)"></label>
-                <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" data-tier="Premium" value="Remove Cobwebs (Entryways/Structures)"></label>
-                <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" data-tier="Premium" value="Fertilize Lawn/Gardens (Log Product/Date)"></label>
-                <label class="option-btn"><span>Inspect Mulch Condition</span><input type="checkbox" data-tier="Premium" value="Inspect Mulch Condition"></label>
-              </div>
-            </details>
-
-            <details class="card" style="padding:.75rem; margin-top:.75rem;">
-              <summary style="cursor:pointer;font-weight:700;">Storm Damage Prevention Service</summary>
-              <div style="margin-top:.5rem;">
-                <div class="muted" style="margin-bottom:.35rem;">Scheduling Options</div>
-                <div class="option-grid option-grid--2">
-                  <label class="option-btn"><span>1x Per Month</span><input type="checkbox" data-tier="Storm" value="1x per month"></label>
-                  <label class="option-btn"><span>2x Per Month</span><input type="checkbox" data-tier="Storm" value="2x per month"></label>
-                  <label class="option-btn"><span>Custom: Pre-Storm Only</span><input type="checkbox" data-tier="Storm" value="Custom: Pre-Storm Only"></label>
-                  <label class="option-btn"><span>Custom: Post-Storm Only</span><input type="checkbox" data-tier="Storm" value="Custom: Post-Storm Only"></label>
-                  <label class="option-btn"><span>Custom: Both Pre- &amp; Post-Storm</span><input type="checkbox" data-tier="Storm" value="Custom: Both Pre- & Post-Storm"></label>
-                  <label class="option-btn"><span>Custom: Seasonal (Fall – Spring)</span><input type="checkbox" data-tier="Storm" value="Custom: Seasonal (Fall – Spring)"></label>
-                </div>
-
-                <div class="muted" style="margin:.6rem 0 .35rem;">Regular Checks</div>
-                <div class="option-grid option-grid--2">
-                  <label class="option-btn"><span>Inspect Gutters & Drains for Clogs</span><input type="checkbox" data-tier="Storm" value="Inspect gutters and drains for clogs"></label>
-                  <label class="option-btn"><span>Assess/Remove Hazardous Branches (Light Trimming)</span><input type="checkbox" data-tier="Storm" value="Assess/remove hazardous branches near the house (light trimming)"></label>
-                  <label class="option-btn"><span>Identify/Address Other Potential Storm Hazards</span><input type="checkbox" data-tier="Storm" value="Identify/address other potential storm hazards"></label>
-                </div>
-              </div>
-            </details>
-
-            <div class="inline" style="margin-top:.75rem;">
-              <button class="button button--primary" type="submit">Save Preferences</button>
-              <p id="pref_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
-            </div>
+          <h2>Account Balance</h2>
+          <p class="muted">Prepay to keep a credit on file. (Payments processor coming soon.)</p>
+          <div class="totals">
+            <label>Current Balance</label><output id="balance">$0.00</output>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Add Funds (Placeholder)</h2>
+          <form id="add-funds-form" class="inline">
+            <label for="add_amount">Amount ($)</label>
+            <input id="add_amount" type="number" min="1" step="1" value="50" />
+            <button class="button button--primary" type="submit">Add Credit</button>
+            <p id="pay-status" class="muted" role="status"></p>
           </form>
         </div>
       </div>
+    </section>
 
-      <!-- INVOICES -->
-      <div class="panel" id="panel-invoices">
+    <!-- Requests -->
+    <section id="panel-requests" class="panel">
+      <div class="grid-2">
         <div class="card">
-          <h3>My Invoices</h3>
-          <table class="table" id="inv-table">
-            <thead><tr><th>#</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
-            <tbody></tbody>
-          </table>
-          <p id="inv_status" role="status" class="muted" style="margin-top:.35rem;"></p>
-        </div>
-      </div>
-
-      <!-- EXTRAS -->
-      <div class="panel" id="panel-extras">
-        <div class="card">
-          <h3>Request Additional Service</h3>
+          <h2>Request Extra Service</h2>
           <form id="extra-form">
             <label for="x_service">Service</label>
-            <input id="x_service" required placeholder="e.g., One-Time Cleanup" />
-            <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
-              <div><label for="x_date">Preferred Date</label><input id="x_date" type="date" /></div>
-              <div><label for="x_window">Time Window (optional)</label><input id="x_window" placeholder="Morning / Afternoon" /></div>
-            </div>
-            <label for="x_notes" style="margin-top:.5rem;">Notes</label>
-            <textarea id="x_notes" rows="3" placeholder="Access, pets, gate code, etc."></textarea>
-            <div class="inline" style="margin-top:.6rem;">
+            <input id="x_service" required placeholder="e.g., Storm Check, One-time mow, Bush trim" />
+            <label for="x_date">Preferred Date</label>
+            <input id="x_date" type="date" />
+            <label for="x_notes">Notes</label>
+            <textarea id="x_notes" rows="3" placeholder="Gate code, pet info, priority areas"></textarea>
+            <div class="inline" style="margin-top:.5rem">
               <button class="button button--primary" type="submit">Send Request</button>
-              <p id="extra_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
+              <p id="extra-status" class="muted" role="status"></p>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Special Request</h2>
+          <form id="special-form">
+            <label for="s_subject">Subject</label>
+            <input id="s_subject" required placeholder="Custom project / scheduling" />
+            <label for="s_body">Details</label>
+            <textarea id="s_body" rows="4" required></textarea>
+            <div class="inline" style="margin-top:.5rem">
+              <button class="button" type="submit">Submit</button>
+              <p id="special-status" class="muted" role="status"></p>
             </div>
           </form>
         </div>
       </div>
+    </section>
 
-      <!-- HISTORY + FEEDBACK -->
-      <div class="panel" id="panel-history">
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>Service History</h3>
-            <div id="history"><p class="muted">No completed services yet.</p></div>
-          </div>
-          <div class="card">
-            <h3>Leave Feedback</h3>
-            <form id="fb-form">
-              <label for="fb_job">Job</label>
-              <select id="fb_job" required></select>
-              <label for="fb_text" style="margin-top:.5rem;">Your Comment</label>
-              <textarea id="fb_text" rows="3" required placeholder="How did we do?"></textarea>
-              <div class="inline" style="margin-top:.6rem;">
-                <button class="button" type="submit">Submit Feedback</button>
-                <p id="fb_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
-              </div>
-            </form>
-          </div>
+    <!-- Service History -->
+    <section id="panel-history" class="panel">
+      <div class="card">
+        <h2>Your Service History</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Service</th><th>Notes</th><th>Photos</th></tr></thead>
+            <tbody id="hist-tbody"></tbody>
+          </table>
         </div>
       </div>
+    </section>
 
-    </div>
-  </section>
+    <!-- Comments -->
+    <section id="panel-comments" class="panel">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Comment on Previous Service</h2>
+          <form id="comment-form">
+            <label for="c_date">Service Date</label>
+            <input id="c_date" type="date" required />
+            <label for="c_text">Your Comment</label>
+            <textarea id="c_text" rows="4" required></textarea>
+            <div class="inline" style="margin-top:.5rem">
+              <button class="button" type="submit">Send Comment</button>
+              <p id="comment-status" class="muted" role="status"></p>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Your Comments</h2>
+          <ul id="comments-list" style="margin:0;padding-left:1rem;"></ul>
+        </div>
+      </div>
+    </section>
+  </div>
 
-  <!-- Netlify Identity -->
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    // ====== Tabs
-    const tabBtns=[...document.querySelectorAll('.tab')];
-    const panels={
-      overview: document.getElementById('panel-overview'),
-      preferences: document.getElementById('panel-preferences'),
-      invoices: document.getElementById('panel-invoices'),
-      extras: document.getElementById('panel-extras'),
-      history: document.getElementById('panel-history'),
-    };
-    tabBtns.forEach(b=>b.addEventListener('click', ()=>{
-      tabBtns.forEach(t=>t.setAttribute('aria-selected','false'));
-      b.setAttribute('aria-selected','true');
-      Object.values(panels).forEach(p=>p.classList.remove('active'));
-      panels[b.dataset.tab].classList.add('active');
-    }));
+    // ===== Gate =====
+    (function gate(){
+      const role = sessionStorage.getItem('tnk_role');
+      const email = sessionStorage.getItem('tnk_user_email');
+      if (role !== 'customer' || !email) window.location.replace('login-customer.html');
+    })();
 
-    // ====== store + keys
+    // ===== Helpers / Storage =====
+    const meEmail = sessionStorage.getItem('tnk_user_email') || '';
+    document.getElementById('me-email').textContent = meEmail;
+
     const store = {
-      get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
-      set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+      get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+      set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
     };
-    const K = {
+    const KEYS = {
       invoices: 'tnk_invoices',
-      balances: 'tnk_balances',
-      prefs:    'tnk_prefs',
-      extras:   'tnk_extra_requests',
-      jobs:     'tnk_jobs',
-      feedback: 'tnk_job_feedback'
+      jobs: 'tnk_jobs',
+      prefs: 'tnk_prefs',
+      balance: 'tnk_balance',
+      extra: 'tnk_extra_requests',
+      special: 'tnk_special_requests',
+      history: 'tnk_history',
+      comments: 'tnk_comments'
     };
 
-    const hello = document.getElementById('hello');
-    const balanceEl = document.getElementById('balance');
-    function money(n){ return `$${Number(n||0).toFixed(2)}`; }
-
-    // Netlify Identity boot
-    function waitIdentity(){
-      return new Promise((resolve)=>{
-        const cur = netlifyIdentity.currentUser && netlifyIdentity.currentUser();
-        if (cur) return resolve(cur);
-        netlifyIdentity.on('init', resolve);
-        netlifyIdentity.init();
-      });
-    }
-    function userEmail(u){ return (u?.email || '').toLowerCase(); }
-
-    // Overview summary
-    function renderSummary(email){
-      const prefs = store.get(K.prefs, {})[email] || {};
-      const jobs = store.get(K.jobs, []).filter(j => (j.customer_email||'').toLowerCase()===email);
-      const next = jobs.filter(j => (j.status!=='completed')).sort((a,b)=> (a.date<b.date? -1:1))[0];
-      const wrap = document.getElementById('summary');
-      wrap.innerHTML = `
-        <div><strong>Tier:</strong> ${prefs.tier || '—'}</div>
-        <div><strong>Add-Ons:</strong> ${(prefs.addons||[]).join(', ') || '—'}</div>
-        <div style="margin-top:.35rem;"><strong>Next Visit:</strong> ${ next ? `${next.date||''} ${next.time||''} — ${next.title||'Service'}` : '—' }</div>
-      `;
-    }
-
-    // Balance helpers
-    function loadBalance(email){ const all = store.get(K.balances, {}); return Number(all[email]||0); }
-    function saveBalance(email, amt){ const all = store.get(K.balances, {}); all[email]=Number(amt||0); store.set(K.balances, all); }
-
-    // Invoices
-    function renderInvoices(email){
-      const tbody = document.querySelector('#inv-table tbody');
-      const status = document.getElementById('inv_status');
-      const all = store.get(K.invoices, []);
-      const rows = all.filter(i => (i.customer_email||'').toLowerCase() === email)
-                      .sort((a,b)=> (a.date<b.date?1:-1));
-      tbody.innerHTML = '';
-      if(rows.length===0){ status.textContent = 'No invoices yet.'; return; }
-      status.textContent='';
-      rows.forEach(i=>{
-        const total = i.total ?? (Array.isArray(i.items)? i.items.reduce((s,x)=>s+(x.qty||0)*(x.unit||0),0) : 0);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${i.number}</td>
-          <td>${i.date||''}</td>
-          <td>${i.due||''}</td>
-          <td>${money(total)}</td>
-          <td><span class="badge ${i.status==='paid'?'b-paid':'b-unpaid'}">${i.status||'unpaid'}</span></td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // Preferences (cascade)
-    function setTierCascade(tier){
-      const allChecks = [...document.querySelectorAll('#prefs-form input[type="checkbox"]')];
-      const tiers = { Essential:1, Standard:2, Premium:3 };
-      const rank = tiers[tier] || 0;
-      allChecks.forEach(c=>{
-        const t = c.getAttribute('data-tier');
-        const r = (t==='Essential'?1 : t==='Standard'?2 : t==='Premium'?3 : t==='Storm'?99 : 0);
-        // Storm is independent; keep as-is
-        if (t==='Storm') return;
-        if (rank>=r) c.checked = true;
-      });
-    }
-
-    function loadPrefs(email){
-      const p = store.get(K.prefs, {})[email] || {};
-      document.getElementById('pref_tier').value = p.tier || '';
-      const checks = [...document.querySelectorAll('#prefs-form input[type="checkbox"]')];
-      checks.forEach(c => c.checked = (p.addons||[]).includes(c.value));
-      if (p.tier) setTierCascade(p.tier);
-    }
-
-    // History + feedback
-    function renderHistory(email){
-      const wrap = document.getElementById('history');
-      const select = document.getElementById('fb_job');
-      const jobs = store.get(K.jobs, []).filter(j => (j.customer_email||'').toLowerCase()===email && j.status==='completed');
-      select.innerHTML = '<option value="">Select a completed job…</option>';
-      if(jobs.length===0){ wrap.innerHTML = '<p class="muted">No completed services yet.</p>'; return; }
-      wrap.innerHTML = '';
-      jobs.forEach(j=>{
-        const div = document.createElement('div');
-        div.style.marginBottom = '.75rem';
-        const imgs = (j.photos||[]).slice(0,6).map(src => `<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;margin-right:.35rem;box-shadow:var(--shadow-1)">`).join('');
-        div.innerHTML = `
-          <div><strong>${j.date || ''}</strong> — ${j.title || 'Service'}</div>
-          <div style="margin:.35rem 0;">${imgs || ''}</div>
-          ${j.employee_notes ? `<div class="muted"><em>Tech note:</em> ${j.employee_notes}</div>` : ''}
-        `;
-        wrap.appendChild(div);
-        const opt = document.createElement('option');
-        opt.value = j.id; opt.textContent = `${j.date||''} — ${j.title||'Service'}`;
-        select.appendChild(opt);
-      });
-    }
-
-    // ===== Boot
-    document.getElementById('btn-logout').addEventListener('click', ()=> netlifyIdentity.logout());
-    netlifyIdentity.on('logout', ()=> location.replace('login-customer.html'));
-
-    waitIdentity().then(user=>{
-      if(!user) return location.replace('login-customer.html');
-      const email = userEmail(user);
-      hello.textContent = `Welcome, ${user.user_metadata?.full_name || user.email}`;
-
-      // Overview
-      balanceEl.textContent = money(loadBalance(email));
-      renderSummary(email);
-
-      // Invoices / Prefs / History
-      renderInvoices(email);
-      loadPrefs(email);
-      renderHistory(email);
-
-      // Balance form
-      const balForm = document.getElementById('balance-form');
-      balForm.addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const add = Number(document.getElementById('bal_amount').value || 0);
-        const newBal = loadBalance(email) + add;
-        saveBalance(email, newBal);
-        balanceEl.textContent = money(newBal);
-        document.getElementById('bal_status').textContent = 'Updated.';
-        balForm.reset();
-      });
-
-      // Prefs: cascade on tier change + save
-      document.getElementById('pref_tier').addEventListener('change', (e)=>{
-        setTierCascade(e.target.value);
-      });
-
-      const prefForm = document.getElementById('prefs-form');
-      prefForm.addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const tier = document.getElementById('pref_tier').value;
-        const addons = [...document.querySelectorAll('#prefs-form input[type="checkbox"]:checked')].map(i=>i.value);
-        const all = store.get(K.prefs, {});
-        all[email] = { tier, addons };
-        store.set(K.prefs, all);
-        document.getElementById('pref_status').textContent = 'Saved.';
-        renderSummary(email);
-      });
-
-      // Extra request
-      document.getElementById('extra-form').addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const data = {
-          id: crypto.randomUUID(),
-          email,
-          service: document.getElementById('x_service').value.trim(),
-          date: document.getElementById('x_date').value || '',
-          window: document.getElementById('x_window').value.trim(),
-          notes: document.getElementById('x_notes').value.trim(),
-          created_at: new Date().toISOString()
-        };
-        const list = store.get(K.extras, []); list.push(data); store.set(K.extras, list);
-        document.getElementById('extra_status').textContent = 'Request sent (demo).';
-        e.target.reset();
-      });
-
-      // Feedback
-      document.getElementById('fb-form').addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const jobId = document.getElementById('fb_job').value;
-        const text = document.getElementById('fb_text').value.trim();
-        if(!jobId) return (document.getElementById('fb_status').textContent='Pick a job.');
-        const list = store.get(K.feedback, []);
-        list.push({ id: crypto.randomUUID(), job_id: jobId, email, text, created_at: new Date().toISOString() });
-        store.set(K.feedback, list);
-        document.getElementById('fb_status').textContent = 'Thanks for the feedback!';
-        e.target.reset();
+    // ===== Tabs =====
+    const tabs = document.querySelectorAll('.tab');
+    const panels = {
+      overview: document.getElementById('panel-overview'),
+      invoices: document.getElementById('panel-invoices'),
+      preferences: document.getElementById('panel-preferences'),
+      payments: document.getElementById('panel-payments'),
+      requests: document.getElementById('panel-requests'),
+      history: document.getElementById('panel-history'),
+      comments: document.getElementById('panel-comments'),
+    };
+    tabs.forEach(b=>{
+      b.addEventListener('click', ()=>{
+        tabs.forEach(x=>x.setAttribute('aria-selected','false'));
+        b.setAttribute('aria-selected','true');
+        Object.values(panels).forEach(p=>p.classList.remove('active'));
+        panels[b.dataset.tab].classList.add('active');
       });
     });
+
+    // ===== Overview: Next Visit =====
+    function renderNextVisit(){
+      const jobs = store.get(KEYS.jobs, []);
+      const mine = jobs.filter(j=> (j.customer_email||'').toLowerCase() === meEmail.toLowerCase());
+      const upcoming = mine
+        .filter(j=> j.status === 'scheduled')
+        .sort((a,b)=> (a.date < b.date ? -1 : 1))[0];
+      document.getElementById('next-visit').textContent =
+        upcoming ? `${upcoming.date} ${upcoming.start||''} — ${upcoming.service||'Service'}` : 'No upcoming job scheduled.';
+    }
+
+    // ===== Invoices =====
+    const invTbody = document.getElementById('inv-tbody');
+    function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+    function openInvoice(inv){
+      const items = (inv.items||[]).map(i=>`
+        <tr><td>${i.desc||''}</td><td>${i.qty||0}</td><td>${money(i.unit||0)}</td><td>${money((i.qty||0)*(i.unit||0))}</td></tr>
+      `).join('');
+      const html = `
+        <html><head><meta charset="utf-8"><title>${inv.number}</title>
+        <style>body{font-family:Segoe UI,Arial;padding:24px;color:#1e2f1e}
+        table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left}</style>
+        </head><body>
+        <h2>Invoice ${inv.number}</h2>
+        <div>Date: ${inv.date||''} &nbsp; Due: ${inv.due||''} &nbsp; Status: ${inv.status}</div>
+        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${items}</tbody></table>
+        <p style="text-align:right"><strong>Total: ${money(inv.total ?? 0)}</strong></p>
+        <button onclick="window.print()">Print / Save</button>
+        </body></html>`;
+      const w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    }
+    function renderInvoices(){
+      const all = store.get(KEYS.invoices, []);
+      const rows = all
+        .filter(i=> (i.customer_email||'').toLowerCase() === meEmail.toLowerCase())
+        .sort((a,b)=> (a.date < b.date ? 1 : -1))
+        .map(i=>`
+          <tr>
+            <td>${i.number}</td>
+            <td>${i.date||''}</td>
+            <td>${i.due||''}</td>
+            <td>${money(i.total ?? 0)}</td>
+            <td><span class="badge ${i.status==='paid'?'b-paid':'b-unpaid'}">${i.status}</span></td>
+            <td><button class="button" data-open="${i.id}">View</button></td>
+          </tr>
+        `).join('') || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
+      invTbody.innerHTML = rows;
+    }
+    invTbody.addEventListener('click', (e)=>{
+      const id = e.target?.dataset?.open;
+      if(!id) return;
+      const inv = store.get(KEYS.invoices, []).find(x=>x.id===id);
+      if(inv) openInvoice(inv);
+    });
+
+    // ===== Preferences =====
+    const prefsForm = document.getElementById('prefs-form');
+    const prefsStatus = document.getElementById('prefs-status');
+    function loadPrefs(){
+      const all = store.get(KEYS.prefs, {});
+      const mine = all[meEmail] || [];
+      prefsForm.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+        cb.checked = mine.includes(cb.value);
+      });
+    }
+    prefsForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const selected = [...prefsForm.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+      const all = store.get(KEYS.prefs, {});
+      all[meEmail] = selected;
+      store.set(KEYS.prefs, all);
+      prefsStatus.textContent = 'Saved.';
+      setTimeout(()=> prefsStatus.textContent='', 1500);
+    });
+
+    // ===== Payments / Balance =====
+    const balanceEl = document.getElementById('balance');
+    const addForm = document.getElementById('add-funds-form');
+    const payStatus = document.getElementById('pay-status');
+    function getBalance(){
+      const b = store.get(KEYS.balance, {});
+      return Number(b[meEmail] || 0);
+    }
+    function setBalance(v){
+      const b = store.get(KEYS.balance, {});
+      b[meEmail] = Number(v);
+      store.set(KEYS.balance, b);
+      balanceEl.textContent = money(b[meEmail]);
+    }
+    addForm.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const amt = Number(document.getElementById('add_amount').value || 0);
+      if(amt>0){ setBalance(getBalance()+amt); payStatus.textContent='Added.'; setTimeout(()=>payStatus.textContent='', 1200); }
+    });
+
+    // ===== Requests =====
+    const extraForm = document.getElementById('extra-form');
+    const extraStatus = document.getElementById('extra-status');
+    extraForm.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const list = store.get(KEYS.extra, []);
+      list.push({
+        id: crypto.randomUUID(),
+        email: meEmail,
+        service: document.getElementById('x_service').value.trim(),
+        date: document.getElementById('x_date').value || '',
+        notes: document.getElementById('x_notes').value.trim(),
+        created_at: new Date().toISOString()
+      });
+      store.set(KEYS.extra, list);
+      extraStatus.textContent = 'Request sent.';
+      extraForm.reset();
+      setTimeout(()=> extraStatus.textContent='', 1500);
+    });
+
+    const specialForm = document.getElementById('special-form');
+    const specialStatus = document.getElementById('special-status');
+    specialForm.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const list = store.get(KEYS.special, []);
+      list.push({
+        id: crypto.randomUUID(),
+        email: meEmail,
+        subject: document.getElementById('s_subject').value.trim(),
+        body: document.getElementById('s_body').value.trim(),
+        created_at: new Date().toISOString()
+      });
+      store.set(KEYS.special, list);
+      specialStatus.textContent = 'Submitted.';
+      specialForm.reset();
+      setTimeout(()=> specialStatus.textContent='', 1500);
+    });
+
+    // ===== History =====
+    const histTbody = document.getElementById('hist-tbody');
+    function renderHistory(){
+      const all = store.get(KEYS.history, []);
+      const rows = all
+        .filter(h=> (h.email||'').toLowerCase() === meEmail.toLowerCase())
+        .sort((a,b)=> (a.date < b.date ? 1 : -1))
+        .map(h=>`
+          <tr>
+            <td>${h.date||''}</td>
+            <td>${h.service||''}</td>
+            <td>${(h.notes||'').replace(/</g,'&lt;')}</td>
+            <td>${(h.photos||[]).length} photo(s)</td>
+          </tr>
+        `).join('') || `<tr><td colspan="4" class="muted">No history yet.</td></tr>`;
+      histTbody.innerHTML = rows;
+    }
+
+    // ===== Comments =====
+    const commentForm = document.getElementById('comment-form');
+    const commentStatus = document.getElementById('comment-status');
+    const commentsList = document.getElementById('comments-list');
+    function renderComments(){
+      const all = store.get(KEYS.comments, []);
+      const mine = all.filter(c=> (c.email||'').toLowerCase() === meEmail.toLowerCase())
+        .sort((a,b)=> (a.date < b.date ? 1 : -1));
+      commentsList.innerHTML = mine.map(c=>`<li><strong>${c.date}:</strong> ${(c.text||'').replace(/</g,'&lt;')}</li>`).join('') || '<li class="muted">No comments yet.</li>';
+    }
+    commentForm.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const all = store.get(KEYS.comments, []);
+      all.push({ email: meEmail, date: document.getElementById('c_date').value, text: document.getElementById('c_text').value.trim() });
+      store.set(KEYS.comments, all);
+      commentStatus.textContent = 'Sent.';
+      commentForm.reset();
+      renderComments();
+      setTimeout(()=> commentStatus.textContent='', 1500);
+    });
+
+    // ===== Logout =====
+    document.getElementById('logout').addEventListener('click', async ()=>{
+      try{ await fetch('/.netlify/identity/logout', {method:'POST'});}catch{}
+      sessionStorage.removeItem('tnk_user_email');
+      sessionStorage.removeItem('tnk_role');
+      window.location.replace('login-customer.html');
+    });
+
+    // ===== Init =====
+    function init(){
+      balanceEl.textContent = money(getBalance());
+      renderNextVisit();
+      renderInvoices();
+      loadPrefs();
+      renderHistory();
+      renderComments();
+    }
+    init();
   </script>
 </body>
 </html>
