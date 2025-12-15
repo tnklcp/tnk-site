@@ -1,32 +1,37 @@
-/* Admin portal logic — moved out of admin.html to keep it lean */
+// ===== Redirect helper to prevent ping-pong =====
+function redirectOnce(url) {
+  const now = Date.now();
+  const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
+  if (now - last < 1500) return;
+  sessionStorage.setItem('tnk_redirect_lock', String(now));
+  window.location.replace(url);
+}
 
-/* ===== Auth gate (front-end only) ===== */
-(function () {
+// ===== Auth gate =====
+(function authGate() {
   const role = sessionStorage.getItem('tnk_role');
   const root = document.getElementById('admin-root');
   const err = document.getElementById('auth-error');
   if (role === 'admin') {
     document.body.classList.remove('locked');
-    root.removeAttribute('aria-hidden');
+    if (root) root.removeAttribute('aria-hidden');
     if (err) err.hidden = true;
   } else {
     document.body.classList.remove('locked');
-    root.setAttribute('aria-hidden', 'true');
-    root.style.display = 'none';
+    if (root) { root.setAttribute('aria-hidden','true'); root.style.display='none'; }
     if (err) err.hidden = false;
-    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+    redirectOnce(role === 'employee' ? 'employee.html' : 'login.html');
   }
 })();
 
-/* ===== Tabs ===== */
+// ===== Tabs =====
 const tabs = document.querySelectorAll('.tab-btn');
 const panels = {
-  accounts:   document.getElementById('panel-accounts'),
+  accounts: document.getElementById('panel-accounts'),
   timesheets: document.getElementById('panel-timesheets'),
-  promos:     document.getElementById('panel-promos'),
-  prices:     document.getElementById('panel-prices'),
-  invoices:   document.getElementById('panel-invoices'),
-  paystubs:   document.getElementById('panel-paystubs'),
+  promos: document.getElementById('panel-promos'),
+  prices: document.getElementById('panel-prices'),
+  invoices: document.getElementById('panel-invoices'),
 };
 tabs.forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -37,21 +42,20 @@ tabs.forEach(btn=>{
   });
 });
 
-/* ===== Local Storage Helpers ===== */
+// ===== Local Storage Helpers =====
 const store = {
   get(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; } },
   set(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 };
 const KEYS = {
-  accounts:   'tnk_accounts',
+  accounts: 'tnk_accounts',
   timesheets: 'tnk_timesheets',
-  promos:     'tnk_promotions',
-  prices:     'tnk_prices',
-  invoices:   'tnk_invoices',
-  paystubs:   'tnk_paystubs'
+  promos: 'tnk_promotions',
+  prices: 'tnk_prices',
+  invoices: 'tnk_invoices'
 };
 
-/* Seed data (only if empty) */
+// Seed minimal data if empty
 (function seed(){
   if(!store.get(KEYS.accounts)) {
     store.set(KEYS.accounts, [
@@ -61,13 +65,12 @@ const KEYS = {
     ]);
   }
   if(!store.get(KEYS.timesheets)) { store.set(KEYS.timesheets, []); }
-  if(!store.get(KEYS.prices))     { store.set(KEYS.prices, { essential:35, standard:55, premium:85 }); }
-  if(!store.get(KEYS.promos))     { store.set(KEYS.promos, { title:'Storm-Season Check', subtitle:'Inspection + Light Debris Removal', active:true }); }
-  if(!store.get(KEYS.invoices))   { store.set(KEYS.invoices, []); }
-  if(!store.get(KEYS.paystubs))   { store.set(KEYS.paystubs, []); }
+  if(!store.get(KEYS.prices)) { store.set(KEYS.prices, { essential:35, standard:55, premium:85 }); }
+  if(!store.get(KEYS.promos)) { store.set(KEYS.promos, { title:'Storm-Season Check', subtitle:'Inspection + Light Debris Removal', active:true }); }
+  if(!store.get(KEYS.invoices)) { store.set(KEYS.invoices, []); }
 })();
 
-/* ===== Accounts ===== */
+// ===== Accounts Module =====
 const accForm = document.getElementById('account-form');
 const accIdEl = document.getElementById('acc_id');
 const accRoleEl = document.getElementById('acc_role');
@@ -83,7 +86,7 @@ const accFilterRole = document.getElementById('acc_filter_role');
 const accSearch = document.getElementById('acc_search');
 
 function loadAccounts(){ return store.get(KEYS.accounts, []); }
-function saveAccounts(list){ store.set(KEYS.accounts, list); renderAccounts(); refreshEmployeeSelects(); refreshCustomerSelects(); refreshPaystubEmployeeInputs(); }
+function saveAccounts(list){ store.set(KEYS.accounts, list); renderAccounts(); refreshEmployeeSelects(); refreshCustomerSelects(); }
 
 function renderAccounts(){
   const role = accFilterRole.value;
@@ -130,8 +133,8 @@ accForm.addEventListener('submit', (e)=>{
     address: accAddrEl.value.trim()
   };
   const list = loadAccounts();
-  const idx = list.findIndex(a=>a.id===id);
-  if(idx >= 0) list[idx] = data; else list.push(data);
+  const existingIdx = list.findIndex(a=>a.id===id);
+  if(existingIdx >= 0) list[existingIdx] = data; else list.push(data);
   saveAccounts(list);
   accStatus.textContent = 'Saved.';
   resetAccountForm();
@@ -142,11 +145,11 @@ accFilterRole.addEventListener('change', renderAccounts);
 accSearch.addEventListener('input', renderAccounts);
 
 accTableBody.addEventListener('click', (e)=>{
-  const tr = e.target.closest('tr'); if(!tr) return;
+  const tr = e.target.closest('tr');
+  if(!tr) return;
   const id = tr.dataset.id;
   const list = loadAccounts();
   const item = list.find(a=>a.id===id);
-
   if(e.target.classList.contains('btn-edit')){
     accIdEl.value = item.id;
     accRoleEl.value = item.role;
@@ -164,7 +167,7 @@ accTableBody.addEventListener('click', (e)=>{
   }
 });
 
-/* ===== Timesheets ===== */
+// ===== Timesheets Module =====
 const tsForm = document.getElementById('ts-form');
 const tsIdEl = document.getElementById('ts_id');
 const tsEmpEmailEl = document.getElementById('ts_employee_email');
@@ -194,29 +197,46 @@ function refreshEmployeeSelects(){
   if([...tsFilterEmail.options].some(o=>o.value===current)) tsFilterEmail.value=current;
 }
 
-function parseTimeToHours(hhmm){ if(!hhmm) return 0; const [h,m] = hhmm.split(':').map(Number); return h + (m||0)/60; }
-function calcHours(start, end){ const s = parseTimeToHours(start); const e = parseTimeToHours(end); return Math.round(Math.max(0, e - s) * 100) / 100; }
+function parseTimeToHours(hhmm){
+  if(!hhmm) return 0;
+  const [h,m] = hhmm.split(':').map(Number);
+  return h + (m||0)/60;
+}
+function calcHours(start, end){
+  const s = parseTimeToHours(start);
+  const e = parseTimeToHours(end);
+  const diff = Math.max(0, e - s);
+  return Math.round(diff * 100) / 100;
+}
 
 function renderTimesheets(){
   const list = loadTimesheets();
   const filterEmail = tsFilterEmail.value;
   const from = tsFilterFrom.value ? new Date(tsFilterFrom.value) : null;
-  const to   = tsFilterTo.value ? new Date(tsFilterTo.value) : null;
+  const to = tsFilterTo.value ? new Date(tsFilterTo.value) : null;
 
   const rows = list
     .filter(t => filterEmail==='all' ? true : t.employee_email === filterEmail)
-    .filter(t => { const d = new Date(t.date); if(from && d < from) return false; if(to && d > to) return false; return true; })
+    .filter(t => {
+      const d = new Date(t.date || t.work_date || t.date);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    })
     .sort((a,b)=> (a.date<b.date?1:-1))
     .map(t => {
-      const total = calcHours(t.start_time, t.end_time).toFixed(2);
+      const total = (t.hours != null) ? Number(t.hours).toFixed(2)
+                   : calcHours(t.start_time, t.end_time).toFixed(2);
       return `<tr data-id="${t.id}">
-        <td>${t.date}</td>
+        <td>${t.date || t.work_date || ''}</td>
         <td>${t.employee_email}</td>
-        <td>${t.start_time}</td>
-        <td>${t.end_time}</td>
+        <td>${t.start_time || ''}</td>
+        <td>${t.end_time || ''}</td>
         <td>${total}</td>
         <td>${t.notes||''}</td>
-        <td><button class="btn-small btn-approve ${t.approved?'btn-small--ok':''}" type="button">${t.approved?'Approved':'Approve'}</button></td>
+        <td>
+          <button class="btn-small btn-approve ${t.approved?'btn-small--ok':''}" type="button">${t.approved?'Approved':'Approve'}</button>
+        </td>
         <td class="cell-actions">
           <button class="btn-small btn-edit" type="button">Edit</button>
           <button class="btn-small btn-small--danger btn-del" type="button">Delete</button>
@@ -240,17 +260,29 @@ tsForm.addEventListener('submit', (e)=>{
   };
   const list = loadTimesheets();
   const idx = list.findIndex(t=>t.id===id);
-  if(idx>=0) { data.approved = !!list[idx].approved; list[idx] = data; tsSubmitText.textContent = 'Save Entry'; }
-  else { list.push(data); }
+  if(idx>=0) {
+    data.approved = !!list[idx].approved;
+    list[idx] = data;
+    tsSubmitText.textContent = 'Save Entry';
+  } else {
+    list.push(data);
+  }
   saveTimesheets(list);
   tsStatus.textContent = 'Saved.';
   tsForm.reset();
   tsIdEl.value = '';
 });
-tsResetBtn.addEventListener('click', ()=>{ tsForm.reset(); tsIdEl.value=''; tsSubmitText.textContent='Save Entry'; tsStatus.textContent=''; });
+
+tsResetBtn.addEventListener('click', ()=>{
+  tsForm.reset();
+  tsIdEl.value = '';
+  tsSubmitText.textContent = 'Save Entry';
+  tsStatus.textContent = '';
+});
 
 tsTableBody.addEventListener('click', (e)=>{
-  const tr = e.target.closest('tr'); if(!tr) return;
+  const tr = e.target.closest('tr');
+  if(!tr) return;
   const id = tr.dataset.id;
   const list = loadTimesheets();
   const item = list.find(t=>t.id===id);
@@ -258,39 +290,48 @@ tsTableBody.addEventListener('click', (e)=>{
   if(e.target.classList.contains('btn-edit')){
     tsIdEl.value = item.id;
     tsEmpEmailEl.value = item.employee_email;
-    tsDateEl.value = item.date;
-    tsStartEl.value = item.start_time;
-    tsEndEl.value = item.end_time;
+    tsDateEl.value = item.date || item.work_date || '';
+    tsStartEl.value = item.start_time || '';
+    tsEndEl.value = item.end_time || '';
     tsNotesEl.value = item.notes || '';
     tsSubmitText.textContent = 'Update Entry';
     window.scrollTo({ top: document.querySelector('#panel-timesheets').offsetTop - 20, behavior: 'smooth' });
   }
   if(e.target.classList.contains('btn-del')){
-    if(confirm('Delete this timesheet?')) saveTimesheets(list.filter(t=>t.id!==id));
+    if(confirm('Delete this timesheet?')){
+      saveTimesheets(list.filter(t=>t.id!==id));
+    }
   }
   if(e.target.classList.contains('btn-approve')){
-    item.approved = !item.approved; saveTimesheets(list);
+    item.approved = !item.approved;
+    saveTimesheets(list);
   }
 });
+
 tsFilterEmail.addEventListener('change', renderTimesheets);
 tsFilterFrom.addEventListener('change', renderTimesheets);
 tsFilterTo.addEventListener('change', renderTimesheets);
-tsClearFilters.addEventListener('click', ()=>{ tsFilterEmail.value='all'; tsFilterFrom.value=''; tsFilterTo.value=''; renderTimesheets(); });
+tsClearFilters.addEventListener('click', ()=>{
+  tsFilterEmail.value = 'all'; tsFilterFrom.value=''; tsFilterTo.value='';
+  renderTimesheets();
+});
 
-/* ===== Promotions & Prices ===== */
+// ===== Promotions + Prices =====
 const promoForm = document.getElementById('promo-form');
 const promoStatus = document.getElementById('promo_status');
 promoForm.addEventListener('submit', (e)=>{
   e.preventDefault();
-  store.set(KEYS.promos, {
+  const data = {
     title: document.getElementById('promo_title').value.trim(),
     subtitle: document.getElementById('promo_subtitle').value.trim(),
     active: document.getElementById('promo_active').value === 'true'
-  });
+  };
+  store.set(KEYS.promos, data);
   promoStatus.textContent = 'Promotion saved.';
 });
 (function loadPromos(){
-  const p = store.get(KEYS.promos, null); if(!p) return;
+  const p = store.get(KEYS.promos, null);
+  if(!p) return;
   document.getElementById('promo_title').value = p.title || '';
   document.getElementById('promo_subtitle').value = p.subtitle || '';
   document.getElementById('promo_active').value = p.active ? 'true' : 'false';
@@ -300,21 +341,23 @@ const priceForm = document.getElementById('price-form');
 const priceStatus = document.getElementById('price_status');
 priceForm.addEventListener('submit', (e)=>{
   e.preventDefault();
-  store.set(KEYS.prices, {
+  const data = {
     essential: Number(document.getElementById('p_essential').value || 35),
-    standard:  Number(document.getElementById('p_standard').value || 55),
-    premium:   Number(document.getElementById('p_premium').value || 85)
-  });
+    standard: Number(document.getElementById('p_standard').value || 55),
+    premium: Number(document.getElementById('p_premium').value || 85),
+  };
+  store.set(KEYS.prices, data);
   priceStatus.textContent = 'Prices saved.';
 });
 (function loadPrices(){
-  const p = store.get(KEYS.prices, null); if(!p) return;
+  const p = store.get(KEYS.prices, null);
+  if(!p) return;
   document.getElementById('p_essential').value = p.essential ?? 35;
-  document.getElementById('p_standard').value  = p.standard ?? 55;
-  document.getElementById('p_premium').value   = p.premium ?? 85;
+  document.getElementById('p_standard').value = p.standard ?? 55;
+  document.getElementById('p_premium').value = p.premium ?? 85;
 })();
 
-/* ===== Invoices ===== */
+// ===== Invoices Module =====
 const invForm = document.getElementById('inv-form');
 const invIdEl = document.getElementById('inv_id');
 const invCustomerEl = document.getElementById('inv_customer');
@@ -343,6 +386,7 @@ const customerDatalist = document.getElementById('customer-emails');
 
 function loadInvoices(){ return store.get(KEYS.invoices, []); }
 function saveInvoices(list){ store.set(KEYS.invoices, list); renderInvoices(); }
+
 function refreshCustomerSelects(){
   const customers = loadAccounts().filter(a=>a.role==='customer');
   customerDatalist.innerHTML = customers.map(c=>`<option value="${c.email}">`).join('');
@@ -350,6 +394,7 @@ function refreshCustomerSelects(){
   fInvCustomer.innerHTML = `<option value="all">All Customers</option>` + customers.map(c=>`<option value="${c.email}">${c.name} (${c.email})</option>`).join('');
   if([...fInvCustomer.options].some(o=>o.value===current)) fInvCustomer.value=current;
 }
+
 function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
 
 function addItemRow(item={ desc:'', qty:1, unit:35 }){
@@ -366,13 +411,15 @@ function addItemRow(item={ desc:'', qty:1, unit:35 }){
   row.querySelector('.btn-del-item').addEventListener('click', ()=>{ row.remove(); recalcTotals(); });
   recalcTotals();
 }
+
 function getItems(){
   return [...invItemsWrap.querySelectorAll('.items-row')].map(r=>({
     desc: r.querySelector('.it-desc').value.trim(),
     qty: Number(r.querySelector('.it-qty').value || 0),
-    unit: Number(r.querySelector('.it-unit').value || 0)
+    unit: Number(r.querySelector('.it-unit').value || 0),
   })).filter(i=>i.desc || i.qty || i.unit);
 }
+
 function recalcTotals(){
   const items = getItems();
   const subtotal = items.reduce((s,i)=> s + i.qty * i.unit, 0);
@@ -383,7 +430,9 @@ function recalcTotals(){
   outTax.textContent = money(taxAmt);
   outTotal.textContent = money(total);
 }
+
 invAddItemBtn.addEventListener('click', ()=> addItemRow());
+
 function resetInvoiceForm(){
   invIdEl.value = '';
   invCustomerEl.value = '';
@@ -399,12 +448,16 @@ function resetInvoiceForm(){
   invStatusMsg.textContent = '';
   recalcTotals();
 }
+
 function autoInvoiceNumber(){
   const key='tnk_inv_counter';
   let n = Number(localStorage.getItem(key) || 1000);
-  n += 1; localStorage.setItem(key, String(n));
+  n += 1;
+  localStorage.setItem(key, String(n));
   return `INV-${n}`;
 }
+
+// Save invoice
 invForm.addEventListener('submit', (e)=>{
   e.preventDefault();
   const id = invIdEl.value || crypto.randomUUID();
@@ -413,6 +466,7 @@ invForm.addEventListener('submit', (e)=>{
   const subtotal = items.reduce((s,i)=> s + i.qty * i.unit, 0);
   const taxAmt = subtotal * (taxPct/100);
   const total = subtotal + taxAmt;
+
   const data = {
     id,
     customer_email: invCustomerEl.value.trim(),
@@ -421,16 +475,23 @@ invForm.addEventListener('submit', (e)=>{
     date: invDateEl.value,
     due: invDueEl.value,
     tax_pct: taxPct,
-    items, subtotal, tax: taxAmt, total,
+    items,
+    subtotal,
+    tax: taxAmt,
+    total,
     notes: invNotesEl.value.trim()
   };
+
   const list = loadInvoices();
   const idx = list.findIndex(x=>x.id===id);
-  if(idx>=0) list[idx] = data; else list.push(data);
+  if(idx>=0) { list[idx] = data; }
+  else { list.push(data); }
   saveInvoices(list);
+
   invStatusMsg.textContent = 'Invoice saved.';
   resetInvoiceForm();
 });
+
 invResetBtn.addEventListener('click', resetInvoiceForm);
 [invTaxEl].forEach(el=> el.addEventListener('input', recalcTotals));
 
@@ -439,6 +500,7 @@ function renderInvoices(){
   const fCust = fInvCustomer.value;
   const fStat = fInvStatus.value;
   const q = (fInvQ.value || '').toLowerCase();
+
   const rows = list
     .filter(i => fCust==='all' ? true : i.customer_email === fCust)
     .filter(i => fStat==='all' ? true : i.status === fStat)
@@ -453,6 +515,7 @@ function renderInvoices(){
         <td>${money(i.total)}</td>
         <td>${i.status}</td>
         <td class="cell-actions">
+          <button class="btn-small btn-view" type="button">View</button>
           <button class="btn-small btn-edit" type="button">Edit</button>
           <button class="btn-small ${i.status==='paid'?'':'btn-small--ok'} btn-toggle" type="button">
             ${i.status==='paid'?'Mark Unpaid':'Mark Paid'}
@@ -463,8 +526,10 @@ function renderInvoices(){
     `).join('');
   invTableBody.innerHTML = rows || '<tr><td colspan="7" class="muted">No invoices yet.</td></tr>';
 }
+
 invTableBody.addEventListener('click', (e)=>{
-  const tr = e.target.closest('tr'); if(!tr) return;
+  const tr = e.target.closest('tr');
+  if(!tr) return;
   const id = tr.dataset.id;
   const list = loadInvoices();
   const item = list.find(x=>x.id===id);
@@ -486,25 +551,33 @@ invTableBody.addEventListener('click', (e)=>{
     recalcTotals();
     window.scrollTo({ top: document.querySelector('#panel-invoices').offsetTop - 20, behavior:'smooth' });
   }
+
   if(e.target.classList.contains('btn-toggle')){
     item.status = item.status === 'paid' ? 'unpaid' : 'paid';
     saveInvoices(list);
   }
+
   if(e.target.classList.contains('btn-del')){
     if(confirm('Delete this invoice?')){
       saveInvoices(list.filter(x=>x.id!==id));
     }
   }
+
+  if(e.target.classList.contains('btn-view')){
+    openInvoiceWindow(item);
+  }
 });
+
 [fInvCustomer, fInvStatus].forEach(el=> el.addEventListener('change', renderInvoices));
 fInvQ.addEventListener('input', renderInvoices);
+
 btnExportCSV.addEventListener('click', ()=>{
   const list = loadInvoices();
   const rows = [
     ['number','customer_email','date','due','status','subtotal','tax','total','notes'],
     ...list.map(i=>[
       i.number, i.customer_email, i.date||'', i.due||'', i.status,
-      i.subtotal, i.tax, i.total, (i.notes||'').replaceAll('"','""')
+      i.subtotal, i.tax, i.total, (i.notes||'').replaceAll('"','"')
     ])
   ];
   const csv = rows.map(r=> r.map(v=>{
@@ -518,168 +591,87 @@ btnExportCSV.addEventListener('click', ()=>{
   URL.revokeObjectURL(url);
 });
 
-/* ===== Paystubs ===== */
-const psForm = document.getElementById('ps-form');
-const psIdEl = document.getElementById('ps_id');
-const psEmpEl = document.getElementById('ps_employee');
-const psStatusEl = document.getElementById('ps_status');
-const psFromEl = document.getElementById('ps_from');
-const psToEl = document.getElementById('ps_to');
-const psHoursEl = document.getElementById('ps_hours');
-const psRateEl = document.getElementById('ps_rate');
-const psGrossEl = document.getElementById('ps_gross');
-const psUrlEl = document.getElementById('ps_url');
-const psNotesEl = document.getElementById('ps_notes');
-const psSubmitText = document.getElementById('ps_submit_text');
-const psStatusMsg = document.getElementById('ps_status_msg');
-const psResetBtn = document.getElementById('ps_reset');
+function openInvoiceWindow(inv){
+  const win = window.open('', '_blank');
+  const styles = `
+    <style>
+      body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; color:#1e2f1e; }
+      h1,h2,h3 { margin:0 0 6px; }
+      .head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+      .brand { display:flex; align-items:center; gap:12px; }
+      .brand img { width:64px; height:64px; border-radius:12px; }
+      .meta { text-align:right; }
+      .muted { opacity:.8; }
+      table { width:100%; border-collapse:collapse; margin-top: 12px; }
+      th, td { border-bottom:1px solid #e8e1d6; padding:8px; text-align:left; }
+      tfoot td { border-top:2px solid #cfc7b6; font-weight:700; }
+      .totals { max-width:360px; margin-left:auto; }
+      .actions { margin-top: 18px; }
+      button { padding:.5rem .9rem; border-radius:8px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; }
+    </style>
+  `;
+  const money = n => `$${(Number(n||0)).toFixed(2)}`;
+  const itemsRows = (inv.items||[]).map(it=>`
+    <tr>
+      <td>${it.desc||''}</td>
+      <td>${it.qty||0}</td>
+      <td>${money(it.unit||0)}</td>
+      <td>${money((it.qty||0)*(it.unit||0))}</td>
+    </tr>
+  `).join('');
 
-const psTableBody = document.querySelector('#ps_table tbody');
-const psFilterEmp = document.getElementById('ps_filter_emp');
-const psFilterStatus = document.getElementById('ps_filter_status');
-const psExportBtn = document.getElementById('ps_export_csv');
-const psEmpDatalist = document.getElementById('employee-emails-ps');
+  const html = `
+    <!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>${styles}</head>
+    <body>
+      <div class="head">
+        <div class="brand">
+          <img src="images/IMG_2713.png" alt="">
+          <div>
+            <h2>The Neighborhood Kids Lawncare Plus</h2>
+            <div class="muted">Serving Pacific City to Depoe Bay • 541-921-4416 • TNKLCP@gmail.com</div>
+          </div>
+        </div>
+        <div class="meta">
+          <h1>${inv.number}</h1>
+          <div>Date: ${inv.date||''}</div>
+          <div>Due: ${inv.due||''}</div>
+          <div>Status: ${inv.status}</div>
+        </div>
+      </div>
 
-function loadPaystubs(){ return store.get(KEYS.paystubs, []); }
-function savePaystubs(list){ store.set(KEYS.paystubs, list); renderPaystubs(); }
+      <div><strong>Bill To:</strong> ${inv.customer_email}</div>
 
-function refreshPaystubEmployeeInputs(){
-  const emps = loadAccounts().filter(a=>a.role==='employee');
-  psEmpDatalist.innerHTML = emps.map(e=>`<option value="${e.email}">`).join('');
-  const cur = psFilterEmp.value;
-  psFilterEmp.innerHTML = `<option value="all">All Employees</option>` + emps.map(e=>`<option value="${e.email}">${e.name} (${e.email})</option>`).join('');
-  if([...psFilterEmp.options].some(o=>o.value===cur)) psFilterEmp.value = cur;
+      <table>
+        <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
+        <tbody>${itemsRows || '<tr><td colspan="4" class="muted">No items</td></tr>'}</tbody>
+      </table>
+
+      <table class="totals">
+        <tbody>
+          <tr><td>Subtotal</td><td style="text-align:right;">${money(inv.subtotal||0)}</td></tr>
+          <tr><td>Tax (${(inv.tax_pct||0).toFixed(2)}%)</td><td style="text-align:right;">${money(inv.tax||0)}</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td>Total</td><td style="text-align:right;">${money(inv.total||0)}</td></tr>
+        </tfoot>
+      </table>
+
+      ${inv.notes ? `<p class="muted">Notes: ${inv.notes}</p>` : ''}
+
+      <div class="actions">
+        <button onclick="window.print()">Print / Save PDF</button>
+      </div>
+    </body>
+    </html>
+  `;
+  win.document.open(); win.document.write(html); win.document.close();
+  try { win.focus(); } catch {}
 }
-function recalcGross(){
-  const hours = Number(psHoursEl.value || 0);
-  const rate  = Number(psRateEl.value  || 0);
-  const gross = Math.max(0, Math.round(hours*rate*100)/100);
-  psGrossEl.value = gross.toFixed(2);
-}
-psHoursEl.addEventListener('input', recalcGross);
-psRateEl.addEventListener('input', recalcGross);
 
-function resetPaystubForm(){
-  psIdEl.value = '';
-  psEmpEl.value = '';
-  psStatusEl.value = 'draft';
-  psFromEl.value = ''; psToEl.value = '';
-  psHoursEl.value = '0'; psRateEl.value = '0'; psGrossEl.value = '0.00';
-  psUrlEl.value = ''; psNotesEl.value = '';
-  psSubmitText.textContent = 'Save Paystub';
-  psStatusMsg.textContent = '';
-}
-
-psForm.addEventListener('submit', (e)=>{
-  e.preventDefault();
-  const id = psIdEl.value || crypto.randomUUID();
-  const row = {
-    id,
-    employee_email: psEmpEl.value.trim(),
-    status: psStatusEl.value,
-    period_from: psFromEl.value,
-    period_to: psToEl.value,
-    hours: Number(psHoursEl.value || 0),
-    rate: Number(psRateEl.value || 0),
-    gross: Number(psGrossEl.value || 0),
-    url: psUrlEl.value.trim(),
-    notes: psNotesEl.value.trim(),
-    created_at: new Date().toISOString()
-  };
-  const list = loadPaystubs();
-  const idx = list.findIndex(x=>x.id===id);
-  if(idx>=0) list[idx] = row; else list.push(row);
-  savePaystubs(list);
-  psStatusMsg.textContent = 'Paystub saved.';
-  resetPaystubForm();
-});
-psResetBtn.addEventListener('click', resetPaystubForm);
-
-function renderPaystubs(){
-  const list = loadPaystubs();
-  const emp = psFilterEmp.value;
-  const stat = psFilterStatus.value;
-  const rows = list
-    .filter(s => emp==='all' ? true : (s.employee_email===emp))
-    .filter(s => stat==='all' ? true : (s.status===stat))
-    .sort((a,b)=> (a.period_from < b.period_from ? 1 : -1))
-    .map(s => `
-      <tr data-id="${s.id}">
-        <td>${s.employee_email}</td>
-        <td>${s.period_from} → ${s.period_to}</td>
-        <td>${(s.hours||0).toFixed(2)}</td>
-        <td>$${(s.gross||0).toFixed(2)}</td>
-        <td>${s.status}</td>
-        <td>${ s.url ? `<a class="button" href="${s.url}" target="_blank" rel="noopener">Open</a>` : '<span class="muted">No file</span>' }</td>
-        <td class="cell-actions">
-          <button class="btn-small btn-edit-ps" type="button">Edit</button>
-          <button class="btn-small btn-toggle-ps ${s.status==='published'?'':'btn-small--ok'}" type="button">
-            ${s.status==='published'?'Unpublish':'Publish'}
-          </button>
-          <button class="btn-small btn-small--danger btn-del-ps" type="button">Delete</button>
-        </td>
-      </tr>
-    `).join('');
-  psTableBody.innerHTML = rows || '<tr><td colspan="7" class="muted">No paystubs yet.</td></tr>';
-}
-psTableBody.addEventListener('click', (e)=>{
-  const tr = e.target.closest('tr'); if(!tr) return;
-  const id = tr.dataset.id;
-  const list = loadPaystubs();
-  const s = list.find(x=>x.id===id);
-
-  if(e.target.classList.contains('btn-edit-ps')){
-    psIdEl.value = s.id;
-    psEmpEl.value = s.employee_email;
-    psStatusEl.value = s.status || 'draft';
-    psFromEl.value = s.period_from || '';
-    psToEl.value   = s.period_to || '';
-    psHoursEl.value= s.hours ?? 0;
-    psRateEl.value = s.rate ?? 0;
-    psGrossEl.value= (s.gross ?? 0).toFixed(2);
-    psUrlEl.value  = s.url || '';
-    psNotesEl.value= s.notes || '';
-    psSubmitText.textContent = 'Update Paystub';
-    psStatusMsg.textContent = '';
-    window.scrollTo({ top: document.querySelector('#panel-paystubs').offsetTop - 20, behavior:'smooth' });
-  }
-  if(e.target.classList.contains('btn-toggle-ps')){
-    s.status = s.status === 'published' ? 'draft' : 'published';
-    savePaystubs(list);
-  }
-  if(e.target.classList.contains('btn-del-ps')){
-    if(confirm('Delete this paystub?')){
-      savePaystubs(list.filter(x=>x.id!==id));
-    }
-  }
-});
-[psFilterEmp, psFilterStatus].forEach(el => el.addEventListener('change', renderPaystubs));
-
-psExportBtn.addEventListener('click', ()=>{
-  const list = loadPaystubs();
-  const rows = [
-    ['employee_email','status','period_from','period_to','hours','rate','gross','url','notes','created_at'],
-    ...list.map(s=>[
-      s.employee_email, s.status, s.period_from, s.period_to, s.hours, s.rate, s.gross, s.url||'', (s.notes||'').replaceAll('"','""'), s.created_at
-    ])
-  ];
-  const csv = rows.map(r=> r.map(v=>{
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replaceAll('"','""')}"` : s;
-  }).join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'paystubs.csv'; a.click();
-  URL.revokeObjectURL(url);
-});
-
-/* ===== Initial renders ===== */
+// ===== Initial renders =====
 renderAccounts();
 refreshEmployeeSelects();
 refreshCustomerSelects();
 renderTimesheets();
 resetInvoiceForm();
 renderInvoices();
-refreshPaystubEmployeeInputs();
-renderPaystubs();
