@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .loading { opacity:.85; text-align:center; margin-top:.5rem; }
+  </style>
 </head>
 <body>
   <header class="hero">
@@ -17,18 +20,63 @@
 
   <section class="section">
     <div class="container" style="max-width:1000px">
-      <p id="who" style="opacity:.9"></p>
-      <div class="admin-grid" style="display:grid;grid-template-columns:1fr;gap:1rem;">
-        <div class="admin-card">
-          <h2>Welcome</h2>
-          <p>This is a placeholder Admin area. You are seeing this because your Netlify Identity user has the <strong>admin</strong> role.</p>
-          <ul>
-            <li>Manage accounts, hours, promotions, prices, and invoices (to be wired later).</li>
-          </ul>
+      <p id="who" class="loading">Checking access…</p>
+      <div id="content" style="display:none">
+        <div class="admin-grid" style="display:grid;grid-template-columns:1fr;gap:1rem;">
+          <div class="admin-card">
+            <h2>Welcome</h2>
+            <p>You are signed in with the <strong>admin</strong> role.</p>
+          </div>
         </div>
       </div>
     </div>
   </section>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script>
+    const who = document.getElementById('who');
+    const content = document.getElementById('content');
+
+    function isAdmin(user){
+      const roles = (user && user.app_metadata && Array.isArray(user.app_metadata.roles))
+        ? user.app_metadata.roles
+        : [];
+      return roles.includes('admin');
+    }
+
+    function waitIdentity(){
+      return new Promise((resolve) => {
+        const cur = window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+        if (cur) return resolve(cur);
+        netlifyIdentity.on('init', resolve);
+        netlifyIdentity.init();
+      });
+    }
+
+    document.getElementById('logout').addEventListener('click', () => {
+      netlifyIdentity.logout();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      location.replace('login.html');
+    });
+
+    waitIdentity().then((user) => {
+      if (!user) {
+        location.replace('login.html');
+        return;
+      }
+      if (!isAdmin(user)) {
+        location.replace('login.html');
+        return;
+      }
+      who.textContent = `Signed in as ${user.email} (admin)`;
+      content.style.display = 'block';
+    });
+  </script>
+</body>
+</html>
+
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
