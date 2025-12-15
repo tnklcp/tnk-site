@@ -3,93 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>My Hours | Neighborhood Kids Lawncare Plus</title>
+  <title>Employee Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .table { width:100%; border-collapse: collapse; }
-    .table th, .table td { border-bottom:1px solid #ddd; padding:.6rem; text-align:left; }
-    .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
-    .b-pending { background:#fff3cd; color:#9a6a00; }
-    .b-approved { background:#d1f7c4; color:#195d00; }
-    .b-rejected { background:#ffd6d6; color:#a30000; }
+    .loading { opacity:.85; text-align:center; margin-top:.5rem; }
   </style>
 </head>
 <body>
   <header class="hero">
-    <h1>My Hours</h1>
+    <h1>Employee Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <span id="user-badge"></span>
+      <button id="logout" class="button">Log Out</button>
     </div>
   </header>
 
   <section class="section">
-    <div class="container" style="max-width:820px">
-      <form id="hours-form">
-        <label>Date</label>
-        <input type="date" name="work_date" required />
-
-        <label>Hours</label>
-        <input type="number" name="hours" min="0" max="24" step="0.25" required />
-
-        <label>Notes (optional)</label>
-        <textarea name="notes" rows="3" placeholder="Tasks performed, locations, etc."></textarea>
-
-        <button class="button" type="submit">Add Entry</button>
-        <p id="status" role="status" style="margin-top:10px;"></p>
-      </form>
-
-      <h2 style="text-align:center;margin-top:2rem">Your Recent Entries</h2>
-      <table class="table" id="hours-table">
-        <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <div class="container" style="max-width:1000px">
+      <p id="who" class="loading">Checking access…</p>
+      <div id="content" style="display:none">
+        <div class="admin-grid" style="display:grid;grid-template-columns:1fr;gap:1rem;">
+          <div class="admin-card">
+            <h2>Welcome</h2>
+            <p>You are signed in with <strong>employee</strong> (or <strong>admin</strong>) role.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="js/identity.js"></script>
   <script>
-    (async function gate() {
-      try {
-        await TNK.requireRole(['employee']); // employees or admins
-        TNK.renderUserBadge('user-badge');
-      } catch {
-        location.replace('login.html');
-      }
-    })();
+    const who = document.getElementById('who');
+    const content = document.getElementById('content');
 
-    // Local demo storage (replace with API later)
-    const form = document.getElementById('hours-form');
-    const statusEl = document.getElementById('status');
-    const tbody = document.querySelector('#hours-table tbody');
+    function rolesOf(user){
+      return (user && user.app_metadata && Array.isArray(user.app_metadata.roles))
+        ? user.app_metadata.roles
+        : [];
+    }
 
-    function loadHours(){
-      const rows = JSON.parse(localStorage.getItem('tnk_hours') || '[]');
-      tbody.innerHTML = '';
-      rows.forEach(r=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.work_date}</td>
-          <td>${r.hours}</td>
-          <td><span class="badge b-${r.status||'pending'}">${r.status||'pending'}</span></td>
-          <td>${(r.notes||'').replace(/</g,'&lt;')}</td>
-          <td></td>
-        `;
-        tbody.appendChild(tr);
+    function allowEmployee(user){
+      const roles = rolesOf(user);
+      return roles.includes('employee') || roles.includes('admin');
+    }
+
+    function waitIdentity(){
+      return new Promise((resolve) => {
+        const cur = window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+        if (cur) return resolve(cur);
+        netlifyIdentity.on('init', resolve);
+        netlifyIdentity.init();
       });
     }
-    form.addEventListener('submit', (e)=>{
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(form).entries());
-      const rows = JSON.parse(localStorage.getItem('tnk_hours') || '[]');
-      rows.push({ id: crypto.randomUUID(), ...data, status:'pending' });
-      localStorage.setItem('tnk_hours', JSON.stringify(rows));
-      statusEl.textContent = 'Saved.';
-      form.reset();
-      loadHours();
+
+    document.getElementById('logout').addEventListener('click', () => {
+      netlifyIdentity.logout();
     });
-    loadHours();
+
+    netlifyIdentity.on('logout', () => {
+      location.replace('login.html');
+    });
+
+    // Main flow
+    waitIdentity().then((user) => {
+      if (!user) {
+        // Not logged in → go to login once (no loop)
+        location.replace('login.html');
+        return;
+      }
+      if (!allowEmployee(user)) {
+        // Logged in but not employee/admin → back to login with widget
+        location.replace('login.html');
+        return;
+      }
+      who.textContent = `Signed in as ${user.email}`;
+      content.style.display = 'block';
+    });
   </script>
 </body>
 </html>
