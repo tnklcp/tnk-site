@@ -5,24 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    /* --- Layout + Cards --- */
+    .admin-wrap { max-width: 1200px; margin: 2rem auto; }
+    .muted { opacity:.8; font-size:.95rem; }
+    .admin-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
+    .tab-btn {
+      background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer;
+      font-weight:700; color:var(--clr-primary-600);
+    }
+    .tab-btn[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .admin-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; }
+    .admin-card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1.0rem; }
+    .admin-card h2, .admin-card h3 { margin:.25rem 0 .65rem; color:var(--clr-primary-600); }
+    .admin-actions { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+
+    /* --- Tables --- */
+    .table-wrap { overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; }
+    th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
+    thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
+    tr:hover td { background:#fffdf7; }
+    .cell-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .btn-small { padding:.35rem .6rem; border-radius:8px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:600; }
+    .btn-small--danger { border-color:#e6b6b6; color:#7b1f1f; background:#fff; }
+    .btn-small--ok { border-color:#b6d7b6; color:#1f5f1f; }
+
+    /* --- Forms inside cards --- */
+    .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.75rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.75rem; }
+    .stack { display:grid; gap:.6rem; }
+    .inline { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .mt { margin-top:.75rem; }
+    .mb { margin-bottom:.75rem; }
+
+    /* --- Invoice items --- */
+    .items-head, .items-row { display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
+    .items-head { font-weight:700; color:var(--clr-primary-600); }
+    .items-row input { width:100%; }
+    .items-row .btn-del-item { white-space:nowrap; }
+
+    .totals { display:grid; grid-template-columns: 1fr auto; gap:.4rem 1rem; align-items:center; max-width:420px; margin-left:auto; }
+    .totals label { text-align:right; }
+
+    @media (max-width: 900px){
+      .admin-grid { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .items-head, .items-row { grid-template-columns: 1.3fr .9fr .9fr auto; }
+    }
+
+    /* Hide content until auth check completes */
+    body.locked #admin-root { display: none; }
+    .auth-error { max-width: 800px; margin: 3rem auto; text-align:center; }
+  </style>
+  <script src="js/admin.js" defer></script>
 </head>
 <body class="locked">
-  <div class="admin-wrap container" id="admin-root" aria-hidden="true">
+  <div class="admin-wrap container" id="admin-root">
     <h1 style="text-align:center; margin-bottom:.25rem;">Admin Portal</h1>
-    <p class="muted" style="text-align:center; margin-top:0;">Front-end demo (local data in this browser). Backend coming next.</p>
+    <p class="muted" style="text-align:center; margin-top:0;">Front-end demo (data stored in your browser). We’ll connect a real backend next.</p>
 
     <!-- Tabs -->
     <div class="admin-tabs" role="tablist" aria-label="Admin Sections">
-      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="accounts">Accounts</button>
+      <button class="tab-btn" role="tab" aria-selected="true" data-tab="accounts">Accounts</button>
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="promos">Promotions</button>
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="prices">Pricing</button>
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
     </div>
 
-    <!-- Panels -->
+    <!-- ============ Accounts ============ -->
     <section class="tab-panel active" id="panel-accounts">
       <div class="admin-grid">
         <div class="admin-card">
@@ -43,35 +98,57 @@
               </div>
             </div>
             <div class="grid-3">
-              <div><label for="acc_name">Full Name</label><input id="acc_name" type="text" required /></div>
-              <div><label for="acc_phone">Phone</label><input id="acc_phone" type="tel" /></div>
-              <div data-for="customer"><label for="acc_address">Address (Customers)</label><input id="acc_address" type="text" /></div>
+              <div>
+                <label for="acc_name">Full Name</label>
+                <input id="acc_name" type="text" required />
+              </div>
+              <div>
+                <label for="acc_phone">Phone</label>
+                <input id="acc_phone" type="tel" />
+              </div>
+              <div data-for="customer">
+                <label for="acc_address">Address (Customers)</label>
+                <input id="acc_address" type="text" />
+              </div>
             </div>
             <div class="inline mt">
-              <button class="button button--primary" type="submit"><span class="btn-icon">💾</span><span id="acc_submit_text">Save Account</span></button>
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">💾</span><span id="acc_submit_text">Save Account</span>
+              </button>
               <button id="acc_reset" class="button" type="button">Reset</button>
             </div>
             <p id="acc_status" class="muted"></p>
           </form>
         </div>
+
         <div class="admin-card">
           <h2>Accounts</h2>
           <div class="inline mb">
             <label for="acc_filter_role">Filter</label>
-            <select id="acc_filter_role"><option value="all">All</option><option value="customer">Customers</option><option value="employee">Employees</option></select>
+            <select id="acc_filter_role">
+              <option value="all">All</option>
+              <option value="customer">Customers</option>
+              <option value="employee">Employees</option>
+            </select>
             <label for="acc_search">Search</label>
             <input id="acc_search" type="search" placeholder="Name or Email" />
           </div>
+
           <div class="table-wrap">
             <table id="acc_table">
-              <thead><tr><th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <thead>
+                <tr>
+                  <th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- ============ Timesheets ============ -->
     <section class="tab-panel" id="panel-timesheets">
       <div class="admin-grid">
         <div class="admin-card">
@@ -79,50 +156,87 @@
           <form id="ts-form" class="stack">
             <input type="hidden" id="ts_id" />
             <div class="grid-2">
-              <div><label for="ts_employee_email">Employee Email</label><input id="ts_employee_email" type="email" required list="employee-emails" /><datalist id="employee-emails"></datalist></div>
-              <div><label for="ts_date">Date</label><input id="ts_date" type="date" required /></div>
+              <div>
+                <label for="ts_employee_email">Employee Email</label>
+                <input id="ts_employee_email" type="email" required list="employee-emails" />
+                <datalist id="employee-emails"></datalist>
+              </div>
+              <div>
+                <label for="ts_date">Date</label>
+                <input id="ts_date" type="date" required />
+              </div>
             </div>
             <div class="grid-3">
-              <div><label for="ts_start">Start</label><input id="ts_start" type="time" required /></div>
-              <div><label for="ts_end">End</label><input id="ts_end" type="time" required /></div>
-              <div><label for="ts_notes">Notes</label><input id="ts_notes" type="text" placeholder="Optional" /></div>
+              <div>
+                <label for="ts_start">Start (HH:MM)</label>
+                <input id="ts_start" type="time" required />
+              </div>
+              <div>
+                <label for="ts_end">End (HH:MM)</label>
+                <input id="ts_end" type="time" required />
+              </div>
+              <div>
+                <label for="ts_notes">Notes</label>
+                <input id="ts_notes" type="text" placeholder="Optional" />
+              </div>
             </div>
             <div class="inline mt">
-              <button class="button button--primary" type="submit"><span class="btn-icon">🕒</span><span id="ts_submit_text">Save Entry</span></button>
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">🕒</span><span id="ts_submit_text">Save Entry</span>
+              </button>
               <button id="ts_reset" class="button" type="button">Reset</button>
             </div>
             <p id="ts_status" class="muted"></p>
           </form>
         </div>
+
         <div class="admin-card">
           <h2>Employee Hours</h2>
           <div class="inline mb">
             <label for="ts_filter_email">Employee</label>
             <select id="ts_filter_email"><option value="all">All Employees</option></select>
-            <label for="ts_filter_from">From</label><input id="ts_filter_from" type="date" />
-            <label for="ts_filter_to">To</label><input id="ts_filter_to" type="date" />
+            <label for="ts_filter_from">From</label>
+            <input id="ts_filter_from" type="date" />
+            <label for="ts_filter_to">To</label>
+            <input id="ts_filter_to" type="date" />
             <button id="ts_clear_filters" class="btn-small" type="button">Clear</button>
           </div>
+
           <div class="table-wrap">
             <table id="ts_table">
-              <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Notes</th><th>Approved</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <thead>
+                <tr>
+                  <th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Notes</th><th>Approved</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- ============ Promotions ============ -->
     <section class="tab-panel" id="panel-promos">
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Promotions</h2>
           <form id="promo-form" class="stack">
             <div class="grid-2">
-              <div><label for="promo_title">Title</label><input id="promo_title" type="text" required /></div>
-              <div><label for="promo_active">Active</label><select id="promo_active"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+              <div>
+                <label for="promo_title">Title</label>
+                <input id="promo_title" name="title" type="text" placeholder="Storm-Season Check" required />
+              </div>
+              <div>
+                <label for="promo_active">Active</label>
+                <select id="promo_active" name="active">
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
             </div>
-            <label for="promo_subtitle">Subtitle</label><input id="promo_subtitle" type="text" />
+            <label for="promo_subtitle">Subtitle</label>
+            <input id="promo_subtitle" name="subtitle" type="text" placeholder="Inspection + Light Debris Removal" />
             <div class="inline mt">
               <button class="button button--primary" type="submit">Save Promotion</button>
               <a class="button" href="index.html#specials">Preview on Site</a>
@@ -133,15 +247,25 @@
       </div>
     </section>
 
+    <!-- ============ Pricing ============ -->
     <section class="tab-panel" id="panel-prices">
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Pricing</h2>
           <form id="price-form" class="stack">
             <div class="grid-3">
-              <div><label for="p_essential">Essential ($)</label><input id="p_essential" type="number" min="0" step="1" value="35" required /></div>
-              <div><label for="p_standard">Standard ($)</label><input id="p_standard" type="number" min="0" step="1" value="55" required /></div>
-              <div><label for="p_premium">Premium ($)</label><input id="p_premium" type="number" min="0" step="1" value="85" required /></div>
+              <div>
+                <label for="p_essential">Essential ($)</label>
+                <input id="p_essential" name="essential" type="number" min="0" step="1" value="35" required />
+              </div>
+              <div>
+                <label for="p_standard">Standard ($)</label>
+                <input id="p_standard" name="standard" type="number" min="0" step="1" value="55" required />
+              </div>
+              <div>
+                <label for="p_premium">Premium ($)</label>
+                <input id="p_premium" name="premium" type="number" min="0" step="1" value="85" required />
+              </div>
             </div>
             <div class="inline mt">
               <button class="button button--primary" type="submit">Save Prices</button>
@@ -153,6 +277,7 @@
       </div>
     </section>
 
+    <!-- ============ Invoices ============ -->
     <section class="tab-panel" id="panel-invoices">
       <div class="admin-grid">
         <div class="admin-card">
@@ -160,89 +285,91 @@
           <form id="inv-form" class="stack" autocomplete="off">
             <input type="hidden" id="inv_id" />
             <div class="grid-3">
-              <div><label for="inv_customer">Customer Email</label><input id="inv_customer" type="email" required list="customer-emails" /><datalist id="customer-emails"></datalist></div>
-              <div><label for="inv_number">Invoice #</label><input id="inv_number" type="text" placeholder="INV-1001" /></div>
-              <div><label for="inv_status">Status</label><select id="inv_status"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div>
+              <div>
+                <label for="inv_customer">Customer Email</label>
+                <input id="inv_customer" type="email" required list="customer-emails" />
+                <datalist id="customer-emails"></datalist>
+              </div>
+              <div>
+                <label for="inv_number">Invoice #</label>
+                <input id="inv_number" type="text" placeholder="INV-1001" />
+              </div>
+              <div>
+                <label for="inv_status">Status</label>
+                <select id="inv_status">
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
             </div>
+
             <div class="grid-3">
-              <div><label for="inv_date">Invoice Date</label><input id="inv_date" type="date" required /></div>
-              <div><label for="inv_due">Due Date</label><input id="inv_due" type="date" /></div>
-              <div><label for="inv_tax">Tax %</label><input id="inv_tax" type="number" min="0" step="0.01" value="0" /></div>
+              <div>
+                <label for="inv_date">Invoice Date</label>
+                <input id="inv_date" type="date" required />
+              </div>
+              <div>
+                <label for="inv_due">Due Date</label>
+                <input id="inv_due" type="date" />
+              </div>
+              <div>
+                <label for="inv_tax">Tax %</label>
+                <input id="inv_tax" type="number" min="0" step="0.01" value="0" />
+              </div>
             </div>
+
             <div class="stack">
-              <div class="items-head"><div>Description</div><div>Qty</div><div>Unit $</div><div></div></div>
+              <div class="items-head">
+                <div>Description</div><div>Qty</div><div>Unit $</div><div></div>
+              </div>
               <div id="items-rows" class="stack"></div>
-              <div><button id="add-item" type="button" class="btn-small">+ Add Line Item</button></div>
+              <div>
+                <button id="add-item" type="button" class="btn-small">+ Add Line Item</button>
+              </div>
             </div>
+
             <div class="totals mt">
-              <label>Subtotal</label><output id="inv_subtotal">$0.00</output>
-              <label>Tax</label><output id="inv_tax_amt">$0.00</output>
-              <label><strong>Total</strong></label><output id="inv_total"><strong>$0.00</strong></output>
+              <label>Subtotal</label> <output id="inv_subtotal">$0.00</output>
+              <label>Tax</label>      <output id="inv_tax_amt">$0.00</output>
+              <label><strong>Total</strong></label> <output id="inv_total"><strong>$0.00</strong></output>
             </div>
-            <label for="inv_notes" class="mt">Notes</label><input id="inv_notes" type="text" placeholder="Thanks for your business!" />
+
+            <label for="inv_notes" class="mt">Notes</label>
+            <input id="inv_notes" type="text" placeholder="Thanks for your business!" />
+
             <div class="inline mt">
-              <button class="button button--primary" type="submit"><span class="btn-icon">💾</span><span id="inv_submit_text">Save Invoice</span></button>
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">💾</span><span id="inv_submit_text">Save Invoice</span>
+              </button>
               <button id="inv_reset" class="button" type="button">Reset</button>
             </div>
             <p id="inv_status_msg" class="muted"></p>
           </form>
         </div>
+
         <div class="admin-card">
           <h2>Invoices</h2>
           <div class="inline mb">
-            <label for="f_inv_customer">Customer</label><select id="f_inv_customer"><option value="all">All Customers</option></select>
-            <label for="f_inv_status">Status</label><select id="f_inv_status"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
-            <label for="f_inv_q">Search</label><input id="f_inv_q" type="search" placeholder="Invoice # or Email" />
+            <label for="f_inv_customer">Customer</label>
+            <select id="f_inv_customer"><option value="all">All Customers</option></select>
+            <label for="f_inv_status">Status</label>
+            <select id="f_inv_status">
+              <option value="all">All</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="paid">Paid</option>
+            </select>
+            <label for="f_inv_q">Search</label>
+            <input id="f_inv_q" type="search" placeholder="Invoice # or Email" />
             <button id="inv_export_csv" class="btn-small" type="button">Export CSV</button>
           </div>
+
           <div class="table-wrap">
             <table id="inv_table">
-              <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="tab-panel" id="panel-paystubs">
-      <div class="admin-grid">
-        <div class="admin-card">
-          <h2>Create or Edit Paystub</h2>
-          <form id="ps-form" class="stack" autocomplete="off">
-            <input type="hidden" id="ps_id" />
-            <div class="grid-2">
-              <div><label for="ps_employee">Employee Email</label><input id="ps_employee" type="email" required list="employee-emails-ps" /><datalist id="employee-emails-ps"></datalist></div>
-              <div><label for="ps_status">Status</label><select id="ps_status"><option value="draft">Draft</option><option value="published">Published</option></select></div>
-            </div>
-            <div class="grid-4">
-              <div><label for="ps_from">Period From</label><input id="ps_from" type="date" required /></div>
-              <div><label for="ps_to">Period To</label><input id="ps_to" type="date" required /></div>
-              <div><label for="ps_hours">Hours</label><input id="ps_hours" type="number" min="0" step="0.01" value="0" required /></div>
-              <div><label for="ps_rate">Hourly Rate ($)</label><input id="ps_rate" type="number" min="0" step="0.01" value="0" required /></div>
-            </div>
-            <div class="grid-2">
-              <div><label for="ps_gross">Gross ($)</label><input id="ps_gross" type="number" min="0" step="0.01" value="0" required /></div>
-              <div><label for="ps_url">Stub File URL (PDF)</label><input id="ps_url" type="url" placeholder="https://.../paystub.pdf" /></div>
-            </div>
-            <label for="ps_notes">Notes</label><input id="ps_notes" type="text" placeholder="Optional notes" />
-            <div class="inline mt">
-              <button class="button button--primary" type="submit"><span class="btn-icon">💾</span><span id="ps_submit_text">Save Paystub</span></button>
-              <button id="ps_reset" class="button" type="button">Reset</button>
-            </div>
-            <p id="ps_status_msg" class="muted"></p>
-          </form>
-        </div>
-        <div class="admin-card">
-          <h2>Paystubs</h2>
-          <div class="inline mb">
-            <label for="ps_filter_emp">Employee</label><select id="ps_filter_emp"><option value="all">All Employees</option></select>
-            <label for="ps_filter_status">Status</label><select id="ps_filter_status"><option value="all">All</option><option value="draft">Draft</option><option value="published">Published</option></select>
-            <button id="ps_export_csv" class="btn-small" type="button">Export CSV</button>
-          </div>
-          <div class="table-wrap">
-            <table id="ps_table">
-              <thead><tr><th>Employee</th><th>Period</th><th>Hours</th><th>Gross</th><th>Status</th><th>File</th><th>Actions</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
               <tbody></tbody>
             </table>
           </div>
@@ -259,7 +386,5 @@
     <h2>Access Denied</h2>
     <p>You must sign in as Admin via the <a href="login.html">Employee Portal</a>.</p>
   </div>
-
-  <script src="js/admin.js" defer></script>
 </body>
 </html>
