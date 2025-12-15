@@ -3,401 +3,139 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Employee Portal — TNK Lawncare Plus</title>
+  <title>My Hours | Neighborhood Kids Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0 1rem; }
-    .tab { padding:.5rem .8rem; border-radius:999px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
-    .tab[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
-    .panel { display:none; }
-    .panel.active { display:block; }
-    .card { background:#fffaf0; border-radius:12px; box-shadow: var(--shadow-1); padding:1rem; }
-    .grid { display:grid; gap:1rem; }
-    .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
     .table { width:100%; border-collapse: collapse; }
-    .table th, .table td { border-bottom:1px solid #e9e2cf; padding:.6rem; text-align:left; vertical-align:top; }
-    .tag { display:inline-block; background:#eef6ee; color:#1e3b1e; padding:.15rem .45rem; border-radius:999px; font-size:.8rem; }
-    @media (max-width: 900px){ .grid-2{ grid-template-columns: 1fr; } }
+    .table th, .table td { border-bottom:1px solid #ddd; padding:.6rem; text-align:left; }
+    .badge { padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
+    .b-pending { background:#fff3cd; color:#9a6a00; }
+    .b-approved { background:#d1f7c4; color:#195d00; }
+    .b-rejected { background:#ffd6d6; color:#a30000; }
   </style>
 </head>
 <body>
+  <!-- Auth Gate -->
+  <script>
+    function redirectOnce(url) {
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
+      if (now - last < 1500) return;
+      sessionStorage.setItem('tnk_redirect_lock', String(now));
+      window.location.replace(url);
+    }
+    (function authGate() {
+      const role = sessionStorage.getItem('tnk_role');
+      if (role === 'employee') return;                 // ok
+      if (role === 'admin') return redirectOnce('admin.html');
+      redirectOnce('login.html');
+    })();
+  </script>
+
   <header class="hero">
-    <h1>Employee Portal</h1>
+    <h1>My Hours</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button id="logout" class="button">Log Out</button>
+      <button class="button" id="logout">Log Out</button>
     </div>
   </header>
 
   <section class="section">
-    <div class="container">
-      <p id="who" class="muted" style="margin-top:0;">Checking access…</p>
+    <div class="container" style="max-width:820px">
+      <form id="hours-form">
+        <label>Date</label>
+        <input type="date" name="work_date" required />
 
-      <div class="tabs" role="tablist">
-        <button class="tab" role="tab" aria-selected="true" data-tab="jobs">Jobs</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="hours">Hours</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="timeoff">Time Off</button>
-      </div>
+        <label>Hours</label>
+        <input type="number" name="hours" min="0" max="24" step="0.25" required />
 
-      <!-- JOBS -->
-      <div class="panel active" id="panel-jobs">
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>My Jobs</h3>
-            <div class="inline" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-              <label for="range">Range</label>
-              <select id="range">
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="all">All Assigned</option>
-              </select>
-            </div>
-            <table class="table" id="jobs-table">
-              <thead><tr><th>Date/Time</th><th>Customer</th><th>Work</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <p id="jobs_status" role="status" class="muted" style="margin-top:.35rem;"></p>
-          </div>
+        <label>Notes (optional)</label>
+        <textarea name="notes" rows="3" placeholder="Tasks performed, locations, etc."></textarea>
 
-          <div class="card">
-            <h3>Job Details</h3>
-            <p id="job_title" style="font-weight:700;margin:.25rem 0 .5rem;"></p>
-            <div id="job_meta" class="muted" style="margin-bottom:.5rem;"></div>
-            <div id="job_photos" style="display:flex;gap:.5rem;flex-wrap:wrap;"></div>
+        <button class="button" type="submit">Add Entry</button>
+        <p id="status" role="status" style="margin-top:10px;"></p>
+      </form>
 
-            <label for="job_notes" style="margin-top:.5rem;">Completion Notes</label>
-            <textarea id="job_notes" rows="3" placeholder="What was done, any issues?"></textarea>
-
-            <label for="job_images" style="margin-top:.5rem;">Attach Photos</label>
-            <input id="job_images" type="file" accept="image/*" multiple />
-
-            <div class="inline" style="margin-top:.6rem;">
-              <button id="btn-complete" class="button button--primary" disabled>Mark Complete (Send for Review)</button>
-              <p id="complete_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- HOURS -->
-      <div class="panel" id="panel-hours">
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>Add Hours</h3>
-            <form id="hours-form">
-              <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem;">
-                <div><label>Date</label><input id="h_date" type="date" required /></div>
-                <div><label>Start</label><input id="h_start" type="time" required /></div>
-                <div><label>End</label><input id="h_end" type="time" required /></div>
-              </div>
-              <label style="margin-top:.5rem;">Notes</label>
-              <input id="h_notes" placeholder="Optional" />
-              <div class="inline" style="margin-top:.6rem;">
-                <button class="button button--primary" type="submit">Save</button>
-                <p id="h_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
-              </div>
-            </form>
-          </div>
-
-          <div class="card">
-            <h3>Recent Entries</h3>
-            <table class="table" id="hours-table">
-              <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Status</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- PAYSTUBS (read-only) -->
-      <div class="panel" id="panel-paystubs">
-        <div class="card">
-          <h3>My Paystubs</h3>
-          <p class="muted">Generated by Admin. You can view/download when available.</p>
-          <table class="table" id="ps-table">
-            <thead><tr><th>Period</th><th>Hours</th><th>Gross</th><th>Notes</th><th>Action</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- TIME OFF -->
-      <div class="panel" id="panel-timeoff">
-        <div class="grid grid-2">
-          <div class="card">
-            <h3>Request Time Off</h3>
-            <form id="to-form">
-              <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem;">
-                <div><label>From</label><input id="to_from" type="date" required /></div>
-                <div><label>To</label><input id="to_to" type="date" required /></div>
-              </div>
-              <label style="margin-top:.5rem;">Reason</label>
-              <input id="to_reason" required />
-              <div class="inline" style="margin-top:.6rem;">
-                <button class="button" type="submit">Submit Request</button>
-                <p id="to_status" role="status" class="muted" style="margin:0 0 0 .5rem;"></p>
-              </div>
-            </form>
-          </div>
-
-          <div class="card">
-            <h3>My Requests</h3>
-            <table class="table" id="to-table">
-              <thead><tr><th>Dates</th><th>Reason</th><th>Status</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
+      <h2 style="text-align:center;margin-top:2rem">Your Recent Entries</h2>
+      <table class="table" id="hours-table">
+        <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
   </section>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    // Tabs
-    const tabBtns=[...document.querySelectorAll('.tab')];
-    const panels={
-      jobs: document.getElementById('panel-jobs'),
-      hours: document.getElementById('panel-hours'),
-      paystubs: document.getElementById('panel-paystubs'),
-      timeoff: document.getElementById('panel-timeoff'),
+    // Demo-only logout
+    document.getElementById('logout').onclick = async () => {
+      sessionStorage.removeItem('tnk_role');
+      sessionStorage.removeItem('tnk_user_email');
+      redirectOnce('login.html');
     };
-    tabBtns.forEach(b=>b.addEventListener('click', ()=>{
-      tabBtns.forEach(t=>t.setAttribute('aria-selected','false'));
-      b.setAttribute('aria-selected','true');
-      Object.values(panels).forEach(p=>p.classList.remove('active'));
-      panels[b.dataset.tab].classList.add('active');
-    }));
 
-    // store
+    const form = document.getElementById('hours-form');
+    const statusEl = document.getElementById('status');
+    const tbody = document.querySelector('#hours-table tbody');
+
+    // Local storage keys (demo)
     const store = {
-      get(k,f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
-      set(k,v){ localStorage.setItem(k, JSON.stringify(v)); },
+      get(k, f){ try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
+      set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
     };
-    const K = {
-      jobs: 'tnk_jobs',
-      times: 'tnk_timesheets',
-      stubs: 'tnk_paystubs',
-      timeoff: 'tnk_timeoff',
-    };
+    const K = { timesheets:'tnk_timesheets' };
 
-    function rolesOf(u){ return (u?.app_metadata?.roles)||[]; }
-    function waitIdentity(){
-      return new Promise((resolve)=>{
-        const cur = netlifyIdentity.currentUser && netlifyIdentity.currentUser();
-        if (cur) return resolve(cur);
-        netlifyIdentity.on('init', resolve);
-        netlifyIdentity.init();
-      });
-    }
-    function emailOf(u){ return (u?.email||'').toLowerCase(); }
-    function money(n){ return `$${Number(n||0).toFixed(2)}`; }
-
-    // Auth
-    const who = document.getElementById('who');
-    document.getElementById('logout').addEventListener('click', ()=> netlifyIdentity.logout());
-    netlifyIdentity.on('logout', ()=> location.replace('login.html'));
-
-    let MY_EMAIL = '';
-
-    // ===== Jobs
-    const rangeSel = document.getElementById('range');
-    const jobsTbody = document.querySelector('#jobs-table tbody');
-    const jobsStatus = document.getElementById('jobs_status');
-    const jobTitle = document.getElementById('job_title');
-    const jobMeta = document.getElementById('job_meta');
-    const jobPhotos = document.getElementById('job_photos');
-    const jobNotes = document.getElementById('job_notes');
-    const jobImages = document.getElementById('job_images');
-    const btnComplete = document.getElementById('btn-complete');
-    let selectedJobId = null;
-
-    function isInRange(d, mode){
-      const today = new Date(); today.setHours(0,0,0,0);
-      const dt = new Date(d); dt.setHours(0,0,0,0);
-      if(mode==='today') return dt.getTime()===today.getTime();
-      if(mode==='week'){
-        const start = new Date(today); const end = new Date(today);
-        const day = today.getDay(); const diffToMon = (day+6)%7;
-        start.setDate(today.getDate()-diffToMon);
-        end.setDate(start.getDate()+6);
-        return dt>=start && dt<=end;
-      }
-      return true;
-    }
-
-    function renderJobs(){
-      const all = store.get(K.jobs, []);
-      const mine = all.filter(j => (j.assigned_to||'').toLowerCase()===MY_EMAIL);
-      const r = rangeSel.value;
-      const rows = mine.filter(j => !j.status || j.status==='assigned' || j.status==='in_progress' || j.status==='pending_review')
-                       .filter(j => j.date ? isInRange(j.date, r) : true)
-                       .sort((a,b)=> (a.date < b.date ? -1 : 1));
-      jobsTbody.innerHTML = '';
-      if(rows.length===0){ jobsStatus.textContent='No jobs for selected range.'; return; }
-      jobsStatus.textContent='';
-      rows.forEach(j=>{
+    async function loadHours() {
+      const email = sessionStorage.getItem('tnk_user_email') || '';
+      const rows = store.get(K.timesheets, []).filter(r => (r.employee_email||'') === email);
+      tbody.innerHTML = '';
+      rows.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${j.date || ''} ${j.time || ''}</td>
-          <td>${j.customer_name||''}<br/><small>${j.customer_email||''}</small></td>
-          <td>${j.title||''}<br/>${(j.services||[]).map(s=>`<span class="tag">${s}</span>`).join(' ')}</td>
-          <td>${j.status||'assigned'}</td>
-          <td><button class="button" data-open="${j.id}">Open</button></td>
+          <td>${r.work_date}</td>
+          <td>${r.hours}</td>
+          <td><span class="badge b-${r.status||'pending'}">${r.status||'pending'}</span></td>
+          <td>${(r.notes||'').replace(/</g,'&lt;')}</td>
+          <td>${r.status === 'pending' ? '<button class="button" data-edit="'+r.id+'">Edit</button>' : ''}</td>
         `;
-        jobsTbody.appendChild(tr);
+        tbody.appendChild(tr);
       });
     }
 
-    jobsTbody.addEventListener('click', (e)=>{
-      const id = e.target?.dataset?.open;
-      if(!id) return;
-      const all = store.get(K.jobs, []);
-      const j = all.find(x=>x.id===id);
-      selectedJobId = id;
-      jobTitle.textContent = j.title || 'Service';
-      jobMeta.innerHTML = `
-        <div><strong>When:</strong> ${j.date||''} ${j.time||''}</div>
-        <div><strong>Where:</strong> ${j.address||''}</div>
-        <div><strong>Customer:</strong> ${j.customer_name||''} • ${j.customer_email||''}</div>
-        <div><strong>Services:</strong> ${(j.services||[]).join(', ')}</div>
-        <div><strong>Status:</strong> ${j.status||'assigned'}</div>
-      `;
-      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;box-shadow:var(--shadow-1)">`).join('');
-      jobNotes.value = j.employee_notes || '';
-      btnComplete.disabled = false;
+    tbody.addEventListener('click', (e) => {
+      const id = e.target?.dataset?.edit;
+      if (!id) return;
+      const all = store.get(K.timesheets, []);
+      const item = all.find(x => x.id === id);
+      if (!item) return;
+      const hours = prompt('New hours (0–24):', item.hours);
+      const notes = prompt('Notes (optional):', item.notes || '');
+      if (hours === null) return;
+      item.hours = Number(hours);
+      item.notes = notes;
+      store.set(K.timesheets, all);
+      loadHours();
     });
 
-    jobImages.addEventListener('change', async (e)=>{
-      if(!selectedJobId) return;
-      const files = [...e.target.files].slice(0,12);
-      const urls = [];
-      for (const f of files) {
-        const dataUrl = await new Promise(res=>{ const r = new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(f); });
-        urls.push(dataUrl);
-      }
-      const all = store.get(K.jobs, []);
-      const j = all.find(x=>x.id===selectedJobId);
-      j.photos = (j.photos||[]).concat(urls);
-      store.set(K.jobs, all);
-      jobPhotos.innerHTML = (j.photos||[]).map(src=>`<img src="${src}" alt="" style="width:90px;height:70px;object-fit:cover;border-radius:8px;box-shadow:var(--shadow-1)">`).join('');
-      e.target.value = '';
-    });
-
-    document.getElementById('btn-complete').addEventListener('click', ()=>{
-      if(!selectedJobId) return;
-      const list = store.get(K.jobs, []);
-      const j = list.find(x=>x.id===selectedJobId);
-      j.employee_notes = jobNotes.value.trim();
-      j.status = 'pending_review';
-      store.set(K.jobs, list);
-      document.getElementById('complete_status').textContent = 'Submitted for admin review.';
-      renderJobs();
-    });
-
-    rangeSel.addEventListener('change', renderJobs);
-
-    // ===== Hours
-    const hForm = document.getElementById('hours-form');
-    const hStatus = document.getElementById('h_status');
-    const htBody = document.querySelector('#hours-table tbody');
-
-    function parseHours(a,b){
-      if(!a||!b) return 0;
-      const [ah,am]=a.split(':').map(Number); const [bh,bm]=b.split(':').map(Number);
-      return Math.max(0, Math.round(((bh+bm/60)-(ah+am/60))*100)/100);
-    }
-
-    function renderHours(){
-      const list = store.get(K.times, []);
-      const mine = list.filter(t => (t.employee_email||'').toLowerCase()===MY_EMAIL)
-                       .sort((a,b)=> (a.date < b.date ? 1 : -1))
-                       .slice(0,12);
-      htBody.innerHTML = '';
-      if(mine.length===0){ htBody.innerHTML = '<tr><td colspan="5" class="muted">No entries</td></tr>'; return; }
-      mine.forEach(t=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${t.date}</td>
-          <td>${t.start}</td>
-          <td>${t.end}</td>
-          <td>${parseHours(t.start,t.end).toFixed(2)}</td>
-          <td>${t.status||'pending'}</td>
-        `;
-        htBody.appendChild(tr);
-      });
-    }
-
-    hForm.addEventListener('submit', (e)=>{
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const row = {
+      statusEl.textContent = 'Saving...';
+      const email = sessionStorage.getItem('tnk_user_email') || '';
+      const data = {
         id: crypto.randomUUID(),
-        employee_email: MY_EMAIL,
-        date: document.getElementById('h_date').value,
-        start: document.getElementById('h_start').value,
-        end: document.getElementById('h_end').value,
-        notes: document.getElementById('h_notes').value.trim(),
+        employee_email: email,
+        work_date: form.work_date.value,
+        hours: Number(form.hours.value || 0),
+        notes: form.notes.value.trim(),
         status: 'pending'
       };
-      const list = store.get(K.times, []);
-      list.push(row); store.set(K.times, list);
-      hStatus.textContent = 'Saved.';
-      e.target.reset();
-      renderHours();
+      const list = store.get(K.timesheets, []);
+      list.push(data);
+      store.set(K.timesheets, list);
+      statusEl.textContent = 'Saved.';
+      form.reset();
+      loadHours();
     });
 
-    // ===== Paystubs (READ ONLY; provided by Admin)
-    function renderPaystubs(){
-      const tbody = document.querySelector('#ps-table tbody');
-      const list = store.get(K.stubs, []).filter(s => (s.employee_email||'').toLowerCase()===MY_EMAIL)
-                                          .sort((a,b)=> (a.period_from < b.period_from ? 1 : -1));
-      tbody.innerHTML = list.map(s=>`
-        <tr>
-          <td>${s.period_from} → ${s.period_to}</td>
-          <td>${(s.hours||0).toFixed(2)}</td>
-          <td>${money(s.gross||0)}</td>
-          <td>${s.notes||''}</td>
-          <td>${ s.url ? `<a class="button" href="${s.url}" target="_blank" rel="noopener">Open</a>` : '<span class="muted">No file</span>' }</td>
-        </tr>
-      `).join('') || '<tr><td colspan="5" class="muted">No paystubs yet.</td></tr>';
-    }
-
-    // ===== Time off
-    function renderTO(){
-      const tbody = document.querySelector('#to-table tbody');
-      const list = store.get(K.timeoff, []).filter(r => (r.employee_email||'').toLowerCase()===MY_EMAIL)
-                                           .sort((a,b)=> (a.start<b.start?1:-1));
-      tbody.innerHTML = list.map(r=>`
-        <tr><td>${r.start} → ${r.end}</td><td>${r.reason}</td><td>${r.status}</td></tr>
-      `).join('') || '<tr><td colspan="3" class="muted">No requests</td></tr>';
-    }
-    document.getElementById('to-form').addEventListener('submit', (e)=>{
-      e.preventDefault();
-      const row = {
-        id: crypto.randomUUID(),
-        employee_email: MY_EMAIL,
-        start: document.getElementById('to_from').value,
-        end: document.getElementById('to_to').value,
-        reason: document.getElementById('to_reason').value.trim(),
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-      const list = store.get(K.timeoff, []); list.push(row); store.set(K.timeoff, list);
-      document.getElementById('to_status').textContent = 'Submitted.';
-      e.target.reset();
-      renderTO();
-    });
-
-    // ===== Boot
-    waitIdentity().then(user=>{
-      const roles = rolesOf(user||{});
-      if(!user || !(roles.includes('employee') || roles.includes('admin'))) return location.replace('login.html');
-      MY_EMAIL = emailOf(user);
-      who.textContent = `Signed in as ${user.email}`;
-      renderJobs(); renderHours(); renderPaystubs(); renderTO();
-    });
+    loadHours();
   </script>
 </body>
 </html>
