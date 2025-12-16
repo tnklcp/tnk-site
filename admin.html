@@ -5,787 +5,1072 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+  <script src="js/api.js" defer></script>
   <style>
-    .wrap{ max-width:1200px; margin:2rem auto; }
-    .tabs{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
-    .tab{ background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
-    .tab[aria-selected="true"]{ background:var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
-    .panel{ display:none; } .panel.active{ display:block; }
-    .grid-2{ display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:1rem; }
-    .grid-3{ display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:1rem; }
-    .card{ background:var(--clr-surface); border-radius:var(--radius); box-shadow:var(--shadow-1); padding:1rem; }
-    .muted{ opacity:.85; font-size:.95rem; }
-    .table-wrap{ overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
-    table{ width:100%; border-collapse:collapse; background:#fff; }
-    th,td{ padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
-    thead th{ background:#faf6ec; position:sticky; top:0; z-index:1; }
-    .inline{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-    .items-head,.items-row{ display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
-    .items-row input{ width:100%; }
-    .badge{ padding:.2rem .5rem; border-radius:8px; font-size:.85rem; }
-    .b-pending{ background:#fff3cd; color:#9a6a00; }
-    .b-approved{ background:#d1f7c4; color:#195d00; }
-    .b-unpaid{ background:#fff3cd; color:#9a6a00; }
-    .b-paid{ background:#d1f7c4; color:#195d00; }
-    .b-queued{ background:#e9f4ff; color:#004b86; }
-    @media (max-width: 900px){ .grid-2,.grid-3{ grid-template-columns: 1fr; } }
+    /* --- Layout + Cards --- */
+    .admin-wrap { max-width: 1200px; margin: 2rem auto; }
+    .muted { opacity:.8; font-size:.95rem; }
+    .admin-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
+    .tab-btn {
+      background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer;
+      font-weight:700; color:var(--clr-primary-600);
+    }
+    .tab-btn[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .admin-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; }
+    .admin-card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1.0rem; }
+    .admin-card h2, .admin-card h3 { margin:.25rem 0 .65rem; color:var(--clr-primary-600); }
+    .admin-actions { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+
+    /* --- Tables --- */
+    .table-wrap { overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
+    table { width:100%; border-collapse: collapse; background:#fff; }
+    th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
+    thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
+    tr:hover td { background:#fffdf7; }
+    .cell-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .btn-small { padding:.35rem .6rem; border-radius:8px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:600; }
+    .btn-small--danger { border-color:#e6b6b6; color:#7b1f1f; background:#fff; }
+    .btn-small--ok { border-color:#b6d7b6; color:#1f5f1f; }
+
+    /* --- Forms inside cards --- */
+    .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.75rem; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.75rem; }
+    .stack { display:grid; gap:.6rem; }
+    .inline { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+    .mt { margin-top:.75rem; }
+    .mb { margin-bottom:.75rem; }
+
+    /* --- Invoice items --- */
+    .items-head, .items-row { display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
+    .items-head { font-weight:700; color:var(--clr-primary-600); }
+    .items-row input { width:100%; }
+    .items-row .btn-del-item { white-space:nowrap; }
+
+    .totals { display:grid; grid-template-columns: 1fr auto; gap:.4rem 1rem; align-items:center; max-width:420px; margin-left:auto; }
+    .totals label { text-align:right; }
+
+    @media (max-width: 900px){
+      .admin-grid { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .items-head, .items-row { grid-template-columns: 1.3fr .9fr .9fr auto; }
+    }
+
+    /* Hide content until auth check completes */
+    body.locked #admin-root { display: none; }
+    .auth-error { max-width: 800px; margin: 3rem auto; text-align:center; }
   </style>
-  <!-- Optional: Netlify Identity widget (safe if already globally included) -->
-  <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
-<body>
-  <header class="hero">
-    <h1>Admin Portal</h1>
-    <div class="cta-row">
-      <a class="button" href="index.html">← Back to Site</a>
-      <button id="logout" class="button">Log Out</button>
+<body class="locked">
+  <div class="admin-wrap container" id="admin-root" aria-hidden="true">
+    <h1 style="text-align:center; margin-bottom:.25rem;">Admin Portal</h1>
+    <p class="muted" style="text-align:center; margin-top:0;">Front-end demo (data stored in your browser). We’ll connect a real backend next.</p>
+
+    <!-- Tabs -->
+    <div class="admin-tabs" role="tablist" aria-label="Admin Sections">
+      <button class="tab-btn" role="tab" aria-selected="true" data-tab="accounts">Accounts</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="promos">Promotions</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="prices">Pricing</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
     </div>
-  </header>
 
-  <div class="wrap container">
-    <nav class="tabs" role="tablist" aria-label="Admin sections">
-      <button class="tab" role="tab" aria-selected="true" data-tab="jobs">Jobs / Schedule</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="approvals">Approvals</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="accounts">Accounts</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="timesheets">Timesheets</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="invoices">Invoices</button>
-      <button class="tab" role="tab" aria-selected="false" data-tab="pricing">Prices / Promos</button>
-    </nav>
-
-    <!-- Jobs / Schedule -->
-    <section id="panel-jobs" class="panel active">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Create / Assign Job</h2>
-          <form id="job-form">
-            <label>Date</label><input id="j_date" type="date" required />
-            <label>Start (optional)</label><input id="j_start" type="time" />
-            <label>Customer Email</label><input id="j_cust_email" type="email" required list="cust-emails" />
-            <datalist id="cust-emails"></datalist>
-            <label>Customer Name (optional)</label><input id="j_cust_name" />
-            <label>Service</label><input id="j_service" required placeholder="Essential / Standard / Premium / Custom" />
-            <label>Assign to (Employee Email)</label><input id="j_assignee" type="email" required list="emp-emails" />
-            <datalist id="emp-emails"></datalist>
-            <label>Notes</label><textarea id="j_notes" rows="3"></textarea>
-
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button button--primary" type="submit">Save Job</button>
-              <p id="job-status" class="muted" role="status"></p>
-            </div>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>Calendar (Compact)</h2>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Customer</th><th>Service</th><th>Assignee</th><th>Status</th><th></th></tr></thead>
-              <tbody id="job-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Approvals -->
-    <section id="panel-approvals" class="panel">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Completed Jobs (Queue)</h2>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Customer</th><th>Service</th><th>Assignee</th><th>Photos</th><th></th></tr></thead>
-              <tbody id="queue-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h2>Time Off Requests</h2>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Employee</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th></th></tr></thead>
-              <tbody id="to-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Accounts -->
-    <section id="panel-accounts" class="panel">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Create / Edit Account</h2>
-          <form id="acc-form">
+    <!-- ============ Accounts ============ -->
+    <section class="tab-panel active" id="panel-accounts">
+      <div class="admin-grid">
+        <!-- Create / Edit Form -->
+        <div class="admin-card">
+          <h2>Create or Edit Account</h2>
+          <form id="account-form" class="stack" autocomplete="off">
             <input type="hidden" id="acc_id" />
-            <label>Role</label>
-            <select id="acc_role">
-              <option value="customer">Customer</option>
-              <option value="employee">Employee</option>
-            </select>
-            <label>Email</label><input id="acc_email" type="email" required />
-            <label>Full Name</label><input id="acc_name" required />
-            <label>Phone</label><input id="acc_phone" />
-            <label>Address (Customers)</label><input id="acc_address" />
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button button--primary" type="submit">Save</button>
-              <button class="button" type="button" id="acc_reset">Reset</button>
-              <p id="acc_status" class="muted" role="status"></p>
+            <div class="grid-2">
+              <div>
+                <label for="acc_role">Role</label>
+                <select id="acc_role" required>
+                  <option value="customer">Customer</option>
+                  <option value="employee">Employee</option>
+                </select>
+              </div>
+              <div>
+                <label for="acc_email">Email</label>
+                <input id="acc_email" type="email" required />
+              </div>
             </div>
+            <div class="grid-3">
+              <div>
+                <label for="acc_name">Full Name</label>
+                <input id="acc_name" type="text" required />
+              </div>
+              <div>
+                <label for="acc_phone">Phone</label>
+                <input id="acc_phone" type="tel" />
+              </div>
+              <div data-for="customer">
+                <label for="acc_address">Address (Customers)</label>
+                <input id="acc_address" type="text" />
+              </div>
+            </div>
+            <div class="inline mt">
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">💾</span><span id="acc_submit_text">Save Account</span>
+              </button>
+              <button id="acc_reset" class="button" type="button">Reset</button>
+            </div>
+            <p id="acc_status" class="muted"></p>
           </form>
         </div>
-        <div class="card">
+
+        <!-- Accounts Table -->
+        <div class="admin-card">
           <h2>Accounts</h2>
-          <div class="inline">
-            <label>Filter</label>
-            <select id="acc_filter">
+          <div class="inline mb">
+            <label for="acc_filter_role">Filter</label>
+            <select id="acc_filter_role">
               <option value="all">All</option>
               <option value="customer">Customers</option>
               <option value="employee">Employees</option>
             </select>
-            <label>Search</label><input id="acc_q" type="search" placeholder="Name or Email" />
+            <label for="acc_search">Search</label>
+            <input id="acc_search" type="search" placeholder="Name or Email" />
           </div>
-          <div class="table-wrap" style="margin-top:.5rem">
-            <table>
-              <thead><tr><th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th></th></tr></thead>
-              <tbody id="acc-tbody"></tbody>
+
+          <div class="table-wrap">
+            <table id="acc_table">
+              <thead>
+                <tr>
+                  <th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Timesheets -->
-    <section id="panel-timesheets" class="panel">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Add / Edit Hours</h2>
-          <form id="ts-form">
+    <!-- ============ Timesheets ============ -->
+    <section class="tab-panel" id="panel-timesheets">
+      <div class="admin-grid">
+        <!-- Add / Edit Timesheet -->
+        <div class="admin-card">
+          <h2>Add or Edit Hours</h2>
+          <form id="ts-form" class="stack">
             <input type="hidden" id="ts_id" />
-            <label>Employee Email</label><input id="ts_emp" type="email" required list="emp-emails" />
-            <label>Date</label><input id="ts_date" type="date" required />
-            <label>Start</label><input id="ts_start" type="time" />
-            <label>End</label><input id="ts_end" type="time" />
-            <label>Notes</label><input id="ts_notes" />
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button button--primary" type="submit">Save</button>
-              <button class="button" type="button" id="ts_reset">Reset</button>
-              <p id="ts_status" class="muted" role="status"></p>
+            <div class="grid-2">
+              <div>
+                <label for="ts_employee_email">Employee Email</label>
+                <input id="ts_employee_email" type="email" required list="employee-emails" />
+                <datalist id="employee-emails"><!-- options injected --></datalist>
+              </div>
+              <div>
+                <label for="ts_date">Date</label>
+                <input id="ts_date" type="date" required />
+              </div>
             </div>
+            <div class="grid-3">
+              <div>
+                <label for="ts_start">Start (HH:MM)</label>
+                <input id="ts_start" type="time" required />
+              </div>
+              <div>
+                <label for="ts_end">End (HH:MM)</label>
+                <input id="ts_end" type="time" required />
+              </div>
+              <div>
+                <label for="ts_notes">Notes</label>
+                <input id="ts_notes" type="text" placeholder="Optional" />
+              </div>
+            </div>
+            <div class="inline mt">
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">🕒</span><span id="ts_submit_text">Save Entry</span>
+              </button>
+              <button id="ts_reset" class="button" type="button">Reset</button>
+            </div>
+            <p id="ts_status" class="muted"></p>
           </form>
         </div>
-        <div class="card">
+
+        <!-- Timesheets Table -->
+        <div class="admin-card">
           <h2>Employee Hours</h2>
-          <div class="inline">
-            <label>Employee</label><select id="ts_filter"><option value="all">All</option></select>
-            <label>From</label><input id="ts_from" type="date" />
-            <label>To</label><input id="ts_to" type="date" />
-            <button class="button" id="ts_clear" type="button">Clear</button>
+          <div class="inline mb">
+            <label for="ts_filter_email">Employee</label>
+            <select id="ts_filter_email"><option value="all">All Employees</option></select>
+            <label for="ts_filter_from">From</label>
+            <input id="ts_filter_from" type="date" />
+            <label for="ts_filter_to">To</label>
+            <input id="ts_filter_to" type="date" />
+            <button id="ts_clear_filters" class="btn-small" type="button">Clear</button>
           </div>
-          <div class="table-wrap" style="margin-top:.5rem">
-            <table>
-              <thead><tr><th>Date</th><th>Email</th><th>Start</th><th>End</th><th>Total</th><th>Notes</th><th>Approved</th><th></th></tr></thead>
-              <tbody id="ts-tbody"></tbody>
+
+          <div class="table-wrap">
+            <table id="ts_table">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Notes</th><th>Approved</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Invoices -->
-    <section id="panel-invoices" class="panel">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Create / Edit Invoice</h2>
-          <form id="inv-form" autocomplete="off">
-            <input type="hidden" id="inv_id" />
-            <label>Customer Email</label><input id="inv_cust" type="email" required list="cust-emails" />
-            <label>Invoice #</label><input id="inv_num" placeholder="INV-1001" />
-            <label>Status</label>
-            <select id="inv_status"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
-            <div class="grid-3">
-              <div><label>Date</label><input id="inv_date" type="date" required /></div>
-              <div><label>Due</label><input id="inv_due" type="date" /></div>
-              <div><label>Tax %</label><input id="inv_tax" type="number" min="0" step="0.01" value="0" /></div>
-            </div>
-            <div class="items-head" style="margin-top:.5rem"><div>Description</div><div>Qty</div><div>Unit</div><div></div></div>
-            <div id="inv-items" class="card" style="padding:.5rem;"></div>
-            <button id="inv-add" class="button" type="button">+ Add Line</button>
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button button--primary" type="submit">Save Invoice</button>
-              <button class="button" id="inv_reset" type="button">Reset</button>
-              <p id="inv_status_msg" class="muted" role="status"></p>
-            </div>
-          </form>
-        </div>
-        <div class="card">
-          <h2>Invoices</h2>
-          <div class="inline">
-            <label>Customer</label><select id="inv_filter"><option value="all">All</option></select>
-            <label>Status</label><select id="inv_filter_status"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
-            <label>Search</label><input id="inv_q" type="search" placeholder="Invoice # or Email" />
-          </div>
-          <div class="table-wrap" style="margin-top:.5rem">
-            <table>
-              <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th></th></tr></thead>
-              <tbody id="inv-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pricing / Promos -->
-    <section id="panel-pricing" class="panel">
-      <div class="grid-2">
-        <div class="card">
-          <h2>Prices</h2>
-          <form id="price-form">
-            <div class="grid-3">
-              <div><label>Essential ($)</label><input id="p_ess" type="number" min="0" step="1" value="35" /></div>
-              <div><label>Standard ($)</label><input id="p_std" type="number" min="0" step="1" value="55" /></div>
-              <div><label>Premium ($)</label><input id="p_pre" type="number" min="0" step="1" value="85" /></div>
-            </div>
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button button--primary" type="submit">Save</button>
-              <p id="price-status" class="muted" role="status"></p>
-            </div>
-          </form>
-        </div>
-        <div class="card">
+    <!-- ============ Promotions ============ -->
+    <section class="tab-panel" id="panel-promos">
+      <div class="admin-grid">
+        <div class="admin-card">
           <h2>Promotions</h2>
-          <form id="promo-form">
-            <label>Title</label><input id="pr_title" placeholder="Storm-Season Check" />
-            <label>Subtitle</label><input id="pr_sub" placeholder="Inspection + Light Debris Removal" />
-            <label>Active</label><select id="pr_active"><option value="true">Active</option><option value="false">Inactive</option></select>
-            <div class="inline" style="margin-top:.6rem">
-              <button class="button" type="submit">Save</button>
-              <a class="button" href="index.html#specials">Preview</a>
-              <p id="promo-status" class="muted" role="status"></p>
+          <form id="promo-form" class="stack">
+            <div class="grid-2">
+              <div>
+                <label for="promo_title">Title</label>
+                <input id="promo_title" name="title" type="text" placeholder="Storm-Season Check" required />
+              </div>
+              <div>
+                <label for="promo_active">Active</label>
+                <select id="promo_active" name="active">
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
             </div>
+            <label for="promo_subtitle">Subtitle</label>
+            <input id="promo_subtitle" name="subtitle" type="text" placeholder="Inspection + Light Debris Removal" />
+            <div class="inline mt">
+              <button class="button button--primary" type="submit">Save Promotion</button>
+              <a class="button" href="index.html#specials">Preview on Site</a>
+            </div>
+            <p id="promo_status" class="muted"></p>
           </form>
         </div>
       </div>
     </section>
+
+    <!-- ============ Pricing ============ -->
+    <section class="tab-panel" id="panel-prices">
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h2>Pricing</h2>
+          <form id="price-form" class="stack">
+            <div class="grid-3">
+              <div>
+                <label for="p_essential">Essential ($)</label>
+                <input id="p_essential" name="essential" type="number" min="0" step="1" value="35" required />
+              </div>
+              <div>
+                <label for="p_standard">Standard ($)</label>
+                <input id="p_standard" name="standard" type="number" min="0" step="1" value="55" required />
+              </div>
+              <div>
+                <label for="p_premium">Premium ($)</label>
+                <input id="p_premium" name="premium" type="number" min="0" step="1" value="85" required />
+              </div>
+            </div>
+            <div class="inline mt">
+              <button class="button button--primary" type="submit">Save Prices</button>
+              <a class="button" href="index.html#pricing">Preview on Site</a>
+            </div>
+            <p id="price_status" class="muted"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Invoices ============ -->
+    <section class="tab-panel" id="panel-invoices">
+      <div class="admin-grid">
+        <!-- Create / Edit Invoice -->
+        <div class="admin-card">
+          <h2>Create or Edit Invoice</h2>
+          <form id="inv-form" class="stack" autocomplete="off">
+            <input type="hidden" id="inv_id" />
+            <div class="grid-3">
+              <div>
+                <label for="inv_customer">Customer Email</label>
+                <input id="inv_customer" type="email" required list="customer-emails" />
+                <datalist id="customer-emails"><!-- injected --></datalist>
+              </div>
+              <div>
+                <label for="inv_number">Invoice #</label>
+                <input id="inv_number" type="text" placeholder="INV-1001" />
+              </div>
+              <div>
+                <label for="inv_status">Status</label>
+                <select id="inv_status">
+                  <option value="unpaid">Unpaid</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-3">
+              <div>
+                <label for="inv_date">Invoice Date</label>
+                <input id="inv_date" type="date" required />
+              </div>
+              <div>
+                <label for="inv_due">Due Date</label>
+                <input id="inv_due" type="date" />
+              </div>
+              <div>
+                <label for="inv_tax">Tax %</label>
+                <input id="inv_tax" type="number" min="0" step="0.01" value="0" />
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="items-head">
+                <div>Description</div><div>Qty</div><div>Unit $</div><div></div>
+              </div>
+              <div id="items-rows" class="stack"><!-- rows injected --></div>
+              <div>
+                <button id="add-item" type="button" class="btn-small">+ Add Line Item</button>
+              </div>
+            </div>
+
+            <div class="totals mt">
+              <label>Subtotal</label> <output id="inv_subtotal">$0.00</output>
+              <label>Tax</label>      <output id="inv_tax_amt">$0.00</output>
+              <label><strong>Total</strong></label> <output id="inv_total"><strong>$0.00</strong></output>
+            </div>
+
+            <label for="inv_notes" class="mt">Notes</label>
+            <input id="inv_notes" type="text" placeholder="Thanks for your business!" />
+
+            <div class="inline mt">
+              <button class="button button--primary" type="submit">
+                <span class="btn-icon" aria-hidden="true">💾</span><span id="inv_submit_text">Save Invoice</span>
+              </button>
+              <button id="inv_reset" class="button" type="button">Reset</button>
+            </div>
+            <p id="inv_status_msg" class="muted"></p>
+          </form>
+        </div>
+
+        <!-- Invoices Table -->
+        <div class="admin-card">
+          <h2>Invoices</h2>
+          <div class="inline mb">
+            <label for="f_inv_customer">Customer</label>
+            <select id="f_inv_customer"><option value="all">All Customers</option></select>
+            <label for="f_inv_status">Status</label>
+            <select id="f_inv_status">
+              <option value="all">All</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="paid">Paid</option>
+            </select>
+            <label for="f_inv_q">Search</label>
+            <input id="f_inv_q" type="search" placeholder="Invoice # or Email" />
+            <button id="inv_export_csv" class="btn-small" type="button">Export CSV</button>
+          </div>
+
+          <div class="table-wrap">
+            <table id="inv_table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- rows injected --></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p style="text-align:center;margin-top:1.25rem;">
+      <a href="index.html" class="button">← Back to Website</a>
+    </p>
+  </div>
+
+  <div id="auth-error" class="auth-error" hidden>
+    <h2>Access Denied</h2>
+    <p>You must sign in as Admin via the <a href="login.html">Employee Portal</a>.</p>
   </div>
 
   <script>
-    // ===== Role Gate =====
-    (function gate(){
+    // ====== Auth gate (front-end) ======
+    (function () {
       const role = sessionStorage.getItem('tnk_role');
-      const email = sessionStorage.getItem('tnk_user_email');
-      if (role !== 'admin' || !email) window.location.replace('login.html');
+      const root = document.getElementById('admin-root');
+      const err = document.getElementById('auth-error');
+      if (role === 'admin') {
+        document.body.classList.remove('locked');
+        root.removeAttribute('aria-hidden');
+        err.hidden = true;
+      } else {
+        document.body.classList.remove('locked');
+        root.setAttribute('aria-hidden', 'true');
+        root.style.display = 'none';
+        err.hidden = false;
+        setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+      }
     })();
 
-    // ===== Robust Logout =====
-    async function hardLogoutRedirect() {
-      try { await fetch('/.netlify/identity/logout', { method:'POST' }); } catch {}
-      // Clear our app session
-      sessionStorage.removeItem('tnk_user_email');
-      sessionStorage.removeItem('tnk_role');
-      // Clear possible GoTrue/Identity local state
-      try { localStorage.removeItem('gotrue.user'); } catch {}
-      try { localStorage.removeItem('netlify-cms-user'); } catch {}
-      // Force navigation
-      window.location.replace('login.html');
-    }
-
-    async function handleLogout() {
-      // If widget exists, prefer its logout (fires async)
-      try {
-        if (window.netlifyIdentity && typeof window.netlifyIdentity.logout === 'function') {
-          await new Promise(resolve => {
-            const done = () => { window.netlifyIdentity.off('logout', done); resolve(); };
-            window.netlifyIdentity.on('logout', done);
-            window.netlifyIdentity.logout();
-            // Safety timeout in case event doesn't fire
-            setTimeout(done, 1500);
-          });
-        }
-      } catch {}
-      await hardLogoutRedirect();
-    }
-
-    document.getElementById('logout').addEventListener('click', handleLogout);
-
-    // ===== Tabs =====
-    const tabs = document.querySelectorAll('.tab');
+    // ====== Tabs ======
+    const tabs = document.querySelectorAll('.tab-btn');
     const panels = {
-      jobs: document.getElementById('panel-jobs'),
-      approvals: document.getElementById('panel-approvals'),
       accounts: document.getElementById('panel-accounts'),
       timesheets: document.getElementById('panel-timesheets'),
+      promos: document.getElementById('panel-promos'),
+      prices: document.getElementById('panel-prices'),
       invoices: document.getElementById('panel-invoices'),
-      pricing: document.getElementById('panel-pricing'),
     };
-    tabs.forEach(b=>{
-      b.addEventListener('click', ()=>{
-        tabs.forEach(x=>x.setAttribute('aria-selected','false'));
-        b.setAttribute('aria-selected','true');
+    tabs.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        tabs.forEach(b=>b.setAttribute('aria-selected','false'));
+        btn.setAttribute('aria-selected','true');
         Object.values(panels).forEach(p=>p.classList.remove('active'));
-        panels[b.dataset.tab].classList.add('active');
+        panels[btn.dataset.tab].classList.add('active');
       });
     });
 
-    // ===== Storage =====
+    // ====== Local Storage Helpers ======
     const store = {
-      get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
-      set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+      get(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch{ return fallback; } },
+      set(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
     };
     const KEYS = {
       accounts: 'tnk_accounts',
-      jobs: 'tnk_jobs',
-      jobQueue: 'tnk_job_queue',
-      timeoff: 'tnk_timeoff',
       timesheets: 'tnk_timesheets',
-      invoices: 'tnk_invoices',
+      promos: 'tnk_promotions',
       prices: 'tnk_prices',
-      promos: 'tnk_promotions'
+      invoices: 'tnk_invoices'
     };
 
-    // ===== Seed minimal =====
+    // Seed minimal data if empty
     (function seed(){
-      if(!store.get(KEYS.accounts)){
+      if(!store.get(KEYS.accounts)) {
         store.set(KEYS.accounts, [
-          { id: crypto.randomUUID(), role:'employee', name:'Malachi Goreman', email:'malachi@example.com' },
-          { id: crypto.randomUUID(), role:'employee', name:'Ian Loney', email:'ian@example.com' },
-          { id: crypto.randomUUID(), role:'customer', name:'Megan R', email:'megan@example.com', address:'Lincoln City, OR' }
+          { id: crypto.randomUUID(), role:'employee', name:'Malachi Goreman', email:'malachi@example.com', phone:'', address:'' },
+          { id: crypto.randomUUID(), role:'employee', name:'Ian Loney', email:'ian@example.com', phone:'', address:'' },
+          { id: crypto.randomUUID(), role:'customer', name:'Megan R', email:'megan@example.com', phone:'', address:'Lincoln City, OR' },
         ]);
       }
-      if(!store.get(KEYS.prices)){ store.set(KEYS.prices,{ essential:35, standard:55, premium:85 }); }
-      if(!store.get(KEYS.promos)){ store.set(KEYS.promos,{ title:'Storm-Season Check', subtitle:'Inspection + Light Debris Removal', active:true }); }
-      if(!store.get(KEYS.jobs)){ store.set(KEYS.jobs, []); }
-      if(!store.get(KEYS.jobQueue)){ store.set(KEYS.jobQueue, []); }
-      if(!store.get(KEYS.timeoff)){ store.set(KEYS.timeoff, []); }
-      if(!store.get(KEYS.timesheets)){ store.set(KEYS.timesheets, []); }
-      if(!store.get(KEYS.invoices)){ store.set(KEYS.invoices, []); }
+      if(!store.get(KEYS.timesheets)) { store.set(KEYS.timesheets, []); }
+      if(!store.get(KEYS.prices)) { store.set(KEYS.prices, { essential:35, standard:55, premium:85 }); }
+      if(!store.get(KEYS.promos)) { store.set(KEYS.promos, { title:'Storm-Season Check', subtitle:'Inspection + Light Debris Removal', active:true }); }
+      if(!store.get(KEYS.invoices)) { store.set(KEYS.invoices, []); }
     })();
 
-    // ===== Helpers =====
-    function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
-    function subtotal(items){ return (items||[]).reduce((s,i)=> s + (Number(i.qty||0)*Number(i.unit||0)), 0); }
-
-    // ===== Jobs =====
-    const jForm = document.getElementById('job-form');
-    const jStatus = document.getElementById('job-status');
-    const jobTbody = document.getElementById('job-tbody');
-    const custDL = document.getElementById('cust-emails');
-    const empDL = document.getElementById('emp-emails');
-
-    function refreshAccountLists(){
-      const acc = store.get(KEYS.accounts, []);
-      const customers = acc.filter(a=>a.role==='customer');
-      const employees = acc.filter(a=>a.role==='employee');
-      custDL.innerHTML = customers.map(c=>`<option value="${c.email}">`).join('');
-      empDL.innerHTML = employees.map(e=>`<option value="${e.email}">`).join('');
-      // invoice filter select too
-      const invFilt = document.getElementById('inv_filter');
-      invFilt.innerHTML = '<option value="all">All</option>'+customers.map(c=>`<option value="${c.email}">${c.name||c.email}</option>`).join('');
-      // timesheet filter
-      const tsFilt = document.getElementById('ts_filter');
-      tsFilt.innerHTML = '<option value="all">All</option>'+employees.map(e=>`<option value="${e.email}">${e.name||e.email}</option>`).join('');
-    }
-
-    function renderJobs(){
-      const jobs = store.get(KEYS.jobs, []).sort((a,b)=> (a.date < b.date ? -1 : 1));
-      jobTbody.innerHTML = jobs.map(j=>`
-        <tr data-id="${j.id}">
-          <td>${j.date} ${j.start||''}</td>
-          <td>${j.customer_name||j.customer_email}</td>
-          <td>${j.service||''}</td>
-          <td>${j.assignee_email||''}</td>
-          <td>${j.status||'scheduled'}</td>
-          <td>
-            <button class="button" data-edit="${j.id}">Edit</button>
-            <button class="button" data-del="${j.id}">Delete</button>
-            <button class="button" data-inv="${j.id}">Attach Invoice</button>
-          </td>
-        </tr>
-      `).join('') || `<tr><td colspan="6" class="muted">No jobs yet.</td></tr>`;
-    }
-
-    jobTbody.addEventListener('click',(e)=>{
-      const id = e.target?.dataset?.edit || e.target?.dataset?.del || e.target?.dataset?.inv;
-      if(!id) return;
-      const jobs = store.get(KEYS.jobs, []);
-      const j = jobs.find(x=>x.id===id);
-      if(!j) return;
-
-      if(e.target.dataset.edit){
-        j_date.value = j.date || '';
-        j_start.value = j.start || '';
-        j_cust_email.value = j.customer_email || '';
-        j_cust_name.value = j.customer_name || '';
-        j_service.value = j.service || '';
-        j_assignee.value = j.assignee_email || '';
-        j_notes.value = j.notes || '';
-        jForm.dataset.editing = j.id;
-        jStatus.textContent = 'Loaded. Edit and Save.';
-      }
-      if(e.target.dataset.del){
-        if(confirm('Delete this job?')){
-          store.set(KEYS.jobs, jobs.filter(x=>x.id!==id));
-          renderJobs();
-        }
-      }
-      if(e.target.dataset.inv){
-        // quick attach: create an invoice shell for the customer
-        const invs = store.get(KEYS.invoices, []);
-        const newInv = {
-          id: crypto.randomUUID(),
-          customer_email: j.customer_email,
-          number: 'INV-'+(1000+invs.length+1),
-          status:'unpaid',
-          date: j.date,
-          due:'',
-          tax_pct:0,
-          items:[{desc:j.service||'Service', qty:1, unit: store.get(KEYS.prices,{}).essential||35}],
-          subtotal:0, tax:0, total:0, notes:'Job-linked invoice'
-        };
-        newInv.subtotal = subtotal(newInv.items);
-        newInv.total = newInv.subtotal;
-        invs.push(newInv);
-        store.set(KEYS.invoices, invs);
-        alert(`Invoice ${newInv.number} created for ${j.customer_email}`);
-        renderInvoices();
-      }
-    });
-
-    jForm.addEventListener('submit',(e)=>{
-      e.preventDefault();
-      const data = {
-        id: jForm.dataset.editing || crypto.randomUUID(),
-        date: j_date.value,
-        start: j_start.value || '',
-        customer_email: j_cust_email.value.trim(),
-        customer_name: j_cust_name.value.trim(),
-        service: j_service.value.trim(),
-        assignee_email: j_assignee.value.trim(),
-        notes: j_notes.value.trim(),
-        status: 'scheduled',
-        photos: []
-      };
-      const list = store.get(KEYS.jobs, []);
-      const idx = list.findIndex(x=>x.id===data.id);
-      if(idx>=0) list[idx]=data; else list.push(data);
-      store.set(KEYS.jobs, list);
-      jForm.reset(); jForm.dataset.editing=''; jStatus.textContent='Saved.'; renderJobs();
-      setTimeout(()=> jStatus.textContent='', 1200);
-    });
-
-    // ===== Approvals =====
-    const queueTbody = document.getElementById('queue-tbody');
-    function renderQueue(){
-      const q = store.get(KEYS.jobQueue, []);
-      queueTbody.innerHTML = q.map(j=>`
-        <tr data-id="${j.id}">
-          <td>${j.date}</td><td>${j.customer_name||j.customer_email}</td><td>${j.service||''}</td>
-          <td>${j.assignee_email||''}</td><td>${(j.photos||[]).length}</td>
-          <td>
-            <button class="button" data-approve="${j.id}">Approve</button>
-            <button class="button" data-reject="${j.id}">Reject</button>
-          </td>
-        </tr>
-      `).join('') || `<tr><td colspan="6" class="muted">No jobs in queue.</td></tr>`;
-    }
-    queueTbody.addEventListener('click',(e)=>{
-      const approve = e.target?.dataset?.approve;
-      const reject = e.target?.dataset?.reject;
-      const q = store.get(KEYS.jobQueue, []);
-      if(approve){
-        const j = q.find(x=>x.id===approve); if(!j) return;
-        // move to history for the customer
-        const histKey = 'tnk_history';
-        const hist = store.get(histKey, []);
-        hist.push({ email: j.customer_email, date: j.date, service: j.service, notes: j.notes||'', photos: j.photos||[] });
-        store.set(histKey, hist);
-        // mark job done
-        const jobs = store.get(KEYS.jobs, []);
-        const idx = jobs.findIndex(x=>x.id===j.id); if(idx>=0) jobs[idx].status='done';
-        store.set(KEYS.jobs, jobs);
-        // remove from queue
-        store.set(KEYS.jobQueue, q.filter(x=>x.id!==approve));
-        renderQueue(); renderJobs();
-      }
-      if(reject){
-        if(!confirm('Reject this completion?')) return;
-        store.set(KEYS.jobQueue, q.filter(x=>x.id!==reject));
-        renderQueue();
-      }
-    });
-
-    // Time off approvals
-    const toTbody = document.getElementById('to-tbody');
-    function renderTO(){
-      const all = store.get(KEYS.timeoff, []);
-      toTbody.innerHTML = all.map(t=>`
-        <tr data-id="${t.id}">
-          <td>${t.employee_email}</td><td>${t.from}</td><td>${t.to}</td>
-          <td>${(t.reason||'').replace(/</g,'&lt;')}</td>
-          <td><span class="badge ${t.status==='approved'?'b-approved':'b-pending'}">${t.status||'pending'}</span></td>
-          <td>
-            <button class="button" data-approve="${t.id}">Approve</button>
-            <button class="button" data-reject="${t.id}">Reject</button>
-          </td>
-        </tr>
-      `).join('') || `<tr><td colspan="6" class="muted">No requests.</td></tr>`;
-    }
-    toTbody.addEventListener('click',(e)=>{
-      const idA = e.target?.dataset?.approve;
-      const idR = e.target?.dataset?.reject;
-      const all = store.get(KEYS.timeoff, []);
-      const id = idA || idR; if(!id) return; const i = all.findIndex(x=>x.id===id); if(i<0) return;
-      all[i].status = idA ? 'approved' : 'rejected';
-      store.set(KEYS.timeoff, all); renderTO();
-    });
-
-    // ===== Accounts =====
-    const accForm = document.getElementById('acc-form');
-    const accTbody = document.getElementById('acc-tbody');
-    const accFilter = document.getElementById('acc_filter');
-    const accQ = document.getElementById('acc_q');
+    // ====== Accounts Module ======
+    const accForm = document.getElementById('account-form');
+    const accIdEl = document.getElementById('acc_id');
+    const accRoleEl = document.getElementById('acc_role');
+    const accEmailEl = document.getElementById('acc_email');
+    const accNameEl = document.getElementById('acc_name');
+    const accPhoneEl = document.getElementById('acc_phone');
+    const accAddrEl = document.getElementById('acc_address');
+    const accSubmitText = document.getElementById('acc_submit_text');
+    const accResetBtn = document.getElementById('acc_reset');
     const accStatus = document.getElementById('acc_status');
+    const accTableBody = document.querySelector('#acc_table tbody');
+    const accFilterRole = document.getElementById('acc_filter_role');
+    const accSearch = document.getElementById('acc_search');
+
+    function loadAccounts(){ return store.get(KEYS.accounts, []); }
+    function saveAccounts(list){ store.set(KEYS.accounts, list); renderAccounts(); refreshEmployeeSelects(); refreshCustomerSelects(); }
 
     function renderAccounts(){
-      const role = accFilter.value;
-      const q = (accQ.value||'').toLowerCase();
-      const rows = store.get(KEYS.accounts, [])
-        .filter(a=> role==='all' ? true : a.role===role)
-        .filter(a=> !q || (a.name||'').toLowerCase().includes(q) || (a.email||'').toLowerCase().includes(q))
-        .map(a=>`
-          <tr data-id="${a.id}">
-            <td>${a.role}</td><td>${a.name||''}</td><td>${a.email||''}</td>
-            <td>${a.phone||''}</td><td>${a.role==='customer'? (a.address||'') : ''}</td>
-            <td><button class="button" data-edit="${a.id}">Edit</button> <button class="button" data-del="${a.id}">Delete</button></td>
-          </tr>
-        `).join('') || `<tr><td colspan="6" class="muted">No accounts.</td></tr>`;
-      accTbody.innerHTML = rows;
-    }
-    accTbody.addEventListener('click',(e)=>{
-      const id = e.target?.dataset?.edit || e.target?.dataset?.del;
-      if(!id) return;
-      const list = store.get(KEYS.accounts, []);
-      const a = list.find(x=>x.id===id);
-      if(e.target.dataset.edit){
-        acc_id.value = a.id; acc_role.value=a.role; acc_email.value=a.email||''; acc_name.value=a.name||'';
-        acc_phone.value=a.phone||''; acc_address.value=a.address||'';
-        accStatus.textContent = 'Loaded. Edit and Save.';
-      }
-      if(e.target.dataset.del){
-        if(confirm('Delete account?')){ store.set(KEYS.accounts, list.filter(x=>x.id!==id)); renderAccounts(); refreshAccountLists(); }
-      }
-    });
-    accForm.addEventListener('submit',(e)=>{
-      e.preventDefault();
-      const data = { id: acc_id.value || crypto.randomUUID(), role: acc_role.value, email: acc_email.value.trim(), name: acc_name.value.trim(), phone: acc_phone.value.trim(), address: acc_address.value.trim() };
-      const list = store.get(KEYS.accounts, []);
-      const i = list.findIndex(x=>x.id===data.id);
-      if(i>=0) list[i]=data; else list.push(data);
-      store.set(KEYS.accounts, list); accStatus.textContent='Saved.'; accForm.reset(); renderAccounts(); refreshAccountLists();
-      setTimeout(()=>accStatus.textContent='', 1200);
-    });
-    document.getElementById('acc_reset').addEventListener('click', ()=>{ accForm.reset(); acc_id.value=''; accStatus.textContent=''; });
-    accFilter.addEventListener('change', renderAccounts);
-    accQ.addEventListener('input', renderAccounts);
-
-    // ===== Timesheets =====
-    const tsForm = document.getElementById('ts-form');
-    const tsStatus = document.getElementById('ts_status');
-    const tsTbody = document.getElementById('ts-tbody');
-    const tsFilter = document.getElementById('ts_filter');
-    const tsFrom = document.getElementById('ts_from');
-    const tsTo = document.getElementById('ts_to');
-
-    function renderTimesheets(){
-      const all = store.get(KEYS.timesheets, []);
-      const f = tsFilter.value;
-      const from = tsFrom.value ? new Date(tsFrom.value) : null;
-      const to = tsTo.value ? new Date(tsTo.value) : null;
-      const rows = all
-        .filter(t=> f==='all' ? true : (t.employee_email||'').toLowerCase()===f.toLowerCase())
-        .filter(t=> {
-          const d = new Date(t.date); if(from && d<from) return false; if(to && d>to) return false; return true;
-        })
-        .sort((a,b)=> (a.date < b.date ? 1 : -1))
-        .map(t=>{
-          const total = t.hours ?? ((t.start_time && t.end_time) ? timeDiff(t.start_time,t.end_time) : '');
-          return `<tr data-id="${t.id}">
-            <td>${t.date||''}</td><td>${t.employee_email||''}</td><td>${t.start_time||''}</td><td>${t.end_time||''}</td>
-            <td>${total}</td><td>${t.notes||''}</td>
-            <td><span class="badge ${t.approved?'b-approved':'b-pending'}">${t.approved?'approved':'pending'}</span></td>
-            <td><button class="button" data-approve="${t.id}">Toggle Approve</button> <button class="button" data-del="${t.id}">Delete</button></td>
-          </tr>`;
-        }).join('') || `<tr><td colspan="8" class="muted">No entries.</td></tr>`;
-      tsTbody.innerHTML = rows;
-    }
-    function timeDiff(s,e){ const [sh,sm]=s.split(':').map(Number); const [eh,em]=e.split(':').map(Number); return ((eh+em/60)-(sh+sm/60)).toFixed(2); }
-    tsTbody.addEventListener('click',(e)=>{
-      const idA = e.target?.dataset?.approve;
-      const idD = e.target?.dataset?.del;
-      const all = store.get(KEYS.timesheets, []);
-      if(idA){ const i = all.findIndex(x=>x.id===idA); if(i>=0){ all[i].approved = !all[i].approved; store.set(KEYS.timesheets, all); renderTimesheets(); } }
-      if(idD){ if(confirm('Delete entry?')){ store.set(KEYS.timesheets, all.filter(x=>x.id!==idD)); renderTimesheets(); } }
-    });
-    tsForm.addEventListener('submit',(e)=>{
-      e.preventDefault();
-      const data = { id: ts_id.value || crypto.randomUUID(), employee_email: ts_emp.value.trim(), date: ts_date.value, start_time: ts_start.value, end_time: ts_end.value, notes: ts_notes.value.trim(), approved:false };
-      const list = store.get(KEYS.timesheets, []);
-      const i = list.findIndex(x=>x.id===data.id);
-      if(i>=0) list[i]=data; else list.push(data);
-      store.set(KEYS.timesheets, list); tsStatus.textContent='Saved.'; tsForm.reset(); ts_id.value=''; renderTimesheets(); setTimeout(()=>tsStatus.textContent='',1200);
-    });
-    document.getElementById('ts_reset').addEventListener('click', ()=>{ tsForm.reset(); ts_id.value=''; tsStatus.textContent=''; });
-    document.getElementById('ts_clear').addEventListener('click', ()=>{ tsFilter.value='all'; tsFrom.value=''; tsTo.value=''; renderTimesheets(); });
-    [tsFilter, tsFrom, tsTo].forEach(el=> el.addEventListener('change', renderTimesheets));
-
-    // ===== Invoices =====
-    const invForm = document.getElementById('inv-form');
-    const invItems = document.getElementById('inv-items');
-    const invAdd = document.getElementById('inv-add');
-    const invStatus = document.getElementById('inv_status_msg');
-    const invTbody = document.getElementById('inv-tbody');
-    const invFilter = document.getElementById('inv_filter');
-    const invFilterStatus = document.getElementById('inv_filter_status');
-    const invQ = document.getElementById('inv_q');
-
-    function addLine(desc='', qty=1, unit=35){
-      const row = document.createElement('div'); row.className='items-row';
-      row.innerHTML = `
-        <input class="it-desc" placeholder="Description" value="${desc}"/>
-        <input class="it-qty" type="number" min="0" step="1" value="${qty}"/>
-        <input class="it-unit" type="number" min="0" step="0.01" value="${unit}"/>
-        <button class="button" type="button">Delete</button>`;
-      row.querySelector('button').addEventListener('click',()=> row.remove());
-      invItems.appendChild(row);
-    }
-    invAdd.addEventListener('click', ()=> addLine());
-
-    function renderInvoices(){
-      const customers = store.get(KEYS.accounts, []).filter(a=>a.role==='customer');
-      invFilter.innerHTML = '<option value="all">All</option>'+customers.map(c=>`<option value="${c.email}">${c.name||c.email}</option>`).join('');
-
-      const list = store.get(KEYS.invoices, []);
-      const fc = invFilter.value;
-      const fs = invFilterStatus.value;
-      const q = (invQ.value||'').toLowerCase();
-
-      const rows = list
-        .filter(i=> fc==='all' ? true : (i.customer_email||'').toLowerCase()===fc.toLowerCase())
-        .filter(i=> fs==='all' ? true : i.status===fs)
-        .filter(i=> !q || (i.number||'').toLowerCase().includes(q) || (i.customer_email||'').toLowerCase().includes(q))
-        .sort((a,b)=> (a.date < b.date ? 1 : -1))
-        .map(i=>`
-          <tr data-id="${i.id}">
-            <td>${i.number}</td><td>${i.customer_email}</td><td>${i.date||''}</td><td>${i.due||''}</td>
-            <td>${money(i.total ?? 0)}</td>
-            <td><span class="badge ${i.status==='paid'?'b-paid':'b-unpaid'}">${i.status}</span></td>
-            <td>
-              <button class="button" data-edit="${i.id}">Edit</button>
-              <button class="button" data-toggle="${i.id}">${i.status==='paid'?'Mark Unpaid':'Mark Paid'}</button>
-              <button class="button" data-del="${i.id}">Delete</button>
+      const role = accFilterRole.value;
+      const q = (accSearch.value || '').toLowerCase();
+      const rows = loadAccounts()
+        .filter(a => role==='all' ? true : a.role === role)
+        .filter(a => !q || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
+        .map(a => {
+          return `<tr data-id="${a.id}">
+            <td>${a.role}</td>
+            <td>${a.name}</td>
+            <td>${a.email}</td>
+            <td>${a.phone || ''}</td>
+            <td>${a.role==='customer' ? (a.address||'') : ''}</td>
+            <td class="cell-actions">
+              <button class="btn-small btn-edit" type="button">Edit</button>
+              <button class="btn-small btn-small--danger btn-del" type="button">Delete</button>
             </td>
-          </tr>
-        `).join('') || `<tr><td colspan="7" class="muted">No invoices yet.</td></tr>`;
-      invTbody.innerHTML = rows;
+          </tr>`;
+        }).join('');
+      accTableBody.innerHTML = rows || '<tr><td colspan="6" class="muted">No accounts found.</td></tr>';
     }
-    [invFilter, invFilterStatus].forEach(el=> el.addEventListener('change', renderInvoices));
-    invQ.addEventListener('input', renderInvoices);
 
-    invTbody.addEventListener('click',(e)=>{
-      const idE = e.target?.dataset?.edit;
-      const idT = e.target?.dataset?.toggle;
-      const idD = e.target?.dataset?.del;
-      const list = store.get(KEYS.invoices, []);
-      if(idE){
-        const i = list.find(x=>x.id===idE); if(!i) return;
-        inv_id.value = i.id; inv_cust.value = i.customer_email; inv_num.value = i.number;
-        inv_status.value = i.status; inv_date.value = i.date || ''; inv_due.value = i.due || ''; inv_tax.value = i.tax_pct || 0;
-        invItems.innerHTML = ''; (i.items||[]).forEach(it=> addLine(it.desc, it.qty, it.unit));
-        if(!i.items || i.items.length===0) addLine();
-        invStatus.textContent = 'Loaded. Edit and Save.';
+    function resetAccountForm(){
+      accIdEl.value = '';
+      accRoleEl.value = 'customer';
+      accEmailEl.value = '';
+      accNameEl.value = '';
+      accPhoneEl.value = '';
+      accAddrEl.value = '';
+      accSubmitText.textContent = 'Save Account';
+      accStatus.textContent = '';
+    }
+
+    accForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const id = accIdEl.value || crypto.randomUUID();
+      const data = {
+        id,
+        role: accRoleEl.value,
+        email: accEmailEl.value.trim(),
+        name: accNameEl.value.trim(),
+        phone: accPhoneEl.value.trim(),
+        address: accAddrEl.value.trim()
+      };
+      const list = loadAccounts();
+      const existingIdx = list.findIndex(a=>a.id===id);
+      if(existingIdx >= 0) list[existingIdx] = data; else list.push(data);
+      saveAccounts(list);
+      accStatus.textContent = 'Saved.';
+      resetAccountForm();
+    });
+
+    accResetBtn.addEventListener('click', resetAccountForm);
+    accFilterRole.addEventListener('change', renderAccounts);
+    accSearch.addEventListener('input', renderAccounts);
+
+    accTableBody.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr');
+      if(!tr) return;
+      const id = tr.dataset.id;
+      const list = loadAccounts();
+      const item = list.find(a=>a.id===id);
+      if(e.target.classList.contains('btn-edit')){
+        accIdEl.value = item.id;
+        accRoleEl.value = item.role;
+        accEmailEl.value = item.email;
+        accNameEl.value = item.name;
+        accPhoneEl.value = item.phone || '';
+        accAddrEl.value = item.address || '';
+        accSubmitText.textContent = 'Update Account';
+        window.scrollTo({ top: document.querySelector('#panel-accounts').offsetTop - 20, behavior: 'smooth' });
       }
-      if(idT){
-        const i = list.findIndex(x=>x.id===idT); if(i<0) return;
-        list[i].status = list[i].status==='paid' ? 'unpaid' : 'paid';
-        store.set(KEYS.invoices, list); renderInvoices();
-      }
-      if(idD){
-        if(confirm('Delete invoice?')){
-          store.set(KEYS.invoices, list.filter(x=>x.id!==idD));
-          renderInvoices();
+      if(e.target.classList.contains('btn-del')){
+        if(confirm('Delete this account?')){
+          saveAccounts(list.filter(a=>a.id!==id));
         }
       }
     });
 
-    invForm.addEventListener('submit',(e)=>{
+    // ====== Timesheets Module ======
+    const tsForm = document.getElementById('ts-form');
+    const tsIdEl = document.getElementById('ts_id');
+    const tsEmpEmailEl = document.getElementById('ts_employee_email');
+    const tsDateEl = document.getElementById('ts_date');
+    const tsStartEl = document.getElementById('ts_start');
+    const tsEndEl = document.getElementById('ts_end');
+    const tsNotesEl = document.getElementById('ts_notes');
+    const tsSubmitText = document.getElementById('ts_submit_text');
+    const tsStatus = document.getElementById('ts_status');
+    const tsResetBtn = document.getElementById('ts_reset');
+
+    const tsTableBody = document.querySelector('#ts_table tbody');
+    const tsFilterEmail = document.getElementById('ts_filter_email');
+    const tsFilterFrom = document.getElementById('ts_filter_from');
+    const tsFilterTo = document.getElementById('ts_filter_to');
+    const tsClearFilters = document.getElementById('ts_clear_filters');
+    const employeeDatalist = document.getElementById('employee-emails');
+
+    function loadTimesheets(){ return store.get(KEYS.timesheets, []); }
+    function saveTimesheets(list){ store.set(KEYS.timesheets, list); renderTimesheets(); }
+
+    function refreshEmployeeSelects(){
+      const emps = loadAccounts().filter(a=>a.role==='employee');
+      employeeDatalist.innerHTML = emps.map(e=>`<option value="${e.email}">`).join('');
+      const current = tsFilterEmail.value;
+      tsFilterEmail.innerHTML = `<option value="all">All Employees</option>` + emps.map(e=>`<option value="${e.email}">${e.name} (${e.email})</option>`).join('');
+      if([...tsFilterEmail.options].some(o=>o.value===current)) tsFilterEmail.value=current;
+    }
+
+    function parseTimeToHours(hhmm){
+      if(!hhmm) return 0;
+      const [h,m] = hhmm.split(':').map(Number);
+      return h + (m||0)/60;
+    }
+    function calcHours(start, end){
+      const s = parseTimeToHours(start);
+      const e = parseTimeToHours(end);
+      const diff = Math.max(0, e - s);
+      return Math.round(diff * 100) / 100;
+    }
+
+    function renderTimesheets(){
+      const list = loadTimesheets();
+      const filterEmail = tsFilterEmail.value;
+      const from = tsFilterFrom.value ? new Date(tsFilterFrom.value) : null;
+      const to = tsFilterTo.value ? new Date(tsFilterTo.value) : null;
+
+      const rows = list
+        .filter(t => filterEmail==='all' ? true : t.employee_email === filterEmail)
+        .filter(t => {
+          const d = new Date(t.date);
+          if(from && d < from) return false;
+          if(to && d > to) return false;
+          return true;
+        })
+        .sort((a,b)=> (a.date<b.date?1:-1))
+        .map(t => {
+          const total = calcHours(t.start_time, t.end_time).toFixed(2);
+          return `<tr data-id="${t.id}">
+            <td>${t.date}</td>
+            <td>${t.employee_email}</td>
+            <td>${t.start_time}</td>
+            <td>${t.end_time}</td>
+            <td>${total}</td>
+            <td>${t.notes||''}</td>
+            <td>
+              <button class="btn-small btn-approve ${t.approved?'btn-small--ok':''}" type="button">${t.approved?'Approved':'Approve'}</button>
+            </td>
+            <td class="cell-actions">
+              <button class="btn-small btn-edit" type="button">Edit</button>
+              <button class="btn-small btn-small--danger btn-del" type="button">Delete</button>
+            </td>
+          </tr>`;
+        }).join('');
+      tsTableBody.innerHTML = rows || '<tr><td colspan="8" class="muted">No timesheets yet.</td></tr>';
+    }
+
+    tsForm.addEventListener('submit', (e)=>{
       e.preventDefault();
-      const items = [...invItems.querySelectorAll('.items-row')].map(r=>({
+      const id = tsIdEl.value || crypto.randomUUID();
+      const data = {
+        id,
+        employee_email: tsEmpEmailEl.value.trim(),
+        date: tsDateEl.value,
+        start_time: tsStartEl.value,
+        end_time: tsEndEl.value,
+        notes: tsNotesEl.value.trim(),
+        approved: false
+      };
+      const list = loadTimesheets();
+      const idx = list.findIndex(t=>t.id===id);
+      if(idx>=0) {
+        data.approved = !!list[idx].approved;
+        list[idx] = data;
+        tsSubmitText.textContent = 'Save Entry';
+      } else {
+        list.push(data);
+      }
+      saveTimesheets(list);
+      tsStatus.textContent = 'Saved.';
+      tsForm.reset();
+      tsIdEl.value = '';
+    });
+
+    tsResetBtn.addEventListener('click', ()=>{
+      tsForm.reset();
+      tsIdEl.value = '';
+      tsSubmitText.textContent = 'Save Entry';
+      tsStatus.textContent = '';
+    });
+
+    tsTableBody.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr');
+      if(!tr) return;
+      const id = tr.dataset.id;
+      const list = loadTimesheets();
+      const item = list.find(t=>t.id===id);
+
+      if(e.target.classList.contains('btn-edit')){
+        tsIdEl.value = item.id;
+        tsEmpEmailEl.value = item.employee_email;
+        tsDateEl.value = item.date;
+        tsStartEl.value = item.start_time;
+        tsEndEl.value = item.end_time;
+        tsNotesEl.value = item.notes || '';
+        tsSubmitText.textContent = 'Update Entry';
+        window.scrollTo({ top: document.querySelector('#panel-timesheets').offsetTop - 20, behavior: 'smooth' });
+      }
+      if(e.target.classList.contains('btn-del')){
+        if(confirm('Delete this timesheet?')){
+          saveTimesheets(list.filter(t=>t.id!==id));
+        }
+      }
+      if(e.target.classList.contains('btn-approve')){
+        item.approved = !item.approved;
+        saveTimesheets(list);
+      }
+    });
+
+    tsFilterEmail.addEventListener('change', renderTimesheets);
+    tsFilterFrom.addEventListener('change', renderTimesheets);
+    tsFilterTo.addEventListener('change', renderTimesheets);
+    tsClearFilters.addEventListener('click', ()=>{
+      tsFilterEmail.value = 'all'; tsFilterFrom.value=''; tsFilterTo.value='';
+      renderTimesheets();
+    });
+
+    // ====== Promotions + Prices ======
+    const promoForm = document.getElementById('promo-form');
+    const promoStatus = document.getElementById('promo_status');
+    promoForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const data = {
+        title: document.getElementById('promo_title').value.trim(),
+        subtitle: document.getElementById('promo_subtitle').value.trim(),
+        active: document.getElementById('promo_active').value === 'true'
+      };
+      store.set(KEYS.promos, data);
+      promoStatus.textContent = 'Promotion saved.';
+    });
+    (function loadPromos(){
+      const p = store.get(KEYS.promos, null);
+      if(!p) return;
+      document.getElementById('promo_title').value = p.title || '';
+      document.getElementById('promo_subtitle').value = p.subtitle || '';
+      document.getElementById('promo_active').value = p.active ? 'true' : 'false';
+    })();
+
+    const priceForm = document.getElementById('price-form');
+    const priceStatus = document.getElementById('price_status');
+    priceForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const data = {
+        essential: Number(document.getElementById('p_essential').value || 35),
+        standard: Number(document.getElementById('p_standard').value || 55),
+        premium: Number(document.getElementById('p_premium').value || 85),
+      };
+      store.set(KEYS.prices, data);
+      priceStatus.textContent = 'Prices saved.';
+    });
+    (function loadPrices(){
+      const p = store.get(KEYS.prices, null);
+      if(!p) return;
+      document.getElementById('p_essential').value = p.essential ?? 35;
+      document.getElementById('p_standard').value = p.standard ?? 55;
+      document.getElementById('p_premium').value = p.premium ?? 85;
+    })();
+
+    // ====== Invoices Module ======
+    const invForm = document.getElementById('inv-form');
+    const invIdEl = document.getElementById('inv_id');
+    const invCustomerEl = document.getElementById('inv_customer');
+    const invNumberEl = document.getElementById('inv_number');
+    const invStatusEl = document.getElementById('inv_status');
+    const invDateEl = document.getElementById('inv_date');
+    const invDueEl = document.getElementById('inv_due');
+    const invTaxEl = document.getElementById('inv_tax');
+    const invNotesEl = document.getElementById('inv_notes');
+    const invItemsWrap = document.getElementById('items-rows');
+    const invAddItemBtn = document.getElementById('add-item');
+    const invSubmitText = document.getElementById('inv_submit_text');
+    const invStatusMsg = document.getElementById('inv_status_msg');
+    const invResetBtn = document.getElementById('inv_reset');
+
+    const outSub = document.getElementById('inv_subtotal');
+    const outTax = document.getElementById('inv_tax_amt');
+    const outTotal = document.getElementById('inv_total');
+
+    const invTableBody = document.querySelector('#inv_table tbody');
+    const fInvCustomer = document.getElementById('f_inv_customer');
+    const fInvStatus = document.getElementById('f_inv_status');
+    const fInvQ = document.getElementById('f_inv_q');
+    const btnExportCSV = document.getElementById('inv_export_csv');
+    const customerDatalist = document.getElementById('customer-emails');
+
+    function loadInvoices(){ return store.get(KEYS.invoices, []); }
+    function saveInvoices(list){ store.set(KEYS.invoices, list); renderInvoices(); }
+
+    function refreshCustomerSelects(){
+      const customers = loadAccounts().filter(a=>a.role==='customer');
+      // datalist for form
+      customerDatalist.innerHTML = customers.map(c=>`<option value="${c.email}">`).join('');
+      // filter select
+      const current = fInvCustomer.value;
+      fInvCustomer.innerHTML = `<option value="all">All Customers</option>` + customers.map(c=>`<option value="${c.email}">${c.name} (${c.email})</option>`).join('');
+      if([...fInvCustomer.options].some(o=>o.value===current)) fInvCustomer.value=current;
+    }
+
+    function money(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+
+    function addItemRow(item={ desc:'', qty:1, unit:35 }){
+      const row = document.createElement('div');
+      row.className = 'items-row';
+      row.innerHTML = `
+        <input type="text" class="it-desc" placeholder="Description" value="${item.desc||''}" />
+        <input type="number" class="it-qty" min="0" step="1" value="${item.qty||1}" />
+        <input type="number" class="it-unit" min="0" step="0.01" value="${item.unit||0}" />
+        <button type="button" class="btn-small btn-del-item">Delete</button>
+      `;
+      invItemsWrap.appendChild(row);
+      row.addEventListener('input', recalcTotals);
+      row.querySelector('.btn-del-item').addEventListener('click', ()=>{ row.remove(); recalcTotals(); });
+      recalcTotals();
+    }
+
+    function getItems(){
+      return [...invItemsWrap.querySelectorAll('.items-row')].map(r=>({
         desc: r.querySelector('.it-desc').value.trim(),
-        qty: Number(r.querySelector('.it-qty').value||0),
-        unit: Number(r.querySelector('.it-unit').value||0)
-      })).filter(i=> i.desc);
-      const sub = subtotal(items);
-      const taxPct = Number(inv_tax.value || 0);
-      const total = sub + sub*(taxPct/100);
+        qty: Number(r.querySelector('.it-qty').value || 0),
+        unit: Number(r.querySelector('.it-unit').value || 0),
+      })).filter(i=>i.desc || i.qty || i.unit);
+    }
+
+    function recalcTotals(){
+      const items = getItems();
+      const subtotal = items.reduce((s,i)=> s + i.qty * i.unit, 0);
+      const taxPct = Number(invTaxEl.value || 0);
+      const taxAmt = subtotal * (taxPct/100);
+      const total = subtotal + taxAmt;
+      outSub.textContent = money(subtotal);
+      outTax.textContent = money(taxAmt);
+      outTotal.textContent = money(total);
+    }
+
+    invAddItemBtn.addEventListener('click', ()=> addItemRow());
+
+    function resetInvoiceForm(){
+      invIdEl.value = '';
+      invCustomerEl.value = '';
+      invNumberEl.value = autoInvoiceNumber();
+      invStatusEl.value = 'unpaid';
+      invDateEl.valueAsDate = new Date();
+      invDueEl.value = '';
+      invTaxEl.value = '0';
+      invNotesEl.value = '';
+      invItemsWrap.innerHTML = '';
+      addItemRow({ desc:'Mowing / Trimming', qty:1, unit:35 });
+      invSubmitText.textContent = 'Save Invoice';
+      invStatusMsg.textContent = '';
+      recalcTotals();
+    }
+
+    function autoInvoiceNumber(){
+      // Simple local counter
+      const key='tnk_inv_counter';
+      let n = Number(localStorage.getItem(key) || 1000);
+      n += 1;
+      localStorage.setItem(key, String(n));
+      return `INV-${n}`;
+    }
+
+    // Save invoice
+    invForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const id = invIdEl.value || crypto.randomUUID();
+      const items = getItems();
+      const taxPct = Number(invTaxEl.value || 0);
+      const subtotal = items.reduce((s,i)=> s + i.qty * i.unit, 0);
+      const taxAmt = subtotal * (taxPct/100);
+      const total = subtotal + taxAmt;
 
       const data = {
-        id: inv_id.value || crypto.randomUUID(),
-        customer_email: inv_cust.value.trim(),
-        number: inv_num.value.trim() || ('INV-'+(1000 + store.get(KEYS.invoices,[]).length + 1)),
-        status: inv_status.value,
-        date: inv_date.value,
-        due: inv_due.value,
+        id,
+        customer_email: invCustomerEl.value.trim(),
+        number: invNumberEl.value.trim() || autoInvoiceNumber(),
+        status: invStatusEl.value,
+        date: invDateEl.value,
+        due: invDueEl.value,
         tax_pct: taxPct,
-        items, subtotal: sub, tax: sub*(taxPct/100), total, notes: '—'
+        items,
+        subtotal,
+        tax: taxAmt,
+        total,
+        notes: invNotesEl.value.trim()
       };
-      const list = store.get(KEYS.invoices, []);
-      const i = list.findIndex(x=>x.id===data.id);
-      if(i>=0) list[i]=data; else list.push(data);
-      store.set(KEYS.invoices, list); invStatus.textContent='Saved.'; invForm.reset(); invItems.innerHTML=''; addLine(); renderInvoices();
-      setTimeout(()=>invStatus.textContent='',1200);
-    });
-    document.getElementById('inv_reset').addEventListener('click', ()=>{ invForm.reset(); invItems.innerHTML=''; addLine(); invStatus.textContent=''; });
 
-    // ===== Prices / Promos =====
-    const priceForm = document.getElementById('price-form');
-    const priceStatus = document.getElementById('price-status');
-    const promoForm = document.getElementById('promo-form');
-    const promoStatus = document.getElementById('promo-status');
+      const list = loadInvoices();
+      const idx = list.findIndex(x=>x.id===id);
+      if(idx>=0) { list[idx] = data; }
+      else { list.push(data); }
+      saveInvoices(list);
 
-    function loadPrices(){
-      const p = store.get(KEYS.prices, {essential:35,standard:55,premium:85});
-      p_ess.value = p.essential; p_std.value = p.standard; p_pre.value = p.premium;
-    }
-    priceForm.addEventListener('submit',(e)=>{
-      e.preventDefault();
-      store.set(KEYS.prices, { essential:Number(p_ess.value||35), standard:Number(p_std.value||55), premium:Number(p_pre.value||85) });
-      priceStatus.textContent='Saved.'; setTimeout(()=>priceStatus.textContent='',1200);
+      invStatusMsg.textContent = 'Invoice saved.';
+      resetInvoiceForm();
     });
 
-    function loadPromos(){
-      const pr = store.get(KEYS.promos, {title:'Storm-Season Check', subtitle:'Inspection + Light Debris Removal', active:true});
-      pr_title.value = pr.title||''; pr_sub.value = pr.subtitle||''; pr_active.value = pr.active ? 'true' : 'false';
+    invResetBtn.addEventListener('click', resetInvoiceForm);
+    [invTaxEl].forEach(el=> el.addEventListener('input', recalcTotals));
+
+    function renderInvoices(){
+      const list = loadInvoices();
+      const fCust = fInvCustomer.value;
+      const fStat = fInvStatus.value;
+      const q = (fInvQ.value || '').toLowerCase();
+
+      const rows = list
+        .filter(i => fCust==='all' ? true : i.customer_email === fCust)
+        .filter(i => fStat==='all' ? true : i.status === fStat)
+        .filter(i => !q || i.number.toLowerCase().includes(q) || i.customer_email.toLowerCase().includes(q))
+        .sort((a,b)=> (a.date < b.date ? 1 : -1))
+        .map(i => `
+          <tr data-id="${i.id}">
+            <td>${i.number}</td>
+            <td>${i.customer_email}</td>
+            <td>${i.date||''}</td>
+            <td>${i.due||''}</td>
+            <td>${money(i.total)}</td>
+            <td>${i.status}</td>
+            <td class="cell-actions">
+              <button class="btn-small btn-view" type="button">View</button>
+              <button class="btn-small btn-edit" type="button">Edit</button>
+              <button class="btn-small ${i.status==='paid'?'':'btn-small--ok'} btn-toggle" type="button">
+                ${i.status==='paid'?'Mark Unpaid':'Mark Paid'}
+              </button>
+              <button class="btn-small btn-small--danger btn-del" type="button">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      invTableBody.innerHTML = rows || '<tr><td colspan="7" class="muted">No invoices yet.</td></tr>';
     }
-    promoForm.addEventListener('submit',(e)=>{
-      e.preventDefault();
-      store.set(KEYS.promos, { title: pr_title.value.trim(), subtitle: pr_sub.value.trim(), active: pr_active.value==='true' });
-      promoStatus.textContent='Saved.'; setTimeout(()=>promoStatus.textContent='',1200);
+
+    invTableBody.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr');
+      if(!tr) return;
+      const id = tr.dataset.id;
+      const list = loadInvoices();
+      const item = list.find(x=>x.id===id);
+
+      if(e.target.classList.contains('btn-edit')){
+        // load into form
+        invIdEl.value = item.id;
+        invCustomerEl.value = item.customer_email;
+        invNumberEl.value = item.number;
+        invStatusEl.value = item.status;
+        invDateEl.value = item.date || '';
+        invDueEl.value = item.due || '';
+        invTaxEl.value = item.tax_pct || 0;
+        invNotesEl.value = item.notes || '';
+        invItemsWrap.innerHTML = '';
+        (item.items || []).forEach(addItemRow);
+        if(!item.items || item.items.length===0) addItemRow();
+        invSubmitText.textContent = 'Update Invoice';
+        invStatusMsg.textContent = '';
+        recalcTotals();
+        // jump to form
+        window.scrollTo({ top: document.querySelector('#panel-invoices').offsetTop - 20, behavior:'smooth' });
+      }
+
+      if(e.target.classList.contains('btn-toggle')){
+        item.status = item.status === 'paid' ? 'unpaid' : 'paid';
+        saveInvoices(list);
+      }
+
+      if(e.target.classList.contains('btn-del')){
+        if(confirm('Delete this invoice?')){
+          saveInvoices(list.filter(x=>x.id!==id));
+        }
+      }
+
+      if(e.target.classList.contains('btn-view')){
+        openInvoiceWindow(item);
+      }
     });
 
-    // ===== Init =====
-    function init(){
-      refreshAccountLists();
-      renderJobs();
-      renderQueue();
-      renderTO();
-      renderAccounts();
-      renderTimesheets();
-      addLine(); // start invoice form with one line
-      renderInvoices();
-      loadPrices();
-      loadPromos();
+    [fInvCustomer, fInvStatus].forEach(el=> el.addEventListener('change', renderInvoices));
+    fInvQ.addEventListener('input', renderInvoices);
+
+    btnExportCSV.addEventListener('click', ()=>{
+      const list = loadInvoices();
+      const rows = [
+        ['number','customer_email','date','due','status','subtotal','tax','total','notes'],
+        ...list.map(i=>[
+          i.number, i.customer_email, i.date||'', i.due||'', i.status,
+          i.subtotal, i.tax, i.total, (i.notes||'').replaceAll('"','""')
+        ])
+      ];
+      const csv = rows.map(r=> r.map(v=>{
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replaceAll('"','""')}"` : s;
+      }).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'invoices.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    function openInvoiceWindow(inv){
+      // Simple printable invoice view
+      const win = window.open('', '_blank');
+      const styles = `
+        <style>
+          body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px; color:#1e2f1e; }
+          h1,h2,h3 { margin:0 0 6px; }
+          .head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:18px; }
+          .brand { display:flex; align-items:center; gap:12px; }
+          .brand img { width:64px; height:64px; border-radius:12px; }
+          .meta { text-align:right; }
+          .muted { opacity:.8; }
+          table { width:100%; border-collapse:collapse; margin-top: 12px; }
+          th, td { border-bottom:1px solid #e8e1d6; padding:8px; text-align:left; }
+          tfoot td { border-top:2px solid #cfc7b6; font-weight:700; }
+          .totals { max-width:360px; margin-left:auto; }
+          .actions { margin-top: 18px; }
+          button { padding:.5rem .9rem; border-radius:8px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; }
+        </style>
+      `;
+      const itemsRows = (inv.items||[]).map(it=>`
+        <tr>
+          <td>${it.desc||''}</td>
+          <td>${it.qty||0}</td>
+          <td>${money(it.unit||0)}</td>
+          <td>${money((it.qty||0)*(it.unit||0))}</td>
+        </tr>
+      `).join('');
+
+      const html = `
+        <!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>${styles}</head>
+        <body>
+          <div class="head">
+            <div class="brand">
+              <img src="images/IMG_2713.png" alt="">
+              <div>
+                <h2>The Neighborhood Kids Lawncare Plus</h2>
+                <div class="muted">Serving Pacific City to Depoe Bay • 541-921-4416 • TNKLCP@gmail.com</div>
+              </div>
+            </div>
+            <div class="meta">
+              <h1>${inv.number}</h1>
+              <div>Date: ${inv.date||''}</div>
+              <div>Due: ${inv.due||''}</div>
+              <div>Status: ${inv.status}</div>
+            </div>
+          </div>
+
+          <div><strong>Bill To:</strong> ${inv.customer_email}</div>
+
+          <table>
+            <thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead>
+            <tbody>${itemsRows || '<tr><td colspan="4" class="muted">No items</td></tr>'}</tbody>
+          </table>
+
+          <table class="totals">
+            <tbody>
+              <tr><td>Subtotal</td><td style="text-align:right;">${money(inv.subtotal||0)}</td></tr>
+              <tr><td>Tax (${(inv.tax_pct||0).toFixed(2)}%)</td><td style="text-align:right;">${money(inv.tax||0)}</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td>Total</td><td style="text-align:right;">${money(inv.total||0)}</td></tr>
+            </tfoot>
+          </table>
+
+          ${inv.notes ? `<p class="muted">Notes: ${inv.notes}</p>` : ''}
+
+          <div class="actions">
+            <button onclick="window.print()">Print / Save PDF</button>
+          </div>
+        </body>
+        </html>
+      `;
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      try { win.focus(); } catch {}
     }
-    init();
+
+    // ====== Initial Renders ======
+    renderAccounts();
+    refreshEmployeeSelects();
+    refreshCustomerSelects();
+    renderTimesheets();
+    resetInvoiceForm();
+    renderInvoices();
   </script>
 </body>
 </html>
+
