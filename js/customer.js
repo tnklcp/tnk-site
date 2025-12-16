@@ -99,6 +99,30 @@
     slotsWrap.innerHTML = slots.sort((a,b)=> (a.date<b.date?-1:1) || (a.start||'').localeCompare(b.start||'')).map(s=>`<div class="slot"><div>${s.date} • ${s.start||''}${s.end?('–'+s.end):''}</div><div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div></div>`).join('');
   }
   slotsWrap?.addEventListener('click',(e)=>{ const pick=e.target?.dataset?.pick; if(!pick) return; try{ const slot=JSON.parse(pick); const el=byId('x_date'); el.value=slot.date||''; $$('.tab-btn').forEach(t=>t.setAttribute('aria-selected','false')); $$('[data-tab="extras"]')[0]?.setAttribute('aria-selected','true'); $$('.tab-panel').forEach(p=>p.classList.remove('active')); byId('panel-extras').classList.add('active'); el.scrollIntoView({behavior:'smooth', block:'center'});}catch{} });
+<script>
+/* Minimal tabs: works for both .tab-panel and .panel with data-tab="X" → #panel-X */
+(function initTabs(){
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  if (!tabs.length) return;
+
+  const panels = Array.from(document.querySelectorAll('.tab-panel, .panel'));
+
+  function activate(btn){
+    const id = `panel-${btn.dataset.tab}`;
+    tabs.forEach(b => b.setAttribute('aria-selected','false'));
+    btn.setAttribute('aria-selected','true');
+    panels.forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+  }
+
+  tabs.forEach(btn => btn.addEventListener('click', () => activate(btn)));
+
+  // ensure only one panel is active on load
+  const current = tabs.find(b => b.getAttribute('aria-selected') === 'true') || tabs[0];
+  if (current) activate(current);
+})();
+</script>
 
   // init
   renderInvoices(); renderBalance(); renderPrefs(); refreshHistorySelect(); renderComments(); renderHistory(); renderAvailability();
