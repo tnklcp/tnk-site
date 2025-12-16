@@ -37,7 +37,7 @@
     <h1>Admin Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button class="button" id="admin-logout">Log Out</button>
+      <button class="button" id="admin-logout" onclick="if (window.TNKIdentity) { TNKIdentity.logout(); } else { try { sessionStorage.clear(); } catch(e){} location.replace('index.html'); } return false;">Log Out</button>
     </div>
   </header>
 
