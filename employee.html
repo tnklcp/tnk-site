@@ -220,7 +220,59 @@
     </p>
   </div>
 
+  <!-- ADDED: Netlify Identity widget -->
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
+  <!-- ADDED: Minimal identity init + logout + role guard -->
+  <script>
+    (function () {
+      const guard = document.body.getAttribute('data-role-guard'); // "employee-or-admin"
+      function setRoleFromUser(user) {
+        const email = user?.email || '';
+        // Default to employee if logged in; treat admins if role present in app_metadata.roles
+        const roles = (user?.app_metadata && user.app_metadata.roles) || [];
+        const role = roles.includes('admin') ? 'admin' : (user ? 'employee' : '');
+        sessionStorage.setItem('tnk_user_email', email);
+        if (role) sessionStorage.setItem('tnk_role', role); else sessionStorage.removeItem('tnk_role');
+        return role;
+      }
+
+      function enforceGuard(user) {
+        if (guard === 'employee-or-admin') {
+          if (!user) { window.location.replace('login.html'); return; }
+          // employees and admins both allowed here
+        }
+      }
+
+      if (window.netlifyIdentity) {
+        netlifyIdentity.on('init', (user) => {
+          console.log('[Identity] init user:', user);
+          const role = setRoleFromUser(user);
+          enforceGuard(user);
+        });
+        netlifyIdentity.on('login', (user) => {
+          setRoleFromUser(user);
+          // Stay on this page (employee portal) after login
+        });
+        netlifyIdentity.on('logout', () => {
+          sessionStorage.removeItem('tnk_user_email');
+          sessionStorage.removeItem('tnk_role');
+          window.location.replace('login.html');
+        });
+        netlifyIdentity.init();
+      }
+
+      // Logout button
+      document.getElementById('emp-logout').addEventListener('click', (e) => {
+        e.preventDefault();
+        try { window.netlifyIdentity && netlifyIdentity.logout(); } catch {}
+        sessionStorage.removeItem('tnk_user_email');
+        sessionStorage.removeItem('tnk_role');
+        window.location.replace('login.html');
+      });
+    })();
+  </script>
+
   <script src="js/employee.js" defer></script>
 </body>
 </html>
-
