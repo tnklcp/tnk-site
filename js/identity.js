@@ -1,67 +1,128 @@
-<!-- File: js/identity.js -->
-<script>
-  // Lightweight Identity helper
-  window.TNKIdentity = (function () {
-    const GoTrueURL = window.location.origin + '/.netlify/identity';
+/* =========================================================
+   TNK Identity wrapper for Netlify Identity
+   - Loads widget if missing
+   - Normalizes roles
+   - Handles login/logout redirects
+   - Exposes: TNKIdentity.user(), role(), email(), token()
+   ========================================================= */
+(function (w, d) {
+  const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
 
-    let auth;
-    function ensureAuth() {
-      if (auth) return auth;
-      if (!window.GoTrue) {
-        throw new Error('GoTrue library not loaded');
-      }
-      auth = new GoTrue({ APIUrl: GoTrueURL, setCookie: true });
-      return auth;
-    }
+  function ensureWidgetLoaded(cb) {
+    if (w.netlifyIdentity) return cb();
+    const s = d.createElement("script");
+    s.src = WIDGET_SRC;
+    s.onload = cb;
+    d.head.appendChild(s);
+  }
 
-    async function currentUser() {
+  function emailLists() {
+    try {
+      return {
+        admins: (JSON.parse(localStorage.getItem("tnk_admin_emails")) || []).map(x=>String(x).toLowerCase()),
+        employees: (JSON.parse(localStorage.getItem("tnk_employee_emails")) || []).map(x=>String(x).toLowerCase()),
+      };
+    } catch { return { admins: [], employees: [] }; }
+  }
+
+  function normalizeRole(user) {
+    if (!user) return null;
+    const meta = user.app_metadata || {};
+    const roles = Array.isArray(meta.roles) ? meta.roles : [];
+    if (roles.includes("admin")) return "admin";
+    if (roles.includes("employee")) return "employee";
+    // Fallback by email lists (handy while you’re testing)
+    const em = (user.email || "").toLowerCase();
+    const lists = emailLists();
+    if (lists.admins.includes(em)) return "admin";
+    if (lists.employees.includes(em)) return "employee";
+    return "customer";
+  }
+
+  const TNKIdentity = {
+    _redirects: { admin: "admin.html", employee: "employee.html", customer: "customer.html", home: "index.html" },
+
+    configure(opts = {}) {
+      this._redirects = { ...this._redirects, ...(opts.redirects || {}) };
+    },
+
+    user() {
+      try { return w.netlifyIdentity?.currentUser() || null; } catch { return null; }
+    },
+
+    role() {
+      const u = this.user();
+      if (!u) return null;
+      return normalizeRole(u);
+    },
+
+    email() {
+      return this.user()?.email || null;
+    },
+
+    async token() {
+      const u = this.user();
+      if (!u) return null;
+      try { return (await u.jwt()); } catch { return null; }
+    },
+
+    logout() {
       try {
-        return await ensureAuth().currentUser();
-      } catch (e) {
-        console.error('[Identity] currentUser error:', e);
-        return null;
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
+      } catch {}
+      if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
+        w.netlifyIdentity.logout();
+      } else {
+        location.replace(this._redirects.home);
       }
-    }
+    },
 
-    async function login(email, password) {
+    _onLogin(user) {
+      const role = normalizeRole(user) || "customer";
+      // Persist for your existing guards
       try {
-        const user = await ensureAuth().login(email, password, true);
-        return { ok: true, user };
-      } catch (e) {
-        console.error('[Identity] login error:', e);
-        // Friendly messages
-        let msg = e && e.message ? e.message : 'Login failed';
-        if (/confirmation/i.test(msg) || /confirmed/i.test(msg)) {
-          msg = 'Please confirm your email before signing in.';
+        sessionStorage.setItem("tnk_role", role);
+        sessionStorage.setItem("tnk_user_email", user.email || "");
+      } catch {}
+      // Route by role
+      const dest = this._redirects[role] || this._redirects.customer;
+      location.replace(dest);
+    },
+
+    _onLogout() {
+      try {
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
+      } catch {}
+      location.replace(this._redirects.home);
+    },
+
+    init(opts = {}) {
+      this.configure(opts);
+      ensureWidgetLoaded(() => {
+        const id = w.netlifyIdentity;
+        if (!id) return;
+
+        // If already logged in, make sure session values are set
+        const u = id.currentUser();
+        if (u) {
+          try {
+            sessionStorage.setItem("tnk_role", normalizeRole(u) || "customer");
+            sessionStorage.setItem("tnk_user_email", u.email || "");
+          } catch {}
         }
-        if (/invalid/i.test(msg) || /Unauthorized/i.test(msg)) {
-          msg = 'Invalid email or password.';
-        }
-        return { ok: false, error: msg };
-      }
-    }
 
-    async function logout() {
-      try {
-        const u = await currentUser();
-        if (u) await u.logout();
-        return { ok: true };
-      } catch (e) {
-        console.error('[Identity] logout error:', e);
-        return { ok: false, error: 'Logout failed' };
-      }
-    }
+        id.on("login", (user) => this._onLogin(user));
+        id.on("logout", () => this._onLogout());
 
-    async function requestPasswordRecovery(email) {
-      try {
-        await ensureAuth().requestPasswordRecovery(email);
-        return { ok: true };
-      } catch (e) {
-        console.error('[Identity] reset error:', e);
-        return { ok: false, error: e?.message || 'Unable to send reset email.' };
-      }
-    }
+        // Optional: open widget if you’re on a login page without a session
+        // (Keep closed by default to avoid pop-ups)
+      });
+    },
+  };
 
-    return { currentUser, login, logout, requestPasswordRecovery, GoTrueURL };
-  })();
-</script>
+  w.TNKIdentity = TNKIdentity;
+
+})(window, document);
+
