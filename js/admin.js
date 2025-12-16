@@ -359,3 +359,27 @@
   renderAccounts(); refreshSelects(); renderAdminCalendar(); resetInvoiceForm(); renderInvoices(); renderTimesheets(); renderServices(); renderReviews(); renderPTO();
 
 })();
+<script>
+/* Minimal tabs: works for both .tab-panel and .panel with data-tab="X" → #panel-X */
+(function initTabs(){
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  if (!tabs.length) return;
+
+  const panels = Array.from(document.querySelectorAll('.tab-panel, .panel'));
+
+  function activate(btn){
+    const id = `panel-${btn.dataset.tab}`;
+    tabs.forEach(b => b.setAttribute('aria-selected','false'));
+    btn.setAttribute('aria-selected','true');
+    panels.forEach(p => p.classList.remove('active'));
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+  }
+
+  tabs.forEach(btn => btn.addEventListener('click', () => activate(btn)));
+
+  // ensure only one panel is active on load
+  const current = tabs.find(b => b.getAttribute('aria-selected') === 'true') || tabs[0];
+  if (current) activate(current);
+})();
+</script>
