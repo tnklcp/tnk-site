@@ -1,11 +1,11 @@
 [build]
-  base = "tnk-site"
-  publish = "."
-  functions = "netlify/functions"
+  publish = "tnk-site"
+  functions = "tnk-site/netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
 
+# Pretty URLs for your portal pages
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
