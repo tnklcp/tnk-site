@@ -1,4 +1,4 @@
-/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (with local fallback) */
+/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (FAIL LOUDLY) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -6,13 +6,39 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
-  // ----- Auth: employee or admin -----
+  function fatal(msg, detail) {
+    const root = byId("emp-root") || document.body;
+    const box = document.createElement("div");
+    box.style.cssText =
+      "max-width:900px;margin:1rem auto;padding:1rem 1.1rem;border-radius:12px;" +
+      "background:#fff3f3;border:1px solid #e5b1b1;color:#7b1f1f;box-shadow:0 4px 12px rgba(0,0,0,.08)";
+    box.innerHTML = `
+      <h2 style="margin:.1rem 0 .35rem;">Data Unavailable</h2>
+      <p style="margin:.25rem 0 .6rem;">${msg}</p>
+      ${detail ? `<pre style="white-space:pre-wrap;margin:.5rem 0 0;opacity:.9;">${detail}</pre>` : ""}
+      <p style="margin:.75rem 0 0;">
+        <a class="button" href="index.html">← Back to Site</a>
+      </p>
+    `;
+    root.prepend(box);
+
+    document.querySelectorAll("button, input, select, textarea").forEach((el) => {
+      if (el.id === "emp-logout") return;
+      el.disabled = true;
+    });
+
+    throw new Error(msg);
+  }
+
+  // ---- Auth guard: employee or admin ----
   function ok() {
     const role = window.TNKIdentity?.role?.();
-    if (role === "employee" || role === "admin") return true;
     const r = sessionStorage.getItem("tnk_role");
-    if (r === "employee" || r === "admin") return true;
-    location.replace("index.html"); return false;
+    const finalRole = role || r;
+
+    if (finalRole === "employee" || finalRole === "admin") return true;
+    location.replace("login.html");
+    return false;
   }
   if (!ok()) return;
 
@@ -26,42 +52,36 @@
     window.TNKIdentity?.email?.() ||
     "";
 
-  // ----- data adapter (same as customer) -----
-  const Local = {
-    get(k, f) { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
-    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
-  };
   async function jwt() {
-    try { return await window.netlifyIdentity?.currentUser()?.jwt(true); } catch { return null; }
+    try { return await window.netlifyIdentity?.currentUser()?.jwt(true); }
+    catch { return null; }
   }
-  const API = {
-    async get(collection, fallback) {
-      try {
-        const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(await jwt() ? { Authorization: `Bearer ${await jwt()}` } : {})
-          }
-        });
-        if (!res.ok) throw new Error("bad status");
-        const j = await res.json();
-        return (j && j.data) ?? fallback;
-      } catch { return Local.get(collection, fallback); }
-    },
-    async set(collection, data) {
-      try {
-        const res = await fetch(`/.netlify/functions/collections`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(await jwt() ? { Authorization: `Bearer ${await jwt()}` } : {})
-          },
-          body: JSON.stringify({ name: collection, data })
-        });
-        if (!res.ok) throw new Error("bad status");
-      } catch { Local.set(collection, data); }
-    }
-  };
+
+  async function apiGet(collection) {
+    const token = await jwt();
+    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!res.ok) throw new Error(`GET ${collection} failed: ${res.status}`);
+    const j = await res.json();
+    return j?.data;
+  }
+
+  async function apiSet(collection, data) {
+    const token = await jwt();
+    const res = await fetch(`/.netlify/functions/collections`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ name: collection, data }),
+    });
+    if (!res.ok) throw new Error(`PUT ${collection} failed: ${res.status}`);
+  }
 
   const KEYS = {
     jobs: "tnk_jobs",
@@ -69,10 +89,10 @@
     timesheets: "tnk_timesheets",
     pto: "tnk_pto",
     paystubs: "tnk_paystubs",
-    emp_comments: "tnk_emp_comments"
+    emp_comments: "tnk_emp_comments",
   };
 
-  // ----- tabs (clean) -----
+  // ---- tabs ----
   (function initTabs() {
     const tabs = $$(".tab-btn");
     const panels = $$(".panel, .tab-panel");
@@ -89,10 +109,12 @@
     if (current) activate(current);
   })();
 
-  // ----- jobs -----
-  async function loadJobs() { return await API.get(KEYS.jobs, []); }
+  // ---- jobs ----
+  async function loadJobs() { return (await apiGet(KEYS.jobs)) || []; }
+
   const todayBody = $("#emp_today_jobs tbody");
   const jobDrawer = byId("emp_job_drawer");
+
   async function renderToday() {
     const me = (myEmail() || "").toLowerCase();
     const today = todayISO();
@@ -103,10 +125,13 @@
       .join("");
     todayBody.innerHTML = rows || `<tr><td colspan="4" class="muted">No jobs today.</td></tr>`;
   }
+
   todayBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
     const j = (await loadJobs()).find((x) => x.id === tr.dataset.id);
     if (!j) return;
+
     jobDrawer.innerHTML =
       `<p><strong>${j.title || ""}</strong></p>
        <p><strong>Customer:</strong> ${j.customer || ""}</p>
@@ -122,12 +147,11 @@
       .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""))
       .map((j) => `<div class="slot"><div>${j.date} ${j.start || ""}</div><div><strong>${(j.customer || "").split("@")[0]}</strong> — ${j.title || ""}</div></div>`)
       .join("");
-    byId("emp_week_calendar").innerHTML = rows || "<p class=\"muted\">No jobs.</p>";
+    byId("emp_week_calendar").innerHTML = rows || '<p class="muted">No jobs.</p>';
   }
 
-  // ----- complete job -----
-  async function loadReviews() { return await API.get(KEYS.reviews, []); }
-  async function saveReviews(v) { await API.set(KEYS.reviews, v); await renderCompletions(); }
+  // ---- complete job ----
+  async function loadReviews() { return (await apiGet(KEYS.reviews)) || []; }
 
   const cForm = byId("emp-complete-form");
   const cSel = byId("c_job");
@@ -149,12 +173,16 @@
     e.preventDefault();
     const id = cSel.value;
     if (!id) { cStatus.textContent = "Pick a job."; return; }
+
     const jobs = await loadJobs();
     const j = jobs.find((x) => x.id === id);
     if (!j) { cStatus.textContent = "Job not found."; return; }
+
+    // NOTE: This stores photo *names only*; actual file upload not implemented yet
     const photos = Array.from(byId("c_photos").files || []).map((f) => f.name);
-    const list = await loadReviews();
-    list.push({
+
+    const reviews = await loadReviews();
+    reviews.push({
       id: crypto.randomUUID(),
       job_id: j.id,
       date: j.date,
@@ -163,15 +191,18 @@
       notes: byId("c_notes").value.trim(),
       photos,
       employee: myEmail(),
-      status: "pending"
+      status: "pending",
     });
-    await API.set(KEYS.reviews, list);
+
+    await apiSet(KEYS.reviews, reviews);
+
     j.status = "complete_pending_review";
-    await API.set(KEYS.jobs, jobs);
+    await apiSet(KEYS.jobs, jobs);
+
     cStatus.textContent = "Submitted for admin review.";
     cForm.reset();
-    refreshCompleteSelect();
-    renderCompletions();
+    await refreshCompleteSelect();
+    await renderCompletions();
   });
 
   async function renderCompletions() {
@@ -184,12 +215,12 @@
     $("#emp_completions tbody").innerHTML = rows;
   }
 
-  // ----- hours -----
-  async function loadTimesheets() { return await API.get(KEYS.timesheets, []); }
-  async function saveTimesheets(v) { await API.set(KEYS.timesheets, v); await renderHours(); }
+  // ---- hours ----
+  async function loadTimesheets() { return (await apiGet(KEYS.timesheets)) || []; }
 
   const hForm = byId("emp-hours-form");
   const hStatus = byId("eh_status");
+
   hForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const list = await loadTimesheets();
@@ -201,11 +232,12 @@
       start_time: "",
       end_time: "",
       notes: byId("eh_notes").value.trim(),
-      approved: false
+      approved: false,
     });
-    await saveTimesheets(list);
+    await apiSet(KEYS.timesheets, list);
     hStatus.textContent = "Saved.";
     hForm.reset();
+    await renderHours();
   });
 
   async function renderHours() {
@@ -218,11 +250,11 @@
     $("#emp_hours_table tbody").innerHTML = rows;
   }
 
-  // ----- paystubs (read-only for employees) -----
-  async function loadPaystubs() { return await API.get(KEYS.paystubs, []); }
+  // ---- paystubs ----
   async function renderPaystubs() {
     const me = (myEmail() || "").toLowerCase();
-    const rows = (await loadPaystubs())
+    const list = (await apiGet(KEYS.paystubs)) || [];
+    const rows = list
       .filter((p) => (p.employee || "").toLowerCase() === me)
       .sort((a, b) => (a.period || "").localeCompare(b.period || ""))
       .map((p) => `<tr><td>${p.period}</td><td>${p.hours}</td><td>${money(p.gross)}</td><td>${p.status || "issued"}</td><td><button class="button" disabled>Download</button></td></tr>`)
@@ -230,12 +262,12 @@
     $("#emp_paystubs tbody").innerHTML = rows;
   }
 
-  // ----- PTO -----
-  async function loadPTO() { return await API.get(KEYS.pto, []); }
-  async function savePTO(v) { await API.set(KEYS.pto, v); await renderPTO(); }
+  // ---- PTO ----
+  async function loadPTO() { return (await apiGet(KEYS.pto)) || []; }
 
   const ptoForm = byId("pto-form");
   const ptoStatus = byId("pto_status");
+
   ptoForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const list = await loadPTO();
@@ -245,11 +277,12 @@
       from: byId("pto_from").value,
       to: byId("pto_to").value,
       reason: byId("pto_reason").value.trim(),
-      status: "pending"
+      status: "pending",
     });
-    await savePTO(list);
+    await apiSet(KEYS.pto, list);
     ptoStatus.textContent = "Request submitted.";
     ptoForm.reset();
+    await renderPTO();
   });
 
   async function renderPTO() {
@@ -262,9 +295,8 @@
     $("#pto_table_emp tbody").innerHTML = rows;
   }
 
-  // ----- comments (on completed jobs) -----
-  async function loadEmpComments() { return await API.get(KEYS.emp_comments, []); }
-  async function saveEmpComments(v) { await API.set(KEYS.emp_comments, v); await renderEmpComments(); }
+  // ---- comments ----
+  async function loadEmpComments() { return (await apiGet(KEYS.emp_comments)) || []; }
 
   const cmForm = byId("emp-comment-form");
   const cmStatus = byId("cmpl_status");
@@ -282,11 +314,21 @@
     e.preventDefault();
     const jobId = cmSel.value;
     if (!jobId) { cmStatus.textContent = "No job selected."; return; }
+
     const list = await loadEmpComments();
-    list.push({ id: crypto.randomUUID(), employee: myEmail(), job_review_id: jobId, text: byId("cmpl_notes").value.trim(), date: todayISO(), status: "submitted" });
-    await saveEmpComments(list);
+    list.push({
+      id: crypto.randomUUID(),
+      employee: myEmail(),
+      job_review_id: jobId,
+      text: byId("cmpl_notes").value.trim(),
+      date: todayISO(),
+      status: "submitted",
+    });
+
+    await apiSet(KEYS.emp_comments, list);
     cmStatus.textContent = "Comment submitted.";
     cmForm.reset();
+    await renderEmpComments();
   });
 
   async function renderEmpComments() {
@@ -299,16 +341,20 @@
     $("#emp_comments_table tbody").innerHTML = rows;
   }
 
-  // ----- init -----
+  // ---- init (fail loudly) ----
   (async function init() {
-    await renderToday();
-    await renderWeek();
-    await refreshCompleteSelect();
-    await renderCompletions();
-    await renderHours();
-    await renderPaystubs();
-    await renderPTO();
-    await refreshCompletedJobsForComments();
-    await renderEmpComments();
+    try {
+      await renderToday();
+      await renderWeek();
+      await refreshCompleteSelect();
+      await renderCompletions();
+      await renderHours();
+      await renderPaystubs();
+      await renderPTO();
+      await refreshCompletedJobsForComments();
+      await renderEmpComments();
+    } catch (e) {
+      fatal("We couldn’t load your employee portal data. Please refresh, and if it continues contact an admin.", String(e?.message || e));
+    }
   })();
 })();
