@@ -1,17 +1,42 @@
-/* TNK Admin Portal — Identity guard + tabs + Netlify-backed data (with local fallback) */
+/* TNK Admin Portal — Identity guard + tabs + Netlify-backed data (FAIL LOUDLY, no localStorage) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const byId = (id) => document.getElementById(id);
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
 
+  function fatal(msg, detail) {
+    const root = byId("admin-root") || document.body;
+    const box = document.createElement("div");
+    box.style.cssText =
+      "max-width:1000px;margin:1rem auto;padding:1rem 1.1rem;border-radius:12px;" +
+      "background:#fff3f3;border:1px solid #e5b1b1;color:#7b1f1f;box-shadow:0 4px 12px rgba(0,0,0,.08)";
+    box.innerHTML = `
+      <h2 style="margin:.1rem 0 .35rem;">Admin Data Unavailable</h2>
+      <p style="margin:.25rem 0 .6rem;">${msg}</p>
+      ${detail ? `<pre style="white-space:pre-wrap;margin:.5rem 0 0;opacity:.9;">${detail}</pre>` : ""}
+      <p style="margin:.75rem 0 0;">
+        <a class="button" href="index.html">← Back to Site</a>
+      </p>
+    `;
+    root.prepend(box);
+
+    document.querySelectorAll("button, input, select, textarea").forEach((el) => {
+      if (el.id === "admin-logout") return;
+      el.disabled = true;
+    });
+
+    throw new Error(msg);
+  }
+
   // ----- Auth -----
   function assertAdmin() {
     const role = window.TNKIdentity?.role?.();
-    if (role === "admin") return true;
     const r = sessionStorage.getItem("tnk_role");
-    if (r === "admin") return true;
-    location.replace("index.html"); return false;
+    const finalRole = role || r;
+    if (finalRole === "admin") return true;
+    location.replace("login.html");
+    return false;
   }
   if (!assertAdmin()) return;
 
@@ -20,40 +45,39 @@
     window.TNKIdentity?.logout?.();
   });
 
-  // ----- data adapter (same as others) -----
-  const Local = {
-    get(k, f) { try { return JSON.parse(localStorage.getItem(k)) ?? f; } catch { return f; } },
-    set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
-  };
   async function jwt() {
-    try { return await window.netlifyIdentity?.currentUser()?.jwt(true); } catch { return null; }
+    try { return await window.netlifyIdentity?.currentUser()?.jwt(true); }
+    catch { return null; }
   }
-  const API = {
-    async get(collection, fallback) {
-      try {
-        const token = await jwt();
-        const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-        });
-        if (!res.ok) throw new Error("bad status");
-        const j = await res.json();
-        return (j && j.data) ?? fallback;
-      } catch { return Local.get(collection, fallback); }
-    },
-    async set(collection, data) {
-      try {
-        const token = await jwt();
-        const res = await fetch(`/.netlify/functions/collections`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ name: collection, data })
-        });
-        if (!res.ok) throw new Error("bad status");
-      } catch { Local.set(collection, data); }
-    }
-  };
+
+  async function apiGet(collection) {
+    const token = await jwt();
+    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!res.ok) throw new Error(`GET ${collection} failed: ${res.status}`);
+    const j = await res.json();
+    return j?.data;
+  }
+
+  async function apiSet(collection, data) {
+    const token = await jwt();
+    const res = await fetch(`/.netlify/functions/collections`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ name: collection, data }),
+    });
+    if (!res.ok) throw new Error(`PUT ${collection} failed: ${res.status}`);
+  }
 
   const KEYS = {
+    meta: "tnk_meta",
     accounts: "tnk_accounts",
     timesheets: "tnk_timesheets",
     prices: "tnk_prices",
@@ -64,29 +88,32 @@
     reviews: "tnk_reviews",
     pto: "tnk_pto",
     paystubs: "tnk_paystubs",
-    availability: "tnk_availability"
+    availability: "tnk_availability",
   };
 
-  // ----- seed if totally empty (only for first run) -----
-  (async function seed() {
-    if (!(await API.get(KEYS.accounts))) {
-      await API.set(KEYS.accounts, [
-        { id: crypto.randomUUID(), role: "employee", name: "Malachi Goreman", email: "malachi@example.com", phone: "", address: "" },
-        { id: crypto.randomUUID(), role: "employee", name: "Ian Loney", email: "ian@example.com", phone: "", address: "" },
-        { id: crypto.randomUUID(), role: "customer", name: "Megan R", email: "megan@example.com", phone: "", address: "Lincoln City, OR" }
-      ]);
-    }
-    if (!(await API.get(KEYS.timesheets))) await API.set(KEYS.timesheets, []);
-    if (!(await API.get(KEYS.prices))) await API.set(KEYS.prices, { essential: 35, standard: 55, premium: 85 });
-    if (!(await API.get(KEYS.promos))) await API.set(KEYS.promos, { title: "Storm-Season Check", subtitle: "Inspection + Light Debris Removal", active: true });
-    if (!(await API.get(KEYS.invoices))) await API.set(KEYS.invoices, []);
-    if (!(await API.get(KEYS.services))) await API.set(KEYS.services, []);
-    if (!(await API.get(KEYS.jobs))) await API.set(KEYS.jobs, []);
-    if (!(await API.get(KEYS.reviews))) await API.set(KEYS.reviews, []);
-    if (!(await API.get(KEYS.pto))) await API.set(KEYS.pto, []);
-    if (!(await API.get(KEYS.paystubs))) await API.set(KEYS.paystubs, []);
-    if (!(await API.get(KEYS.availability))) await API.set(KEYS.availability, []);
-  })();
+  // ----- seed once (stored in Blobs meta) -----
+  async function seedOnce() {
+    const meta = (await apiGet(KEYS.meta)) || {};
+    if (meta.seeded) return;
+
+    await apiSet(KEYS.accounts, [
+      { id: crypto.randomUUID(), role: "employee", name: "Malachi Goreman", email: "malachi@example.com", phone: "", address: "" },
+      { id: crypto.randomUUID(), role: "employee", name: "Ian Loney", email: "ian@example.com", phone: "", address: "" },
+      { id: crypto.randomUUID(), role: "customer", name: "Megan R", email: "megan@example.com", phone: "", address: "Lincoln City, OR" },
+    ]);
+    await apiSet(KEYS.timesheets, []);
+    await apiSet(KEYS.prices, { essential: 35, standard: 55, premium: 85 });
+    await apiSet(KEYS.promos, { title: "Storm-Season Check", subtitle: "Inspection + Light Debris Removal", active: true });
+    await apiSet(KEYS.invoices, []);
+    await apiSet(KEYS.services, []);
+    await apiSet(KEYS.jobs, []);
+    await apiSet(KEYS.reviews, []);
+    await apiSet(KEYS.pto, []);
+    await apiSet(KEYS.paystubs, []);
+    await apiSet(KEYS.availability, []);
+
+    await apiSet(KEYS.meta, { ...meta, seeded: true, seededAt: new Date().toISOString() });
+  }
 
   // ----- tabs -----
   (function initTabs() {
@@ -117,32 +144,30 @@
     email: byId("acc_email"),
     name: byId("acc_name"),
     phone: byId("acc_phone"),
-    address: byId("acc_address")
+    address: byId("acc_address"),
   };
 
-  async function loadAccounts() { return await API.get(KEYS.accounts, []); }
-  async function saveAccounts(list) { await API.set(KEYS.accounts, list); await renderAccounts(); await refreshSelects(); }
+  async function loadAccounts() { return (await apiGet(KEYS.accounts)) || []; }
+  async function saveAccounts(list) { await apiSet(KEYS.accounts, list); await renderAccounts(); await refreshSelects(); }
 
   async function renderAccounts() {
-    if (!accTableBody) return;
     const role = accFilterRole?.value || "all";
     const q = (accSearch?.value || "").toLowerCase();
     const list = await loadAccounts();
+
     accTableBody.innerHTML =
       list
         .filter((a) => (role === "all" ? true : a.role === role))
-        .filter((a) => !q || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
-        .map(
-          (a) => `
+        .filter((a) => !q || (a.name || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q))
+        .map((a) => `
           <tr data-id="${a.id}">
             <td>${a.role}</td><td>${a.name}</td><td>${a.email}</td>
-            <td>${a.phone || ""}</td><td>${a.role === "customer" ? a.address || "" : ""}</td>
+            <td>${a.phone || ""}</td><td>${a.role === "customer" ? (a.address || "") : ""}</td>
             <td>
-              <button class="btn-small js-edit">Edit</button>
-              <button class="btn-small btn-small--danger js-del">Delete</button>
+              <button class="btn-small js-edit" type="button">Edit</button>
+              <button class="btn-small btn-small--danger js-del" type="button">Delete</button>
             </td>
-          </tr>`
-        )
+          </tr>`)
         .join("") || '<tr><td colspan="6" class="muted">No accounts.</td></tr>';
   }
 
@@ -152,34 +177,47 @@
     const data = {
       id,
       role: accFields.role.value,
-      email: accFields.email.value.trim(),
+      email: accFields.email.value.trim().toLowerCase(),
       name: accFields.name.value.trim(),
       phone: accFields.phone.value.trim(),
-      address: accFields.address.value.trim()
+      address: accFields.address.value.trim(),
     };
     const list = await loadAccounts();
     const i = list.findIndex((a) => a.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
     await saveAccounts(list);
-    if (accStatus) accStatus.textContent = "Saved.";
-    accForm.reset(); accFields.id.value = "";
+    accStatus.textContent = "Saved.";
+    accForm.reset();
+    accFields.id.value = "";
   });
-  byId("acc_reset")?.addEventListener("click", () => { accForm?.reset(); accFields.id.value = ""; if (accStatus) accStatus.textContent = ""; });
+
+  byId("acc_reset")?.addEventListener("click", () => {
+    accForm.reset();
+    accFields.id.value = "";
+    accStatus.textContent = "";
+  });
+
   accFilterRole?.addEventListener("change", renderAccounts);
   accSearch?.addEventListener("input", renderAccounts);
 
   accTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
     const id = tr.dataset.id;
     const list = await loadAccounts();
     const a = list.find((x) => x.id === id);
     if (!a) return;
 
     if (e.target.classList.contains("js-edit")) {
-      accFields.id.value = a.id; accFields.role.value = a.role; accFields.email.value = a.email;
-      accFields.name.value = a.name; accFields.phone.value = a.phone || ""; accFields.address.value = a.address || "";
+      accFields.id.value = a.id;
+      accFields.role.value = a.role;
+      accFields.email.value = a.email;
+      accFields.name.value = a.name;
+      accFields.phone.value = a.phone || "";
+      accFields.address.value = a.address || "";
       window.scrollTo({ top: byId("panel-accounts").offsetTop - 12, behavior: "smooth" });
     }
+
     if (e.target.classList.contains("js-del")) {
       if (confirm("Delete this account?")) await saveAccounts(list.filter((x) => x.id !== id));
     }
@@ -190,15 +228,15 @@
     const customers = accounts.filter((a) => a.role === "customer");
     const employees = accounts.filter((a) => a.role === "employee");
 
-    // Customers datalist for invoices + jobs
-    const custOptions = customers.map((c) => `<option value="${c.email}">`).join("");
-    const dlCustInvoices = byId("admin-customer-emails");
-    if (dlCustInvoices) dlCustInvoices.innerHTML = custOptions;
+    // For invoice customer email datalist
+    const dlCustEmails = byId("admin-customer-emails");
+    if (dlCustEmails) dlCustEmails.innerHTML = customers.map((c) => `<option value="${c.email}">`).join("");
 
-    const dlCustJobs = byId("admin-customers");
-    if (dlCustJobs) dlCustJobs.innerHTML = custOptions;
+    // For job customer datalist (admin.html uses admin-customers)
+    const dlJobCust = byId("admin-customers");
+    if (dlJobCust) dlJobCust.innerHTML = customers.map((c) => `<option value="${c.email}">`).join("");
 
-    // Invoice customer filter dropdown
+    // Invoice table customer filter
     const filterCust = byId("f_inv_customer");
     if (filterCust) {
       const keep = filterCust.value;
@@ -208,15 +246,11 @@
       if ([...filterCust.options].some((o) => o.value === keep)) filterCust.value = keep;
     }
 
-    // Employees datalist for jobs + timesheets
-    const empOptions = employees.map((e) => `<option value="${e.email}">`).join("");
-    const dlEmpJobs = byId("admin-employees");
-    if (dlEmpJobs) dlEmpJobs.innerHTML = empOptions;
+    // Employees datalist for jobs
+    const dlEmp = byId("admin-employees");
+    if (dlEmp) dlEmp.innerHTML = employees.map((e) => `<option value="${e.email}">`).join("");
 
-    const dlEmpTimesheets = byId("employee-emails");
-    if (dlEmpTimesheets) dlEmpTimesheets.innerHTML = empOptions;
-
-    // Timesheet filter dropdown
+    // Timesheet employee filter
     const tsSel = byId("ts_filter_email");
     if (tsSel) {
       const keep = tsSel.value;
@@ -225,33 +259,71 @@
         employees.map((e) => `<option value="${e.email}">${e.name} (${e.email})</option>`).join("");
       if ([...tsSel.options].some((o) => o.value === keep)) tsSel.value = keep;
     }
+
+    // Timesheet employee input datalist (admin.html uses employee-emails)
+    const dlTs = byId("employee-emails");
+    if (dlTs) dlTs.innerHTML = employees.map((e) => `<option value="${e.email}">`).join("");
   }
 
-  // ===== SCHEDULE / JOBS =====
+  // ===== JOBS =====
   const jobForm = byId("job-form");
   const jobStatus = byId("job_status_msg");
-  async function loadJobs() { return await API.get(KEYS.jobs, []); }
-  async function saveJobs(list) { await API.set(KEYS.jobs, list); await renderAdminCalendar(); }
+
+  async function loadJobs() { return (await apiGet(KEYS.jobs)) || []; }
+  async function saveJobs(list) { await apiSet(KEYS.jobs, list); await renderAdminCalendar(); }
 
   async function renderAdminCalendar() {
-    const cal = byId("admin-calendar"); if (!cal) return;
-    const jobs = (await loadJobs()).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""));
-    if (jobs.length === 0) { cal.innerHTML = "<p class='muted'>No jobs scheduled.</p>"; return; }
-    cal.innerHTML = jobs.map((j) => {
-      const cust = (j.customer || "").split("@")[0];
-      return `<div class="slot" data-id="${j.id}">
-        <div><strong>${cust || j.customer}</strong> — ${j.title || ""}</div>
-        <div>${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</div>
-      </div>`;
-    }).join("");
+    const cal = byId("admin-calendar");
+    if (!cal) return;
+
+    const jobs = (await loadJobs()).sort(
+      (a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || "")
+    );
+
+    if (jobs.length === 0) {
+      cal.innerHTML = "<p class='muted'>No jobs scheduled.</p>";
+      return;
+    }
+
+    cal.innerHTML = jobs
+      .map((j) => {
+        const cust = (j.customer || "").split("@")[0];
+        return `<div class="slot" data-id="${j.id}">
+          <div><strong>${cust || j.customer}</strong> — ${j.title || ""}</div>
+          <div>${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</div>
+        </div>`;
+      })
+      .join("");
+
     cal.onclick = async (e) => {
-      const el = e.target.closest(".slot"); if (!el) return;
+      const el = e.target.closest(".slot");
+      if (!el) return;
       const id = el.dataset.id;
-      const j = (await loadJobs()).find((x) => x.id === id); if (!j) return;
-      ["job_id","job_customer","job_title","job_date","job_start","job_end","job_assignee","job_invoice","job_lat","job_lon","job_status","job_notes"]
-        .forEach((k) => { const el2 = byId(k); if (el2) el2.value = j[k.replace("job_", "")] || ""; });
-      if (byId("job_risk_rain")) byId("job_risk_rain").value = j.risk_rain ?? 50;
-      if (byId("job_risk_gust")) byId("job_risk_gust").value = j.risk_gust ?? 35;
+      const j = (await loadJobs()).find((x) => x.id === id);
+      if (!j) return;
+
+      const map = {
+        job_id: "id",
+        job_customer: "customer",
+        job_title: "title",
+        job_date: "date",
+        job_start: "start",
+        job_end: "end",
+        job_assignee: "assignee",
+        job_invoice: "invoice",
+        job_lat: "lat",
+        job_lon: "lon",
+        job_status: "status",
+        job_notes: "notes",
+      };
+      Object.entries(map).forEach(([idKey, field]) => {
+        const el2 = byId(idKey);
+        if (el2) el2.value = j[field] || "";
+      });
+
+      byId("job_risk_rain").value = j.risk_rain ?? 50;
+      byId("job_risk_gust").value = j.risk_gust ?? 35;
+
       window.scrollTo({ top: jobForm.offsetTop - 12, behavior: "smooth" });
     };
   }
@@ -259,6 +331,7 @@
   jobForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = byId("job_id").value || crypto.randomUUID();
+
     const data = {
       id,
       customer: byId("job_customer").value.trim(),
@@ -270,19 +343,27 @@
       invoice: byId("job_invoice").value.trim(),
       lat: byId("job_lat").value || "",
       lon: byId("job_lon").value || "",
-      risk_rain: Number(byId("job_risk_rain")?.value || 50),
-      risk_gust: Number(byId("job_risk_gust")?.value || 35),
+      risk_rain: Number(byId("job_risk_rain").value || 50),
+      risk_gust: Number(byId("job_risk_gust").value || 35),
       status: byId("job_status").value,
-      notes: byId("job_notes").value.trim()
+      notes: byId("job_notes").value.trim(),
     };
+
     const list = await loadJobs();
     const i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
+
     await saveJobs(list);
-    if (jobStatus) jobStatus.textContent = "Saved.";
-    jobForm.reset(); byId("job_id").value = "";
+    jobStatus.textContent = "Saved.";
+    jobForm.reset();
+    byId("job_id").value = "";
   });
-  byId("job_reset")?.addEventListener("click", () => { jobForm?.reset(); byId("job_id").value = ""; if (jobStatus) jobStatus.textContent = ""; });
+
+  byId("job_reset")?.addEventListener("click", () => {
+    jobForm.reset();
+    byId("job_id").value = "";
+    jobStatus.textContent = "";
+  });
 
   // ===== INVOICES =====
   const invForm = byId("inv-form");
@@ -296,16 +377,17 @@
   const invResetBtn = byId("inv_reset");
   const invTotalOut = byId("inv_total");
 
-  async function loadInvoices() { return await API.get(KEYS.invoices, []); }
-  async function saveInvoices(list) { await API.set(KEYS.invoices, list); await renderInvoices(); }
+  async function loadInvoices() { return (await apiGet(KEYS.invoices)) || []; }
+  async function saveInvoices(list) { await apiSet(KEYS.invoices, list); await renderInvoices(); }
 
-  function autoInvoiceNumber() {
-    const k = "tnk_inv_counter"; let n = Number(localStorage.getItem(k) || 1000);
-    n += 1; localStorage.setItem(k, String(n)); return `INV-${n}`;
+  function genInvoiceNumber() {
+    // Unique enough for small business; no localStorage counter needed
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `INV-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   }
 
   function addItemRow(item = { desc: "", qty: 1, unit: 35 }) {
-    if (!invItemsWrap) return;
     const row = document.createElement("div");
     row.className = "items-row";
     row.innerHTML = `
@@ -314,56 +396,64 @@
       <input type="number" class="it-unit" min="0" step="0.01" value="${item.unit ?? 0}" />
       <button type="button" class="btn-small js-del-item">Delete</button>`;
     invItemsWrap.appendChild(row);
+
     row.addEventListener("input", recalcInvoice);
-    row.querySelector(".js-del-item").addEventListener("click", () => { row.remove(); recalcInvoice(); });
+    row.querySelector(".js-del-item").addEventListener("click", () => {
+      row.remove();
+      recalcInvoice();
+    });
+
     recalcInvoice();
   }
+
   function invoiceItems() {
-    if (!invItemsWrap) return [];
     return $$(".items-row", invItemsWrap)
       .map((r) => ({
         desc: $(".it-desc", r).value.trim(),
         qty: Number($(".it-qty", r).value || 0),
-        unit: Number($(".it-unit", r).value || 0)
+        unit: Number($(".it-unit", r).value || 0),
       }))
       .filter((i) => i.desc || i.qty || i.unit);
   }
+
   function recalcInvoice() {
     const items = invoiceItems();
     const sub = items.reduce((s, i) => s + i.qty * i.unit, 0);
-    const taxPct = Number(byId("inv_tax")?.value || 0);
+    const taxPct = Number(byId("inv_tax").value || 0);
     const total = sub + sub * (taxPct / 100);
-    if (invTotalOut) invTotalOut.textContent = money(total);
+    invTotalOut.textContent = money(total);
   }
+
   invAddItemBtn?.addEventListener("click", () => addItemRow());
 
   function resetInvoiceForm() {
-    if (!byId("inv_id")) return;
     byId("inv_id").value = "";
     byId("inv_customer").value = "";
-    byId("inv_number").value = autoInvoiceNumber();
+    byId("inv_number").value = genInvoiceNumber();
     byId("inv_status").value = "unpaid";
     byId("inv_date").valueAsDate = new Date();
     byId("inv_due").value = "";
     byId("inv_tax").value = "0";
     byId("inv_notes").value = "";
-    if (invItemsWrap) invItemsWrap.innerHTML = "";
+    invItemsWrap.innerHTML = "";
     addItemRow({ desc: "Mowing / Trimming", qty: 1, unit: 35 });
-    if (invStatusMsg) invStatusMsg.textContent = "";
+    invStatusMsg.textContent = "";
     recalcInvoice();
   }
 
   invForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const id = byId("inv_id").value || crypto.randomUUID();
     const items = invoiceItems();
     const subtotal = items.reduce((s, i) => s + i.qty * i.unit, 0);
-    const taxPct = Number(byId("inv_tax")?.value || 0);
+    const taxPct = Number(byId("inv_tax").value || 0);
     const total = subtotal + subtotal * (taxPct / 100);
+
     const data = {
       id,
-      customer_email: byId("inv_customer").value.trim(),
-      number: byId("inv_number").value.trim() || autoInvoiceNumber(),
+      customer_email: byId("inv_customer").value.trim().toLowerCase(),
+      number: byId("inv_number").value.trim() || genInvoiceNumber(),
       status: byId("inv_status").value,
       date: byId("inv_date").value,
       due: byId("inv_due").value,
@@ -372,90 +462,101 @@
       subtotal,
       tax: subtotal * (taxPct / 100),
       total,
-      notes: byId("inv_notes").value.trim()
+      notes: byId("inv_notes").value.trim(),
     };
+
     const list = await loadInvoices();
     const i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
+
     await saveInvoices(list);
-    if (invStatusMsg) invStatusMsg.textContent = "Invoice saved.";
+    invStatusMsg.textContent = "Invoice saved.";
     resetInvoiceForm();
   });
+
   invResetBtn?.addEventListener("click", resetInvoiceForm);
   byId("inv_tax")?.addEventListener("input", recalcInvoice);
 
-  // Make invoice filters actually work
-  fInvCustomer?.addEventListener("change", renderInvoices);
-  fInvStatus?.addEventListener("change", renderInvoices);
-  fInvQ?.addEventListener("input", renderInvoices);
-
   async function renderInvoices() {
-    if (!invTableBody) return;
     const list = await loadInvoices();
     const fCust = fInvCustomer?.value || "all";
     const fStat = fInvStatus?.value || "all";
     const q = (fInvQ?.value || "").toLowerCase();
+
     invTableBody.innerHTML =
       list
         .filter((i) => (fCust === "all" ? true : i.customer_email === fCust))
         .filter((i) => (fStat === "all" ? true : i.status === fStat))
-        .filter((i) => !q || i.number.toLowerCase().includes(q) || i.customer_email.toLowerCase().includes(q))
+        .filter((i) => !q || (i.number || "").toLowerCase().includes(q) || (i.customer_email || "").toLowerCase().includes(q))
         .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map(
-          (i) => `
-        <tr data-id="${i.id}">
-          <td>${i.number}</td><td>${i.customer_email}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
-          <td>${money(i.total)}</td><td>${i.status}</td>
-          <td>
-            <button class="btn-small js-view">View</button>
-            <button class="btn-small js-edit">Edit</button>
-            <button class="btn-small ${i.status === "paid" ? "" : "btn-small--ok"} js-toggle">${i.status === "paid" ? "Mark Unpaid" : "Mark Paid"}</button>
-            <button class="btn-small btn-small--danger js-del">Delete</button>
-          </td>
-        </tr>`
-        )
+        .map((i) => `
+          <tr data-id="${i.id}">
+            <td>${i.number}</td><td>${i.customer_email}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
+            <td>${money(i.total)}</td><td>${i.status}</td>
+            <td>
+              <button class="btn-small js-view" type="button">View</button>
+              <button class="btn-small js-edit" type="button">Edit</button>
+              <button class="btn-small ${i.status === "paid" ? "" : "btn-small--ok"} js-toggle" type="button">
+                ${i.status === "paid" ? "Mark Unpaid" : "Mark Paid"}
+              </button>
+              <button class="btn-small btn-small--danger js-del" type="button">Delete</button>
+            </td>
+          </tr>`)
         .join("") || '<tr><td colspan="7" class="muted">No invoices.</td></tr>';
   }
 
   invTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+
     const id = tr.dataset.id;
     const list = await loadInvoices();
-    const i = list.find((x) => x.id === id);
-    if (!i) return;
+    const inv = list.find((x) => x.id === id);
+    if (!inv) return;
 
     if (e.target.classList.contains("js-edit")) {
-      byId("inv_id").value = i.id;
-      byId("inv_customer").value = i.customer_email;
-      byId("inv_number").value = i.number;
-      byId("inv_status").value = i.status;
-      byId("inv_date").value = i.date || "";
-      byId("inv_due").value = i.due || "";
-      byId("inv_tax").value = i.tax_pct || 0;
-      byId("inv_notes").value = i.notes || "";
-      if (invItemsWrap) invItemsWrap.innerHTML = "";
-      (i.items || []).forEach(addItemRow);
-      if (!i.items || i.items.length === 0) addItemRow();
+      byId("inv_id").value = inv.id;
+      byId("inv_customer").value = inv.customer_email;
+      byId("inv_number").value = inv.number;
+      byId("inv_status").value = inv.status;
+      byId("inv_date").value = inv.date || "";
+      byId("inv_due").value = inv.due || "";
+      byId("inv_tax").value = inv.tax_pct || 0;
+      byId("inv_notes").value = inv.notes || "";
+      invItemsWrap.innerHTML = "";
+      (inv.items || []).forEach(addItemRow);
+      if (!inv.items || inv.items.length === 0) addItemRow();
       recalcInvoice();
       window.scrollTo({ top: invForm.offsetTop - 12, behavior: "smooth" });
     }
-    if (e.target.classList.contains("js-toggle")) { i.status = i.status === "paid" ? "unpaid" : "paid"; await saveInvoices(list); }
-    if (e.target.classList.contains("js-del")) { if (confirm("Delete this invoice?")) await saveInvoices(list.filter((x) => x.id !== id)); }
-    if (e.target.classList.contains("js-view")) openInvoiceWindow(i);
+
+    if (e.target.classList.contains("js-toggle")) {
+      inv.status = inv.status === "paid" ? "unpaid" : "paid";
+      await saveInvoices(list);
+    }
+
+    if (e.target.classList.contains("js-del")) {
+      if (confirm("Delete this invoice?")) await saveInvoices(list.filter((x) => x.id !== id));
+    }
+
+    if (e.target.classList.contains("js-view")) openInvoiceWindow(inv);
   });
 
   function openInvoiceWindow(inv) {
     const rows = (inv.items || [])
       .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
       .join("");
+
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>
       <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
       <body><h1>${inv.number}</h1><div>${inv.date || ""} • ${inv.status}</div><div>Bill To: ${inv.customer_email}</div>
       <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
       <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
+
     const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.open(); win.document.write(html); win.document.close();
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
     try { win.focus(); } catch {}
   }
 
@@ -463,15 +564,21 @@
     const list = await loadInvoices();
     const rows = [
       ["number", "customer_email", "date", "due", "status", "subtotal", "tax", "total", "notes"],
-      ...list.map((i) => [i.number, i.customer_email, i.date || "", i.due || "", i.status, i.subtotal, i.tax, i.total, (i.notes || "").replaceAll('"', '""')])
+      ...list.map((i) => [i.number, i.customer_email, i.date || "", i.due || "", i.status, i.subtotal, i.tax, i.total, (i.notes || "").replaceAll('"', '""')]),
     ];
-    const csv = rows.map((r) => r.map((v) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-    }).join(",")).join("\n");
+    const csv = rows
+      .map((r) => r.map((v) => {
+        const s = String(v ?? "");
+        return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+      }).join(","))
+      .join("\n");
+
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "invoices.csv"; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "invoices.csv";
+    a.click();
     URL.revokeObjectURL(url);
   });
 
@@ -482,47 +589,62 @@
   const tsFilterEmail = byId("ts_filter_email");
   const tsFilterFrom = byId("ts_filter_from");
   const tsFilterTo = byId("ts_filter_to");
+
   byId("ts_clear_filters")?.addEventListener("click", () => {
-    if (tsFilterEmail) tsFilterEmail.value = "all";
-    if (tsFilterFrom) tsFilterFrom.value = "";
-    if (tsFilterTo) tsFilterTo.value = "";
+    tsFilterEmail.value = "all";
+    tsFilterFrom.value = "";
+    tsFilterTo.value = "";
     renderTimesheets();
   });
 
-  // Ensure filters actually re-render
-  tsFilterEmail?.addEventListener("change", renderTimesheets);
-  tsFilterFrom?.addEventListener("change", renderTimesheets);
-  tsFilterTo?.addEventListener("change", renderTimesheets);
+  function parseH(hm) {
+    if (!hm) return 0;
+    const [h, m] = hm.split(":").map(Number);
+    return h + (m || 0) / 60;
+  }
 
-  function parseH(hm) { if (!hm) return 0; const [h, m] = hm.split(":").map(Number); return h + (m || 0) / 60; }
-
-  async function loadTimesheets() { return await API.get(KEYS.timesheets, []); }
-  async function saveTimesheets(list) { await API.set(KEYS.timesheets, list); await renderTimesheets(); }
+  async function loadTimesheets() { return (await apiGet(KEYS.timesheets)) || []; }
+  async function saveTimesheets(list) { await apiSet(KEYS.timesheets, list); await renderTimesheets(); }
 
   tsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
+
     const id = byId("ts_id").value || crypto.randomUUID();
     const data = {
       id,
-      employee_email: byId("ts_employee_email").value.trim(),
+      employee_email: byId("ts_employee_email").value.trim().toLowerCase(),
       date: byId("ts_date").value,
       start_time: byId("ts_start").value,
       end_time: byId("ts_end").value,
       notes: byId("ts_notes").value.trim(),
-      approved: false
+      approved: false,
     };
+
     const list = await loadTimesheets();
     const i = list.findIndex((x) => x.id === id);
-    if (i >= 0) { data.approved = !!list[i].approved; list[i] = data; } else list.push(data);
+    if (i >= 0) {
+      data.approved = !!list[i].approved;
+      list[i] = data;
+    } else {
+      list.push(data);
+    }
+
     await saveTimesheets(list);
-    if (tsStatus) tsStatus.textContent = "Saved.";
-    tsForm.reset(); byId("ts_id").value = "";
+    tsStatus.textContent = "Saved.";
+    tsForm.reset();
+    byId("ts_id").value = "";
   });
 
-  byId("ts_reset")?.addEventListener("click", () => { tsForm?.reset(); if (byId("ts_id")) byId("ts_id").value = ""; if (tsStatus) tsStatus.textContent = ""; });
+  byId("ts_reset")?.addEventListener("click", () => {
+    tsForm.reset();
+    byId("ts_id").value = "";
+    tsStatus.textContent = "";
+  });
 
   tsTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+
     const id = tr.dataset.id;
     const list = await loadTimesheets();
     const t = list.find((x) => x.id === id);
@@ -530,22 +652,27 @@
 
     if (e.target.classList.contains("btn-edit")) {
       ["ts_id", "ts_employee_email", "ts_date", "ts_start", "ts_end", "ts_notes"].forEach((k) => {
-        const el = byId(k);
-        if (!el) return;
-        el.value = (k === "ts_id" ? t.id : t[k.replace("ts_", "")]) || "";
+        byId(k).value = (k === "ts_id" ? t.id : t[k.replace("ts_", "")]) || "";
       });
       window.scrollTo({ top: tsForm.offsetTop - 12, behavior: "smooth" });
     }
-    if (e.target.classList.contains("btn-del")) { if (confirm("Delete this timesheet?")) await saveTimesheets(list.filter((x) => x.id !== id)); }
-    if (e.target.classList.contains("btn-approve")) { t.approved = !t.approved; await saveTimesheets(list); }
+
+    if (e.target.classList.contains("btn-del")) {
+      if (confirm("Delete this timesheet?")) await saveTimesheets(list.filter((x) => x.id !== id));
+    }
+
+    if (e.target.classList.contains("btn-approve")) {
+      t.approved = !t.approved;
+      await saveTimesheets(list);
+    }
   });
 
   async function renderTimesheets() {
-    if (!tsTableBody) return;
     const list = await loadTimesheets();
     const f = tsFilterEmail?.value || "all";
     const from = tsFilterFrom?.value ? new Date(tsFilterFrom.value) : null;
     const to = tsFilterTo?.value ? new Date(tsFilterTo.value) : null;
+
     tsTableBody.innerHTML =
       list
         .filter((t) => (f === "all" ? true : t.employee_email === f))
@@ -559,26 +686,37 @@
         .map((t) => `<tr data-id="${t.id}">
           <td>${t.date}</td><td>${t.employee_email}</td><td>${t.start_time}</td><td>${t.end_time}</td>
           <td>${(parseH(t.end_time) - parseH(t.start_time)).toFixed(2)}</td><td>${t.notes || ""}</td>
-          <td><button class="btn-small btn-approve ${t.approved ? "btn-small--ok" : ""}">${t.approved ? "Approved" : "Approve"}</button></td>
-          <td><button class="btn-small btn-edit">Edit</button><button class="btn-small btn-small--danger btn-del">Delete</button></td></tr>`)
+          <td><button type="button" class="btn-small btn-approve ${t.approved ? "btn-small--ok" : ""}">${t.approved ? "Approved" : "Approve"}</button></td>
+          <td><button type="button" class="btn-small btn-edit">Edit</button><button type="button" class="btn-small btn-small--danger btn-del">Delete</button></td></tr>`)
         .join("") || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
   }
 
-  // ===== simple renders for other tables =====
+  // ===== SIMPLE RENDERS (no local fallback) =====
   async function renderServices() {
-    const tbody = $("#svc_table tbody"); if (!tbody) return;
-    const list = await API.get(KEYS.services, []);
-    tbody.innerHTML = list.map((s) => `<tr data-id="${s.id}"><td>${s.tier}</td><td>${s.name}</td><td>${money(s.price_from)}</td><td>${s.desc || ""}</td><td></td></tr>`).join("") || '<tr><td colspan="5" class="muted">No services yet.</td></tr>';
+    const tbody = $("#svc_table tbody");
+    if (!tbody) return;
+    const list = (await apiGet(KEYS.services)) || [];
+    tbody.innerHTML =
+      list.map((s) => `<tr data-id="${s.id}"><td>${s.tier}</td><td>${s.name}</td><td>${money(s.price_from)}</td><td>${s.desc || ""}</td><td></td></tr>`).join("") ||
+      '<tr><td colspan="5" class="muted">No services yet.</td></tr>';
   }
+
   async function renderReviews() {
-    const tbody = $("#review_table tbody"); if (!tbody) return;
-    const list = await API.get(KEYS.reviews, []);
-    tbody.innerHTML = list.map((r) => `<tr><td>${r.date || ""}</td><td>${r.customer || ""}</td><td>${r.title || ""}</td><td>${(r.photos || []).length}</td><td>${r.notes || ""}</td><td>${r.status || "pending"}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">No completed jobs pending.</td></tr>';
+    const tbody = $("#review_table tbody");
+    if (!tbody) return;
+    const list = (await apiGet(KEYS.reviews)) || [];
+    tbody.innerHTML =
+      list.map((r) => `<tr><td>${r.date || ""}</td><td>${r.customer || ""}</td><td>${r.title || ""}</td><td>${(r.photos || []).length}</td><td>${r.notes || ""}</td><td>${r.status || "pending"}</td></tr>`).join("") ||
+      '<tr><td colspan="6" class="muted">No completed jobs pending.</td></tr>';
   }
+
   async function renderPTO() {
-    const tbody = $("#pto_table tbody"); if (!tbody) return;
-    const list = await API.get(KEYS.pto, []);
-    tbody.innerHTML = list.map((p) => `<tr><td>${p.employee || ""}</td><td>${p.from || ""}</td><td>${p.to || ""}</td><td>${p.reason || ""}</td><td>${p.status || "pending"}</td><td></td></tr>`).join("") || '<tr><td colspan="6" class="muted">No requests.</td></tr>';
+    const tbody = $("#pto_table tbody");
+    if (!tbody) return;
+    const list = (await apiGet(KEYS.pto)) || [];
+    tbody.innerHTML =
+      list.map((p) => `<tr><td>${p.employee || ""}</td><td>${p.from || ""}</td><td>${p.to || ""}</td><td>${p.reason || ""}</td><td>${p.status || "pending"}</td><td></td></tr>`).join("") ||
+      '<tr><td colspan="6" class="muted">No requests.</td></tr>';
   }
 
   // promos/prices save
@@ -586,27 +724,41 @@
   const promoStatus = byId("promo_status");
   promoForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await API.set(KEYS.promos, { title: byId("promo_title").value.trim(), subtitle: byId("promo_subtitle").value.trim(), active: byId("promo_active").value === "true" });
-    if (promoStatus) promoStatus.textContent = "Promotion saved.";
+    await apiSet(KEYS.promos, {
+      title: byId("promo_title").value.trim(),
+      subtitle: byId("promo_subtitle").value.trim(),
+      active: byId("promo_active").value === "true",
+    });
+    promoStatus.textContent = "Promotion saved.";
   });
+
   const priceForm = byId("price-form");
   const priceStatus = byId("price_status");
   priceForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await API.set(KEYS.prices, { essential: Number(byId("p_essential").value || 35), standard: Number(byId("p_standard").value || 55), premium: Number(byId("p_premium").value || 85) });
-    if (priceStatus) priceStatus.textContent = "Prices saved.";
+    await apiSet(KEYS.prices, {
+      essential: Number(byId("p_essential").value || 35),
+      standard: Number(byId("p_standard").value || 55),
+      premium: Number(byId("p_premium").value || 85),
+    });
+    priceStatus.textContent = "Prices saved.";
   });
 
-  // ----- init -----
+  // ----- init (fail loudly) -----
   (async function init() {
-    await renderAccounts();
-    await refreshSelects();
-    await renderAdminCalendar();
-    resetInvoiceForm();
-    await renderInvoices();
-    await renderTimesheets();
-    await renderServices();
-    await renderReviews();
-    await renderPTO();
+    try {
+      await seedOnce();
+      await renderAccounts();
+      await refreshSelects();
+      await renderAdminCalendar();
+      resetInvoiceForm();
+      await renderInvoices();
+      await renderTimesheets();
+      await renderServices();
+      await renderReviews();
+      await renderPTO();
+    } catch (e) {
+      fatal("We couldn’t load admin data. Please refresh, and if it continues check Netlify Functions/Blobs.", String(e?.message || e));
+    }
   })();
 })();
