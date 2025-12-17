@@ -1,129 +1,172 @@
 /* =========================================================
    TNK Identity wrapper for Netlify Identity
-   - NO redirect-on-init (prevents redirect races)
-   - Session is stored in sessionStorage only (NO localStorage)
-   - Exposes: TNKIdentity.user(), role(), email(), token(), logout(), init()
+   - Loads widget if missing
+   - Normalizes roles from Identity metadata
+   - Handles login/logout routing (optional)
+   - NO localStorage
+   - FAILS LOUDLY (throws) if Identity is missing when required
+   - Exposes: TNKIdentity.user(), role(), email(), token(), init()
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
 
-  function ensureWidgetLoaded(cb) {
-    if (w.netlifyIdentity) return cb();
-    const s = d.createElement("script");
-    s.src = WIDGET_SRC;
-    s.onload = cb;
-    d.head.appendChild(s);
+  function ensureWidgetLoaded() {
+    return new Promise((resolve, reject) => {
+      if (w.netlifyIdentity) return resolve();
+      const s = d.createElement("script");
+      s.src = WIDGET_SRC;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Failed to load Netlify Identity widget"));
+      d.head.appendChild(s);
+    });
   }
 
-  function roleFromUser(user) {
+  function normalizeRole(user) {
     if (!user) return null;
-    const roles = user.app_metadata?.roles || [];
-    if (Array.isArray(roles)) {
-      if (roles.includes("admin")) return "admin";
-      if (roles.includes("employee")) return "employee";
-      if (roles.includes("customer")) return "customer";
-    }
-    const metaRole = (user.user_metadata?.role || "").toLowerCase();
+
+    // Prefer app_metadata.roles (array), then user_metadata.role (string)
+    const roles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
+    if (roles.includes("admin")) return "admin";
+    if (roles.includes("employee")) return "employee";
+    if (roles.includes("customer")) return "customer";
+
+    const metaRole = String(user?.user_metadata?.role || "").toLowerCase().trim();
     if (metaRole === "admin" || metaRole === "employee" || metaRole === "customer") return metaRole;
+
+    // Default (but still explicit)
     return "customer";
   }
 
-  function setSession(user) {
-    if (!user) return;
-    try {
-      sessionStorage.setItem("tnk_user_email", (user.email || "").toLowerCase());
-      sessionStorage.setItem("tnk_role", roleFromUser(user) || "customer");
-    } catch {}
-  }
-
-  function clearSession() {
-    try {
-      sessionStorage.removeItem("tnk_user_email");
-      sessionStorage.removeItem("tnk_role");
-    } catch {}
-  }
-
-  function routeByRole(role) {
-    if (role === "admin") return "admin.html";
-    if (role === "employee") return "employee.html";
-    return "customer.html";
-  }
-
   const TNKIdentity = {
-    _inited: false,
+    _redirects: {
+      admin: "admin.html",
+      employee: "employee.html",
+      customer: "customer.html",
+      home: "index.html",
+      loginEmployee: "login.html",
+      loginCustomer: "login-customer.html",
+    },
+
+    // prevents redirect ping-pong across rapid events
+    _redirectLockMs: 1200,
+    _lastRedirectAt: 0,
+    _safeReplace(url) {
+      const now = Date.now();
+      if (now - this._lastRedirectAt < this._redirectLockMs) return;
+      this._lastRedirectAt = now;
+      location.replace(url);
+    },
+
+    configure(opts = {}) {
+      if (opts.redirects) this._redirects = { ...this._redirects, ...opts.redirects };
+    },
 
     user() {
-      try { return w.netlifyIdentity?.currentUser?.() || null; } catch { return null; }
+      try {
+        return w.netlifyIdentity?.currentUser?.() || null;
+      } catch {
+        return null;
+      }
     },
 
     role() {
-      return sessionStorage.getItem("tnk_role") || roleFromUser(this.user());
+      const u = this.user();
+      return u ? normalizeRole(u) : null;
     },
 
     email() {
-      return sessionStorage.getItem("tnk_user_email") || this.user()?.email || null;
+      return this.user()?.email || null;
     },
 
-    async token() {
+    async token(forceFresh = false) {
       const u = this.user();
       if (!u) return null;
-      try { return await u.jwt(true); } catch { return null; }
+      try {
+        // Netlify Identity supports jwt(forceRefresh?)
+        return await u.jwt(!!forceFresh);
+      } catch {
+        return null;
+      }
     },
 
     logout() {
-      clearSession();
       try {
-        if (w.netlifyIdentity?.currentUser?.()) w.netlifyIdentity.logout();
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
       } catch {}
-      // Do NOT force redirect here; pages decide.
+      if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
+        w.netlifyIdentity.logout();
+      } else {
+        this._safeReplace(this._redirects.home);
+      }
+    },
+
+    _persistSession(user) {
+      const role = normalizeRole(user) || "customer";
+      try {
+        sessionStorage.setItem("tnk_role", role);
+        sessionStorage.setItem("tnk_user_email", user?.email || "");
+      } catch (e) {
+        // fail loudly
+        throw new Error("SessionStorage unavailable: cannot persist identity session.");
+      }
+      return role;
     },
 
     /**
      * init({
+     *   redirects?: { ... },
+     *   autoRoute?: boolean (default true),
+     *   onInit?: (user)=>void,
      *   onLogin?: (user)=>void,
      *   onLogout?: ()=>void,
-     *   onInit?: (user)=>void,
      * })
      */
-    init(opts = {}) {
-      if (this._inited) return;
-      this._inited = true;
+    async init(opts = {}) {
+      this.configure(opts);
 
-      ensureWidgetLoaded(() => {
-        const id = w.netlifyIdentity;
-        if (!id) return;
+      await ensureWidgetLoaded();
 
-        id.on("init", (user) => {
-          if (user) setSession(user);
-          try { opts.onInit && opts.onInit(user); } catch {}
-        });
+      const id = w.netlifyIdentity;
+      if (!id) throw new Error("Netlify Identity is not available after loading the widget.");
 
-        id.on("login", (user) => {
-          setSession(user);
-          try { opts.onLogin && opts.onLogin(user); } catch {}
-        });
+      const autoRoute = opts.autoRoute !== false;
 
-        id.on("logout", () => {
-          clearSession();
-          try { opts.onLogout && opts.onLogout(); } catch {}
-        });
+      // INIT
+      id.on("init", (user) => {
+        if (user) this._persistSession(user);
+        if (typeof opts.onInit === "function") opts.onInit(user);
 
-        id.init();
+        if (autoRoute && user) {
+          const role = normalizeRole(user);
+          const dest = this._redirects[role] || this._redirects.customer;
+          this._safeReplace(dest);
+        }
       });
-    },
 
-    // Helper used by login pages
-    routeAfterLogin(user) {
-      const role = roleFromUser(user) || "customer";
-      const dest = routeByRole(role);
-      // lock to prevent rapid repeated redirects
-      try {
-        const now = Date.now();
-        const last = Number(sessionStorage.getItem("tnk_redirect_lock") || 0);
-        if (now - last < 1200) return;
-        sessionStorage.setItem("tnk_redirect_lock", String(now));
-      } catch {}
-      location.replace(dest);
+      // LOGIN
+      id.on("login", (user) => {
+        this._persistSession(user);
+        if (typeof opts.onLogin === "function") opts.onLogin(user);
+
+        if (autoRoute) {
+          const role = normalizeRole(user);
+          const dest = this._redirects[role] || this._redirects.customer;
+          this._safeReplace(dest);
+        }
+      });
+
+      // LOGOUT
+      id.on("logout", () => {
+        try {
+          sessionStorage.removeItem("tnk_role");
+          sessionStorage.removeItem("tnk_user_email");
+        } catch {}
+        if (typeof opts.onLogout === "function") opts.onLogout();
+        if (autoRoute) this._safeReplace(this._redirects.home);
+      });
+
+      id.init();
     },
   };
 
