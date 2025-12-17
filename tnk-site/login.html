@@ -55,12 +55,20 @@
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       TNKIdentity.init({
+        autoRoute: false, // IMPORTANT: prevents redirect race
+
         onInit(user) {
-          // If already logged in, route once (no page-level races)
+          // Already logged in? Route now.
           if (user) TNKIdentity.routeAfterLogin(user);
         },
+
         onLogin(user) {
           TNKIdentity.routeAfterLogin(user);
+        },
+
+        onLogout() {
+          // Stay on this page when logged out
+          location.replace("login.html");
         }
       });
 
