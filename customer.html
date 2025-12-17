@@ -20,6 +20,7 @@
     th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
     thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
     .slot { background:#fff; border:1px solid #e6e1d6; border-radius:10px; padding:.6rem .75rem; display:flex; align-items:center; justify-content:space-between; margin:.5rem 0; }
+    .error-banner { display:none; margin: 0 auto 1rem; max-width: 1100px; background:#7b1f1f; color:#fff; padding:.75rem 1rem; border-radius:12px; }
     @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -28,9 +29,11 @@
     <h1>Customer Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button class="button" id="cust-logout" type="button">Log Out</button>
+      <button class="button" id="cust-logout">Log Out</button>
     </div>
   </header>
+
+  <div id="global_error" class="error-banner" role="alert"></div>
 
   <div class="portal-wrap container" id="cust-root">
     <p class="muted" style="text-align:center;margin-top:0;">View invoices, manage services, request extras, and track your history.</p>
@@ -59,7 +62,7 @@
       </div>
     </section>
 
-    <!-- Payments & Balance -->
+    <!-- Payments -->
     <section class="panel" id="panel-payments">
       <div class="grid">
         <div class="card">
@@ -83,7 +86,7 @@
       </div>
     </section>
 
-    <!-- Service Preferences -->
+    <!-- Preferences -->
     <section class="panel" id="panel-preferences">
       <div class="card">
         <h2>Your Service Preferences</h2>
@@ -130,7 +133,7 @@
       </div>
     </section>
 
-    <!-- Request Extra Service -->
+    <!-- Extras -->
     <section class="panel" id="panel-extras">
       <div class="grid">
         <div class="card">
@@ -226,11 +229,10 @@
     </p>
   </div>
 
-  <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script defer src="js/identity.js"></script>
-  <script defer src="js/api.js"></script>
-  <script defer>
-    document.addEventListener("DOMContentLoaded", () => window.TNKIdentity?.init?.());
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="js/identity.js"></script>
+  <script>
+    window.TNKIdentity && TNKIdentity.init();
   </script>
   <script src="js/customer.js" defer></script>
 </body>
