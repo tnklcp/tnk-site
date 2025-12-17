@@ -1,14 +1,11 @@
-# netlify.toml (MUST be at repo root)
-
 [build]
-  base = "tnk-site"
   publish = "."
   functions = "netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
 
-# Pretty URLs for portal pages
+# Pretty URLs for your portal pages
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
@@ -33,9 +30,3 @@
   from = "/login-customer"
   to = "/login-customer.html"
   status = 301
-
-# Optional: make sure direct portal URLs work if you ever add client-side routing later
-[[redirects]]
-  from = "/*"
-  to = "/404.html"
-  status = 404
