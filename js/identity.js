@@ -1,7 +1,8 @@
 /* =========================================================
-   TNK Identity wrapper for Netlify Identity
-   - Session-only state
-   - Roles ONLY from Netlify Identity
+   TNK Identity wrapper for Netlify Identity (Session-only)
+   - No localStorage
+   - Roles ONLY from Netlify Identity app_metadata.roles
+   - Exposes: TNKIdentity.user(), role(), email(), token(), logout(), init()
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
@@ -30,13 +31,20 @@
       home: "index.html",
     },
 
+    configure(opts = {}) {
+      this._redirects = { ...this._redirects, ...(opts.redirects || {}) };
+    },
+
     user() {
-      try { return w.netlifyIdentity?.currentUser() || null; } catch { return null; }
+      try {
+        return w.netlifyIdentity?.currentUser?.() || null;
+      } catch {
+        return null;
+      }
     },
 
     role() {
-      const u = this.user();
-      return normalizeRole(u);
+      return normalizeRole(this.user());
     },
 
     email() {
@@ -46,40 +54,58 @@
     async token() {
       const u = this.user();
       if (!u) return null;
-      try { return await u.jwt(); } catch { return null; }
+      try {
+        return await u.jwt();
+      } catch {
+        return null;
+      }
     },
 
     logout() {
-      sessionStorage.clear();
-      if (w.netlifyIdentity?.currentUser()) {
+      try {
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
+      } catch {}
+      if (w.netlifyIdentity?.currentUser?.()) {
         w.netlifyIdentity.logout();
       } else {
         location.replace(this._redirects.home);
       }
     },
 
-    init() {
+    init(opts = {}) {
+      this.configure(opts);
       ensureWidgetLoaded(() => {
         const id = w.netlifyIdentity;
         if (!id) return;
 
-        const u = id.currentUser();
+        // On load: populate session if logged in
+        const u = id.currentUser?.();
         if (u) {
-          sessionStorage.setItem("tnk_role", normalizeRole(u));
-          sessionStorage.setItem("tnk_user_email", u.email || "");
+          try {
+            sessionStorage.setItem("tnk_role", normalizeRole(u) || "customer");
+            sessionStorage.setItem("tnk_user_email", (u.email || "").toLowerCase());
+          } catch {}
         }
 
         id.on("login", (user) => {
-          const role = normalizeRole(user);
-          sessionStorage.setItem("tnk_role", role);
-          sessionStorage.setItem("tnk_user_email", user.email || "");
+          const role = normalizeRole(user) || "customer";
+          try {
+            sessionStorage.setItem("tnk_role", role);
+            sessionStorage.setItem("tnk_user_email", (user.email || "").toLowerCase());
+          } catch {}
           location.replace(this._redirects[role] || this._redirects.customer);
         });
 
         id.on("logout", () => {
-          sessionStorage.clear();
+          try {
+            sessionStorage.removeItem("tnk_role");
+            sessionStorage.removeItem("tnk_user_email");
+          } catch {}
           location.replace(this._redirects.home);
         });
+
+        // Note: do not auto-open widget (avoids popups)
       });
     },
   };
