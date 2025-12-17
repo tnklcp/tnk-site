@@ -6,7 +6,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# Pretty URLs for your portal pages
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
