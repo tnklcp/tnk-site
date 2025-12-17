@@ -226,14 +226,18 @@
     </p>
   </div>
 
+  <!-- Identity -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script src="js/identity.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    // Customer portal should NOT auto-route (avoid ping-pong).
+    // We just enforce the guard here and let customer.js run normally.
+    (function () {
       TNKIdentity.init({
+        autoRoute: false,
         onInit(user) {
-          const role = sessionStorage.getItem("tnk_role") || (user ? TNKIdentity.role() : null);
-          if (role !== "customer") location.replace("login-customer.html");
+          const role = user ? TNKIdentity.role() : null;
+          if (!user || role !== "customer") location.replace("login-customer.html");
         },
         onLogout() {
           location.replace("login-customer.html");
@@ -244,7 +248,7 @@
         e.preventDefault();
         TNKIdentity.logout();
       });
-    });
+    })();
   </script>
 
   <script src="js/customer.js" defer></script>
