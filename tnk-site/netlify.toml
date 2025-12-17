@@ -2,10 +2,12 @@
   base = "tnk-site"
   publish = "."
   functions = "netlify/functions"
+  command = "npm install"
 
 [functions]
   node_bundler = "esbuild"
 
+# Pretty URLs for your portal pages
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
@@ -30,13 +32,3 @@
   from = "/login-customer"
   to = "/login-customer.html"
   status = 301
-
-[[redirects]]
-  from = "/success"
-  to = "/success.html"
-  status = 200
-
-[[redirects]]
-  from = "/cancel"
-  to = "/cancel.html"
-  status = 200
