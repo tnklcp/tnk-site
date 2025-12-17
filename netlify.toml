@@ -1,9 +1,7 @@
-# netlify.toml at repo root (since the site lives at repo root)
 [build]
   publish = "."
   functions = "netlify/functions"
 
-# Pretty URLs for your portal pages
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
