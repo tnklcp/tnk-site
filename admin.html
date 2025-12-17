@@ -29,7 +29,6 @@
     .stack { display:grid; gap:.6rem; }
     .inline { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .items-head, .items-row { display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
-    .error-banner { display:none; margin: 0 auto 1rem; max-width: 1200px; background:#7b1f1f; color:#fff; padding:.75rem 1rem; border-radius:12px; }
     @media (max-width: 900px){ .admin-grid { grid-template-columns: 1fr; } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -42,11 +41,10 @@
     </div>
   </header>
 
-  <div id="global_error" class="error-banner" role="alert"></div>
-
   <div class="admin-wrap container" id="admin-root">
     <p class="muted" style="text-align:center;margin-top:0;">Manage accounts, schedule, invoices, payroll, and promotions.</p>
 
+    <!-- Tabs -->
     <div class="admin-tabs" role="tablist" aria-label="Admin Sections">
       <button class="tab-btn" role="tab" aria-selected="true"  data-tab="accounts">Accounts</button>
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="schedule">Schedule & Jobs</button>
@@ -57,7 +55,7 @@
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="promos">Promotions & Prices</button>
     </div>
 
-    <!-- Accounts -->
+    <!-- ============ Accounts ============ -->
     <section class="tab-panel active" id="panel-accounts">
       <div class="admin-grid">
         <div class="admin-card">
@@ -116,19 +114,19 @@
           <div class="table-wrap">
             <table id="acc_table">
               <thead><tr><th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Schedule & Jobs -->
+    <!-- ============ Schedule & Jobs ============ -->
     <section class="tab-panel" id="panel-schedule">
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Calendar</h2>
-          <div id="admin-calendar" aria-live="polite"></div>
+          <div id="admin-calendar" aria-live="polite"><!-- calendar render --></div>
         </div>
         <div class="admin-card">
           <h2>New / Edit Job</h2>
@@ -138,7 +136,7 @@
               <div>
                 <label for="job_customer">Customer</label>
                 <input id="job_customer" list="admin-customers" placeholder="type email/name…" required />
-                <datalist id="admin-customers"></datalist>
+                <datalist id="admin-customers"><!-- injected --></datalist>
               </div>
               <div>
                 <label for="job_title">Job Title</label>
@@ -163,11 +161,21 @@
               <div>
                 <label for="job_assignee">Assign Employee</label>
                 <input id="job_assignee" list="admin-employees" placeholder="email or name" />
-                <datalist id="admin-employees"></datalist>
+                <datalist id="admin-employees"><!-- injected --></datalist>
               </div>
               <div>
                 <label for="job_invoice">Attach Invoice #</label>
                 <input id="job_invoice" placeholder="optional (links to invoice)" />
+              </div>
+            </div>
+            <div class="grid-2">
+              <div>
+                <label for="job_lat">Lat (auto)</label>
+                <input id="job_lat" disabled />
+              </div>
+              <div>
+                <label for="job_lon">Lon (auto)</label>
+                <input id="job_lon" disabled />
               </div>
             </div>
             <div class="grid-3">
@@ -201,7 +209,7 @@
       </div>
     </section>
 
-    <!-- Invoices -->
+    <!-- ============ Invoices ============ -->
     <section class="tab-panel" id="panel-invoices">
       <div class="admin-grid">
         <div class="admin-card">
@@ -212,11 +220,11 @@
               <div>
                 <label for="inv_customer">Customer Email</label>
                 <input id="inv_customer" type="email" required list="admin-customer-emails" />
-                <datalist id="admin-customer-emails"></datalist>
+                <datalist id="admin-customer-emails"><!-- injected --></datalist>
               </div>
               <div>
                 <label for="inv_number">Invoice #</label>
-                <input id="inv_number" type="text" />
+                <input id="inv_number" type="text" placeholder="INV-1001" />
               </div>
               <div>
                 <label for="inv_status">Status</label>
@@ -246,7 +254,7 @@
               <div class="items-head">
                 <div>Description</div><div>Qty</div><div>Unit $</div><div></div>
               </div>
-              <div id="items-rows" class="stack"></div>
+              <div id="items-rows" class="stack"><!-- rows --></div>
               <div><button id="add-item" type="button" class="btn-small">+ Add Line Item</button></div>
             </div>
 
@@ -282,14 +290,14 @@
           <div class="table-wrap">
             <table id="inv_table">
               <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Timesheets -->
+    <!-- ============ Timesheets & Payroll ============ -->
     <section class="tab-panel" id="panel-timesheets">
       <div class="admin-grid">
         <div class="admin-card">
@@ -300,7 +308,7 @@
               <div>
                 <label for="ts_employee_email">Employee Email</label>
                 <input id="ts_employee_email" type="email" required list="employee-emails" />
-                <datalist id="employee-emails"></datalist>
+                <datalist id="employee-emails"><!-- injected --></datalist>
               </div>
               <div>
                 <label for="ts_date">Date</label>
@@ -343,32 +351,96 @@
           <div class="table-wrap">
             <table id="ts_table">
               <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Notes</th><th>Approved</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
 
         <div class="admin-card">
           <h2>Payroll</h2>
-          <p class="muted">Payroll actions are placeholders in this build.</p>
+          <form id="payroll-form" class="stack">
+            <div class="grid-3">
+              <div>
+                <label for="pr_period">Pay Period</label>
+                <select id="pr_period">
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label for="pr_from">From</label>
+                <input id="pr_from" type="date" />
+              </div>
+              <div>
+                <label for="pr_to">To</label>
+                <input id="pr_to" type="date" />
+              </div>
+            </div>
+            <div class="inline">
+              <button id="pr_run" class="button button--primary" type="button">Run Payroll</button>
+              <button id="pr_lock" class="button" type="button">Approve & Lock</button>
+            </div>
+            <p id="pr_status" class="muted"></p>
+          </form>
+
+          <div class="table-wrap" style="margin-top:.6rem;">
+            <table id="pr_table">
+              <thead><tr><th>Employee</th><th>Total Hours</th><th>Gross</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody><!-- rows --></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Services -->
+    <!-- ============ Services Catalog ============ -->
     <section class="tab-panel" id="panel-services">
-      <div class="admin-card">
-        <h2>Catalog</h2>
-        <div class="table-wrap">
-          <table id="svc_table">
-            <thead><tr><th>Tier</th><th>Name</th><th>Price From</th><th>Description</th><th>Actions</th></tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h2>Service Items</h2>
+          <form id="svc-form" class="stack">
+            <input type="hidden" id="svc_id" />
+            <div class="grid-3">
+              <div>
+                <label for="svc_name">Name</label>
+                <input id="svc_name" required placeholder="e.g., Lawn Mowing" />
+              </div>
+              <div>
+                <label for="svc_tier">Tier</label>
+                <select id="svc_tier">
+                  <option value="essential">Essential</option>
+                  <option value="standard">Standard</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+              <div>
+                <label for="svc_price">Price From ($)</label>
+                <input id="svc_price" type="number" min="0" step="1" value="35" />
+              </div>
+            </div>
+            <label for="svc_desc">Description</label>
+            <textarea id="svc_desc" rows="3"></textarea>
+            <div class="inline">
+              <button class="button button--primary" type="submit">Save Item</button>
+              <button id="svc_reset" class="button" type="button">Reset</button>
+            </div>
+            <p id="svc_status" class="muted"></p>
+          </form>
+        </div>
+
+        <div class="admin-card">
+          <h2>Catalog</h2>
+          <div class="table-wrap">
+            <table id="svc_table">
+              <thead><tr><th>Tier</th><th>Name</th><th>Price From</th><th>Description</th><th>Actions</th></tr></thead>
+              <tbody><!-- rows --></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Reviews -->
+    <!-- ============ Job Reviews (employee completions) ============ -->
     <section class="tab-panel" id="panel-reviews">
       <div class="admin-grid">
         <div class="admin-card">
@@ -376,23 +448,24 @@
           <div class="table-wrap">
             <table id="review_table">
               <thead><tr><th>Date</th><th>Customer</th><th>Title</th><th>Photos</th><th>Notes</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
+
         <div class="admin-card">
           <h2>Time Off Requests</h2>
           <div class="table-wrap">
             <table id="pto_table">
               <thead><tr><th>Employee</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Promos -->
+    <!-- ============ Promotions & Prices ============ -->
     <section class="tab-panel" id="panel-promos">
       <div class="admin-grid">
         <div class="admin-card">
@@ -401,7 +474,7 @@
             <div class="grid-2">
               <div>
                 <label for="promo_title">Title</label>
-                <input id="promo_title" type="text" required />
+                <input id="promo_title" type="text" placeholder="Storm-Season Check" required />
               </div>
               <div>
                 <label for="promo_active">Active</label>
@@ -409,7 +482,7 @@
               </div>
             </div>
             <label for="promo_subtitle">Subtitle</label>
-            <input id="promo_subtitle" type="text" />
+            <input id="promo_subtitle" type="text" placeholder="Inspection + Light Debris Removal" />
             <div class="inline">
               <button class="button button--primary" type="submit">Save Promotion</button>
               <a class="button" href="index.html#specials">Preview on Site</a>
@@ -453,8 +526,24 @@
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script src="js/identity.js"></script>
   <script>
-    window.TNKIdentity && TNKIdentity.init();
+    document.addEventListener("DOMContentLoaded", () => {
+      TNKIdentity.init({
+        onInit(user) {
+          const role = sessionStorage.getItem("tnk_role") || (user ? TNKIdentity.role() : null);
+          if (role !== "admin") location.replace("login.html");
+        },
+        onLogout() {
+          location.replace("login.html");
+        }
+      });
+
+      document.getElementById("admin-logout").addEventListener("click", (e) => {
+        e.preventDefault();
+        TNKIdentity.logout();
+      });
+    });
   </script>
+
   <script src="js/admin.js" defer></script>
 </body>
 </html>
