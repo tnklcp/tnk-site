@@ -35,13 +35,13 @@
     <p class="muted" style="text-align:center;margin-top:0;">See your schedule, log hours, upload job photos, request PTO, and view paystubs.</p>
 
     <div class="tabs" role="tablist" aria-label="Employee Sections">
-      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="today" type="button">Today</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="week" type="button">This Week</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="complete" type="button">Complete Job</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="hours" type="button">Hours</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs" type="button">Paystubs</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="pto" type="button">Request Time Off</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments" type="button">Job Comments</button>
+      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="today">Today</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="week">This Week</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="complete">Complete Job</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="hours">Hours</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="pto">Request Time Off</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments">Job Comments</button>
     </div>
 
     <!-- Today -->
@@ -88,7 +88,7 @@
             <div>
               <label for="c_photos">Photos (attach)</label>
               <input id="c_photos" type="file" multiple accept="image/*" />
-              <small class="muted">Attach proof of work; thumbnails go to admin review and invoice.</small>
+              <small class="muted">Attach proof of work; filenames are sent to admin review.</small>
             </div>
             <button class="button button--primary" type="submit">Submit for Review</button>
             <p id="c_status" class="muted"></p>
@@ -222,7 +222,8 @@
 
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script defer src="js/identity.js"></script>
-  <script>
+  <script defer src="js/api.js"></script>
+  <script defer>
     document.addEventListener("DOMContentLoaded", () => window.TNKIdentity?.init?.());
   </script>
   <script src="js/employee.js" defer></script>
