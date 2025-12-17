@@ -6,7 +6,7 @@ function json(statusCode, body) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": "no-store"
+      "Cache-Control": "no-store",
     },
     body: JSON.stringify(body),
   };
@@ -23,27 +23,31 @@ export async function handler(event) {
 
     const body = JSON.parse(event.body || "{}");
     const {
-      kind,               // "invoice" | "subscription"
-      customer_email,     // recommended
-      success_url,        // absolute URL
-      cancel_url,         // absolute URL
+      kind, // "invoice" | "subscription"
+      customer_email,
+      success_url,
+      cancel_url,
       metadata = {},
 
-      // invoice payment fields:
+      // invoice:
       amount_cents,
       description,
 
-      // subscription fields:
-      price_id,           // Stripe Price ID (recurring)
-      quantity = 1
+      // subscription (per-client pricing):
+      sub_amount_cents,
+      sub_interval, // "week" | "month" | "year"
+      sub_interval_count = 1,
+      sub_name,
     } = body;
 
     if (!success_url || !cancel_url) return json(400, { ok: false, error: "Missing success_url or cancel_url" });
-    if (!kind || (kind !== "invoice" && kind !== "subscription")) return json(400, { ok: false, error: "Invalid kind" });
+    if (kind !== "invoice" && kind !== "subscription") return json(400, { ok: false, error: "Invalid kind" });
 
-    // ----- Variable / project billing (one-time) -----
+    // One-time invoice payment
     if (kind === "invoice") {
-      if (!Number.isInteger(amount_cents) || amount_cents < 50) return json(400, { ok: false, error: "Invalid amount_cents" });
+      if (!Number.isInteger(amount_cents) || amount_cents < 50) {
+        return json(400, { ok: false, error: "Invalid amount_cents (must be integer cents, >= 50)" });
+      }
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
@@ -66,15 +70,36 @@ export async function handler(event) {
       return json(200, { ok: true, url: session.url, id: session.id });
     }
 
-    // ----- Fixed recurring billing (subscription) -----
+    // Recurring subscription with custom per-customer amount
     if (kind === "subscription") {
-      const pid = price_id || process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
-      if (!pid) return json(500, { ok: false, error: "Missing STRIPE_SUBSCRIPTION_PRICE_ID (or price_id)" });
+      const amt = Number(sub_amount_cents);
+      const interval = String(sub_interval || "").toLowerCase();
+
+      if (!Number.isInteger(amt) || amt < 50) {
+        return json(400, { ok: false, error: "Invalid sub_amount_cents (integer cents, >= 50)" });
+      }
+      if (!["week", "month", "year"].includes(interval)) {
+        return json(400, { ok: false, error: "Invalid sub_interval (week|month|year)" });
+      }
+      const count = Number(sub_interval_count || 1);
+      if (!Number.isInteger(count) || count < 1 || count > 12) {
+        return json(400, { ok: false, error: "Invalid sub_interval_count (1-12)" });
+      }
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer_email: customer_email || undefined,
-        line_items: [{ price: pid, quantity: Number(quantity || 1) }],
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: amt,
+              recurring: { interval, interval_count: count },
+              product_data: { name: sub_name || "TNK Lawncare Recurring Service" },
+            },
+          },
+        ],
         success_url,
         cancel_url,
         metadata,
