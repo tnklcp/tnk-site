@@ -1,4 +1,4 @@
-/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
+/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, FAIL LOUDLY) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -6,39 +6,69 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
-  function fatal(msg, err) {
-    console.error("[EMPLOYEE]", msg, err || "");
-    const root = byId("emp-root");
-    if (root) {
-      root.innerHTML = `
-        <div class="card" style="max-width:900px;margin:2rem auto;">
-          <h2 style="margin:.25rem 0;color:var(--clr-primary-600)">System Error</h2>
-          <p class="muted">${msg}</p>
-          <p class="muted">Open DevTools → Console for details.</p>
-        </div>`;
-    } else alert(msg);
-    throw new Error(msg);
+  function fail(msg, err) {
+    console.error("[Employee]", msg, err || "");
+    const el = byId("global_error");
+    if (el) {
+      el.textContent = msg;
+      el.style.display = "block";
+    } else {
+      alert(msg);
+    }
   }
 
-  if (!window.TNKIdentity) fatal("Missing TNKIdentity. Ensure js/identity.js is loaded.");
-  if (!window.TNK_API) fatal("Missing TNK_API. Ensure js/api.js is loaded.");
-
-  function ok() {
-    const role = window.TNKIdentity.role?.();
-    const r = sessionStorage.getItem("tnk_role");
-    const finalRole = role || r;
-    if (finalRole === "employee" || finalRole === "admin") return true;
+  function requireEmpOrAdmin() {
+    const role = window.TNKIdentity?.role?.() || sessionStorage.getItem("tnk_role");
+    if (role === "employee" || role === "admin") return true;
     location.replace("login.html");
     return false;
   }
-  if (!ok()) return;
+  if (!requireEmpOrAdmin()) return;
 
   byId("emp-logout")?.addEventListener("click", (e) => {
     e.preventDefault();
-    window.TNKIdentity.logout();
+    window.TNKIdentity?.logout?.();
   });
 
-  const myEmail = () => (sessionStorage.getItem("tnk_user_email") || window.TNKIdentity.email?.() || "").toLowerCase();
+  const myEmail = () => (sessionStorage.getItem("tnk_user_email") || window.TNKIdentity?.email?.() || "").toLowerCase();
+
+  async function jwt() {
+    const token = await window.TNKIdentity?.token?.();
+    if (!token) throw new Error("Not authenticated.");
+    return token;
+  }
+
+  async function fetchJSON(url, opts = {}) {
+    const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+    const token = await jwt();
+    headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, { ...opts, headers });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+    }
+    return res.json();
+  }
+
+  const API = {
+    async get(name) {
+      const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`GET ${name} failed: HTTP ${res.status}: ${text || res.statusText}`);
+      }
+      const j = await res.json();
+      return j?.data ?? null;
+    },
+    async set(name, data) {
+      await fetchJSON(`/.netlify/functions/collections`, {
+        method: "PUT",
+        body: JSON.stringify({ name, data })
+      });
+    }
+  };
 
   const KEYS = {
     jobs: "tnk_jobs",
@@ -46,7 +76,7 @@
     timesheets: "tnk_timesheets",
     pto: "tnk_pto",
     paystubs: "tnk_paystubs",
-    emp_comments: "tnk_emp_comments",
+    emp_comments: "tnk_emp_comments"
   };
 
   // Tabs
@@ -66,44 +96,9 @@
     if (current) activate(current);
   })();
 
-  async function loadJobs() {
-    const v = await TNK_API.get(KEYS.jobs);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("Jobs store is corrupted (expected array).");
-    return v;
-  }
-  async function loadReviews() {
-    const v = await TNK_API.get(KEYS.reviews);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("Reviews store is corrupted (expected array).");
-    return v;
-  }
-  async function loadTimesheets() {
-    const v = await TNK_API.get(KEYS.timesheets);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("Timesheets store is corrupted (expected array).");
-    return v;
-  }
-  async function loadPaystubs() {
-    const v = await TNK_API.get(KEYS.paystubs);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("Paystubs store is corrupted (expected array).");
-    return v;
-  }
-  async function loadPTO() {
-    const v = await TNK_API.get(KEYS.pto);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("PTO store is corrupted (expected array).");
-    return v;
-  }
-  async function loadEmpComments() {
-    const v = await TNK_API.get(KEYS.emp_comments);
-    if (v == null) return [];
-    if (!Array.isArray(v)) fatal("Employee comments store is corrupted (expected array).");
-    return v;
-  }
+  async function loadJobs() { return (await API.get(KEYS.jobs)) || []; }
 
-  // Today / Week
+  // Today jobs
   const todayBody = $("#emp_today_jobs tbody");
   const jobDrawer = byId("emp_job_drawer");
 
@@ -111,7 +106,7 @@
     const me = myEmail();
     const today = todayISO();
     const rows = (await loadJobs())
-      .filter((j) => j.date === today && (!j.assignee || String(j.assignee).toLowerCase() === me))
+      .filter((j) => j.date === today && (!j.assignee || (j.assignee || "").toLowerCase() === me))
       .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
       .map((j) => `<tr data-id="${j.id}"><td>${j.start || ""}</td><td>${j.customer || ""}</td><td>${j.title || ""}</td><td>${j.notes || ""}</td></tr>`)
       .join("");
@@ -119,29 +114,34 @@
   }
 
   todayBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr");
-    if (!tr) return;
-    const j = (await loadJobs()).find((x) => x.id === tr.dataset.id);
-    if (!j) return;
-    jobDrawer.innerHTML =
-      `<p><strong>${j.title || ""}</strong></p>
-       <p><strong>Customer:</strong> ${j.customer || ""}</p>
-       <p><strong>When:</strong> ${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</p>
-       <p><strong>Notes:</strong> ${j.notes || ""}</p>
-       <p><strong>Status:</strong> ${j.status || "scheduled"}</p>`;
+    const tr = e.target.closest("tr"); if (!tr) return;
+    try {
+      const j = (await loadJobs()).find((x) => x.id === tr.dataset.id);
+      if (!j) return;
+      jobDrawer.innerHTML = `
+        <p><strong>${j.title || ""}</strong></p>
+        <p><strong>Customer:</strong> ${j.customer || ""}</p>
+        <p><strong>When:</strong> ${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</p>
+        <p><strong>Notes:</strong> ${j.notes || ""}</p>
+        <p><strong>Status:</strong> ${j.status || "scheduled"}</p>`;
+    } catch (err) {
+      fail("Failed to load job details.", err);
+    }
   });
 
   async function renderWeek() {
     const me = myEmail();
     const rows = (await loadJobs())
-      .filter((j) => !j.assignee || String(j.assignee).toLowerCase() === me)
+      .filter((j) => !j.assignee || (j.assignee || "").toLowerCase() === me)
       .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""))
       .map((j) => `<div class="slot"><div>${j.date} ${j.start || ""}</div><div><strong>${(j.customer || "").split("@")[0]}</strong> — ${j.title || ""}</div></div>`)
       .join("");
     byId("emp_week_calendar").innerHTML = rows || '<p class="muted">No jobs.</p>';
   }
 
-  // Complete job -> reviews array + update job status
+  // Complete job → review queue
+  async function loadReviews() { return (await API.get(KEYS.reviews)) || []; }
+
   const cForm = byId("emp-complete-form");
   const cSel = byId("c_job");
   const cStatus = byId("c_status");
@@ -152,7 +152,7 @@
     cSel.innerHTML =
       `<option value="">Select…</option>` +
       jobs
-        .filter((j) => (!j.assignee || String(j.assignee).toLowerCase() === me) && (j.status === "scheduled" || j.status === "in_progress"))
+        .filter((j) => (!j.assignee || (j.assignee || "").toLowerCase() === me) && (j.status === "scheduled" || j.status === "in_progress"))
         .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
         .map((j) => `<option value="${j.id}">${j.date} • ${j.title} (${j.customer})</option>`)
         .join("");
@@ -161,8 +161,8 @@
   async function renderCompletions() {
     const me = myEmail();
     const rows = (await loadReviews())
-      .filter((r) => String(r.employee || "").toLowerCase() === me)
-      .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
+      .filter((r) => (r.employee || "").toLowerCase() === me)
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
       .map((r) => `<tr><td>${r.date || ""}</td><td>${r.title || ""}</td><td>${r.status || "pending"}</td><td>${r.notes || ""}</td></tr>`)
       .join("") || '<tr><td colspan="4" class="muted">No submissions.</td></tr>';
     $("#emp_completions tbody").innerHTML = rows;
@@ -171,17 +171,17 @@
   cForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const jobId = cSel.value;
-      if (!jobId) { cStatus.textContent = "Pick a job."; return; }
+      const id = cSel.value;
+      if (!id) { cStatus.textContent = "Pick a job."; return; }
 
       const jobs = await loadJobs();
-      const j = jobs.find((x) => x.id === jobId);
+      const j = jobs.find((x) => x.id === id);
       if (!j) { cStatus.textContent = "Job not found."; return; }
 
       const photos = Array.from(byId("c_photos").files || []).map((f) => f.name);
 
-      const reviews = await loadReviews();
-      reviews.push({
+      const list = await loadReviews();
+      list.push({
         id: crypto.randomUUID(),
         job_id: j.id,
         date: j.date,
@@ -190,36 +190,30 @@
         notes: byId("c_notes").value.trim(),
         photos,
         employee: myEmail(),
-        status: "pending",
+        status: "pending"
       });
 
-      await TNK_API.set(KEYS.reviews, reviews);
+      await API.set(KEYS.reviews, list);
 
       j.status = "complete_pending_review";
-      await TNK_API.set(KEYS.jobs, jobs);
+      await API.set(KEYS.jobs, jobs);
 
       cStatus.textContent = "Submitted for admin review.";
       cForm.reset();
+
       await refreshCompleteSelect();
       await renderCompletions();
+      await renderToday();
+      await renderWeek();
     } catch (err) {
-      fatal("Failed to submit completion.", err);
+      fail("Failed to submit completion for review.", err);
     }
   });
 
-  // Hours (timesheets)
+  // Hours
+  async function loadTimesheets() { return (await API.get(KEYS.timesheets)) || []; }
   const hForm = byId("emp-hours-form");
   const hStatus = byId("eh_status");
-
-  async function renderHours() {
-    const me = myEmail();
-    const rows = (await loadTimesheets())
-      .filter((t) => String(t.employee_email || "").toLowerCase() === me)
-      .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
-      .map((t) => `<tr><td>${t.date}</td><td>${t.hours || 0}</td><td>${t.approved ? "approved" : "pending"}</td><td>${t.notes || ""}</td></tr>`)
-      .join("") || '<tr><td colspan="4" class="muted">No hours yet.</td></tr>';
-    $("#emp_hours_table tbody").innerHTML = rows;
-  }
 
   hForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -233,22 +227,33 @@
         start_time: "",
         end_time: "",
         notes: byId("eh_notes").value.trim(),
-        approved: false,
+        approved: false
       });
-      await TNK_API.set(KEYS.timesheets, list);
+      await API.set(KEYS.timesheets, list);
       hStatus.textContent = "Saved.";
       hForm.reset();
       await renderHours();
     } catch (err) {
-      fatal("Failed to save hours.", err);
+      fail("Failed to save hours.", err);
     }
   });
 
-  // Paystubs
+  async function renderHours() {
+    const me = myEmail();
+    const rows = (await loadTimesheets())
+      .filter((t) => (t.employee_email || "").toLowerCase() === me)
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .map((t) => `<tr><td>${t.date}</td><td>${t.hours || 0}</td><td>${t.approved ? "approved" : "pending"}</td><td>${t.notes || ""}</td></tr>`)
+      .join("") || '<tr><td colspan="4" class="muted">No hours yet.</td></tr>';
+    $("#emp_hours_table tbody").innerHTML = rows;
+  }
+
+  // Paystubs (read only)
+  async function loadPaystubs() { return (await API.get(KEYS.paystubs)) || []; }
   async function renderPaystubs() {
     const me = myEmail();
     const rows = (await loadPaystubs())
-      .filter((p) => String(p.employee || "").toLowerCase() === me)
+      .filter((p) => (p.employee || "").toLowerCase() === me)
       .sort((a, b) => (a.period || "").localeCompare(b.period || ""))
       .map((p) => `<tr><td>${p.period}</td><td>${p.hours}</td><td>${money(p.gross)}</td><td>${p.status || "issued"}</td><td><button class="button" disabled>Download</button></td></tr>`)
       .join("") || '<tr><td colspan="5" class="muted">No paystubs yet.</td></tr>';
@@ -256,18 +261,9 @@
   }
 
   // PTO
+  async function loadPTO() { return (await API.get(KEYS.pto)) || []; }
   const ptoForm = byId("pto-form");
   const ptoStatus = byId("pto_status");
-
-  async function renderPTO() {
-    const me = myEmail();
-    const rows = (await loadPTO())
-      .filter((p) => String(p.employee || "").toLowerCase() === me)
-      .sort((a, b) => ((a.from || "") < (b.from || "") ? 1 : -1))
-      .map((p) => `<tr><td>${p.from || ""}</td><td>${p.to || ""}</td><td>${p.reason || ""}</td><td>${p.status || "pending"}</td></tr>`)
-      .join("") || '<tr><td colspan="4" class="muted">No requests.</td></tr>';
-    $("#pto_table_emp tbody").innerHTML = rows;
-  }
 
   ptoForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -279,38 +275,39 @@
         from: byId("pto_from").value,
         to: byId("pto_to").value,
         reason: byId("pto_reason").value.trim(),
-        status: "pending",
+        status: "pending"
       });
-      await TNK_API.set(KEYS.pto, list);
+      await API.set(KEYS.pto, list);
       ptoStatus.textContent = "Request submitted.";
       ptoForm.reset();
       await renderPTO();
     } catch (err) {
-      fatal("Failed to submit PTO request.", err);
+      fail("Failed to submit PTO request.", err);
     }
   });
 
-  // Comments on completed jobs
+  async function renderPTO() {
+    const me = myEmail();
+    const rows = (await loadPTO())
+      .filter((p) => (p.employee || "").toLowerCase() === me)
+      .sort((a, b) => (a.from < b.from ? 1 : -1))
+      .map((p) => `<tr><td>${p.from || ""}</td><td>${p.to || ""}</td><td>${p.reason || ""}</td><td>${p.status || "pending"}</td></tr>`)
+      .join("") || '<tr><td colspan="4" class="muted">No requests.</td></tr>';
+    $("#pto_table_emp tbody").innerHTML = rows;
+  }
+
+  // Employee comments
+  async function loadEmpComments() { return (await API.get(KEYS.emp_comments)) || []; }
   const cmForm = byId("emp-comment-form");
   const cmStatus = byId("cmpl_status");
   const cmSel = byId("cmpl_job");
 
   async function refreshCompletedJobsForComments() {
     const me = myEmail();
-    const jobs = (await loadReviews()).filter((r) => String(r.employee || "").toLowerCase() === me);
+    const jobs = (await loadReviews()).filter((r) => (r.employee || "").toLowerCase() === me);
     cmSel.innerHTML =
       jobs.map((j) => `<option value="${j.id}">${j.date || ""} • ${j.title || ""}</option>`).join("") ||
       '<option value="">No completed jobs yet</option>';
-  }
-
-  async function renderEmpComments() {
-    const me = myEmail();
-    const rows = (await loadEmpComments())
-      .filter((c) => String(c.employee || "").toLowerCase() === me)
-      .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
-      .map((c) => `<tr><td>${c.date}</td><td>${c.job_review_id}</td><td>${c.text || ""}</td><td>${c.status || ""}</td></tr>`)
-      .join("") || '<tr><td colspan="4" class="muted">No comments yet.</td></tr>';
-    $("#emp_comments_table tbody").innerHTML = rows;
   }
 
   cmForm?.addEventListener("submit", async (e) => {
@@ -318,7 +315,6 @@
     try {
       const jobId = cmSel.value;
       if (!jobId) { cmStatus.textContent = "No job selected."; return; }
-
       const list = await loadEmpComments();
       list.push({
         id: crypto.randomUUID(),
@@ -326,17 +322,26 @@
         job_review_id: jobId,
         text: byId("cmpl_notes").value.trim(),
         date: todayISO(),
-        status: "submitted",
+        status: "submitted"
       });
-
-      await TNK_API.set(KEYS.emp_comments, list);
+      await API.set(KEYS.emp_comments, list);
       cmStatus.textContent = "Comment submitted.";
       cmForm.reset();
       await renderEmpComments();
     } catch (err) {
-      fatal("Failed to submit employee comment.", err);
+      fail("Failed to submit comment.", err);
     }
   });
+
+  async function renderEmpComments() {
+    const me = myEmail();
+    const rows = (await loadEmpComments())
+      .filter((c) => (c.employee || "").toLowerCase() === me)
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .map((c) => `<tr><td>${c.date}</td><td>${c.job_review_id}</td><td>${c.text || ""}</td><td>${c.status || ""}</td></tr>`)
+      .join("") || '<tr><td colspan="4" class="muted">No comments yet.</td></tr>';
+    $("#emp_comments_table tbody").innerHTML = rows;
+  }
 
   // Init
   (async function init() {
@@ -350,8 +355,8 @@
       await renderPTO();
       await refreshCompletedJobsForComments();
       await renderEmpComments();
-    } catch (e) {
-      fatal("Employee portal failed to initialize.", e);
+    } catch (err) {
+      fail("Employee portal failed to load data (Netlify function / auth).", err);
     }
   })();
 })();
