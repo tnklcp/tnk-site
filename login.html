@@ -28,67 +28,9 @@
     .muted { opacity:.85; font-size:.95rem; }
     .stack { display:grid; gap:.75rem; }
   </style>
-  <!-- Netlify Identity Widget -->
+
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
-  <script>
-    // Prevent redirect ping-pong
-    function redirectOnce(url) {
-      const now = Date.now();
-      const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
-      if (now - last < 1500) return;
-      sessionStorage.setItem('tnk_redirect_lock', String(now));
-      window.location.replace(url);
-    }
-
-    function getRole(user) {
-      // Prefer app_metadata.roles (array), then user_metadata.role, then fallback
-      const appRoles = user?.app_metadata?.roles;
-      if (Array.isArray(appRoles) && appRoles.length) {
-        if (appRoles.includes('admin')) return 'admin';
-        if (appRoles.includes('employee')) return 'employee';
-        if (appRoles.includes('customer')) return 'customer';
-      }
-      const metaRole = (user?.user_metadata?.role || '').toLowerCase();
-      if (metaRole) return metaRole;
-      // Employee portal defaults to employee when unknown
-      return 'employee';
-    }
-
-    function routeAfterLogin(user) {
-      const role = getRole(user);
-      sessionStorage.setItem('tnk_user_email', (user?.email || '').toLowerCase());
-      sessionStorage.setItem('tnk_role', role);
-      if (role === 'admin') return redirectOnce('admin.html');
-      if (role === 'employee') return redirectOnce('employee.html');
-      return redirectOnce('customer.html');
-    }
-
-    function clearSession() {
-      sessionStorage.removeItem('tnk_user_email');
-      sessionStorage.removeItem('tnk_role');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      if (!window.netlifyIdentity) return;
-
-      netlifyIdentity.on('init', user => {
-        // Already signed in? Route immediately.
-        if (user) routeAfterLogin(user);
-      });
-
-      netlifyIdentity.on('login', user => {
-        routeAfterLogin(user);
-      });
-
-      netlifyIdentity.on('logout', () => {
-        clearSession();
-        redirectOnce('login.html');
-      });
-
-      // Initialize widget
-      netlifyIdentity.init();
-    });
-  </script>
+  <script src="js/identity.js" defer></script>
 </head>
 <body>
   <div class="auth-wrap">
@@ -96,11 +38,11 @@
       <div class="auth-brand">
         <img src="images/IMG_2713.png" alt="">
         <h1 class="auth-title">Employee Portal</h1>
-        <p class="muted">Admins: your role is set in Netlify Identity. Employees log in here.</p>
+        <p class="muted">Admins & employees log in here.</p>
       </div>
 
       <div class="stack" style="margin-top:1rem">
-        <button class="button button--primary button--xl" onclick="netlifyIdentity && netlifyIdentity.open('login')">
+        <button class="button button--primary button--xl" id="open-login">
           <span class="btn-icon" aria-hidden="true">🔐</span>
           <span>Log In</span>
         </button>
@@ -109,5 +51,23 @@
       </div>
     </div>
   </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      TNKIdentity.init({
+        onInit(user) {
+          // If already logged in, route once (no page-level races)
+          if (user) TNKIdentity.routeAfterLogin(user);
+        },
+        onLogin(user) {
+          TNKIdentity.routeAfterLogin(user);
+        }
+      });
+
+      document.getElementById("open-login").addEventListener("click", () => {
+        if (window.netlifyIdentity) netlifyIdentity.open("login");
+      });
+    });
+  </script>
 </body>
 </html>
