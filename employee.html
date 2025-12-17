@@ -19,11 +19,10 @@
     table { width:100%; border-collapse:collapse; background:#fff; }
     th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
     thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
-    .error-banner { display:none; margin: 0 auto 1rem; max-width: 1100px; background:#7b1f1f; color:#fff; padding:.75rem 1rem; border-radius:12px; }
     @media (max-width: 900px){ .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
-<body data-role-guard="employee-or-admin">
+<body>
   <header class="hero">
     <h1>Employee Portal</h1>
     <div class="cta-row">
@@ -31,8 +30,6 @@
       <button class="button" id="emp-logout">Log Out</button>
     </div>
   </header>
-
-  <div id="global_error" class="error-banner" role="alert"></div>
 
   <div class="portal-wrap container" id="emp-root">
     <p class="muted" style="text-align:center;margin-top:0;">See your schedule, log hours, upload job photos, request PTO, and view paystubs.</p>
@@ -47,6 +44,7 @@
       <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments">Job Comments</button>
     </div>
 
+    <!-- Today -->
     <section class="panel active" id="panel-today">
       <div class="grid">
         <div class="card">
@@ -54,7 +52,7 @@
           <div class="table-wrap">
             <table id="emp_today_jobs">
               <thead><tr><th>Time</th><th>Customer</th><th>Title</th><th>Notes</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
@@ -65,13 +63,15 @@
       </div>
     </section>
 
+    <!-- Week -->
     <section class="panel" id="panel-week">
       <div class="card">
         <h2>This Week’s Schedule</h2>
-        <div id="emp_week_calendar"></div>
+        <div id="emp_week_calendar"><!-- render --></div>
       </div>
     </section>
 
+    <!-- Complete Job -->
     <section class="panel" id="panel-complete">
       <div class="grid">
         <div class="card">
@@ -79,7 +79,7 @@
           <form id="emp-complete-form" class="stack" enctype="multipart/form-data">
             <div>
               <label for="c_job">Job</label>
-              <select id="c_job" required></select>
+              <select id="c_job" required><!-- jobs assigned to employee --></select>
             </div>
             <div>
               <label for="c_notes">Notes</label>
@@ -99,13 +99,14 @@
           <div class="table-wrap">
             <table id="emp_completions">
               <thead><tr><th>Date</th><th>Job</th><th>Status</th><th>Notes</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Hours -->
     <section class="panel" id="panel-hours">
       <div class="grid">
         <div class="card">
@@ -132,25 +133,27 @@
           <div class="table-wrap">
             <table id="emp_hours_table">
               <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Paystubs -->
     <section class="panel" id="panel-paystubs">
       <div class="card">
         <h2>Paystubs</h2>
         <div class="table-wrap">
           <table id="emp_paystubs">
             <thead><tr><th>Period</th><th>Hours</th><th>Gross</th><th>Status</th><th>Download</th></tr></thead>
-            <tbody></tbody>
+            <tbody><!-- rows --></tbody>
           </table>
         </div>
       </div>
     </section>
 
+    <!-- PTO -->
     <section class="panel" id="panel-pto">
       <div class="grid">
         <div class="card">
@@ -177,13 +180,14 @@
           <div class="table-wrap">
             <table id="pto_table_emp">
               <thead><tr><th>From</th><th>To</th><th>Reason</th><th>Status</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Comments -->
     <section class="panel" id="panel-comments">
       <div class="grid">
         <div class="card">
@@ -191,7 +195,7 @@
           <form id="emp-comment-form" class="stack">
             <div>
               <label for="cmpl_job">Job</label>
-              <select id="cmpl_job" required></select>
+              <select id="cmpl_job" required><!-- completed jobs --></select>
             </div>
             <label for="cmpl_notes">Comment</label>
             <textarea id="cmpl_notes" rows="3" placeholder="Notes for admin review"></textarea>
@@ -204,7 +208,7 @@
           <div class="table-wrap">
             <table id="emp_comments_table">
               <thead><tr><th>Date</th><th>Job</th><th>Comment</th><th>Status</th></tr></thead>
-              <tbody></tbody>
+              <tbody><!-- rows --></tbody>
             </table>
           </div>
         </div>
@@ -219,8 +223,24 @@
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script src="js/identity.js"></script>
   <script>
-    window.TNKIdentity && TNKIdentity.init();
+    document.addEventListener("DOMContentLoaded", () => {
+      TNKIdentity.init({
+        onInit(user) {
+          const role = sessionStorage.getItem("tnk_role") || (user ? TNKIdentity.role() : null);
+          if (role !== "employee" && role !== "admin") location.replace("login.html");
+        },
+        onLogout() {
+          location.replace("login.html");
+        }
+      });
+
+      document.getElementById("emp-logout").addEventListener("click", (e) => {
+        e.preventDefault();
+        TNKIdentity.logout();
+      });
+    });
   </script>
+
   <script src="js/employee.js" defer></script>
 </body>
 </html>
