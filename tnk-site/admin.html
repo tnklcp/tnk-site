@@ -37,7 +37,7 @@
     <h1>Admin Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button class="button" id="admin-logout">Log Out</button>
+      <button class="button" id="admin-logout" onclick="if (window.TNKIdentity) { TNKIdentity.logout(); } else { try { sessionStorage.clear(); } catch(e){} location.replace('index.html'); } return false;">Log Out</button>
     </div>
   </header>
 
@@ -211,6 +211,7 @@
 
     <!-- ============ Invoices ============ -->
     <section class="tab-panel" id="panel-invoices">
+      <!-- (unchanged) -->
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Create / Edit Invoice</h2>
@@ -299,6 +300,7 @@
 
     <!-- ============ Timesheets & Payroll ============ -->
     <section class="tab-panel" id="panel-timesheets">
+      <!-- (unchanged) -->
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Add / Edit Hours</h2>
@@ -395,6 +397,7 @@
 
     <!-- ============ Services Catalog ============ -->
     <section class="tab-panel" id="panel-services">
+      <!-- (unchanged) -->
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Service Items</h2>
@@ -442,6 +445,7 @@
 
     <!-- ============ Job Reviews (employee completions) ============ -->
     <section class="tab-panel" id="panel-reviews">
+      <!-- (unchanged) -->
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Completed Jobs (Pending Review)</h2>
@@ -515,6 +519,48 @@
             <p id="price_status" class="muted"></p>
           </form>
         </div>
+
+        <!-- NEW: Per-customer recurring pricing -->
+        <div class="admin-card">
+          <h2>Recurring Service Pricing (Per Customer)</h2>
+          <p class="muted" style="margin-top:0;">Set each customer’s recurring fee. This will be used when they start a subscription.</p>
+
+          <form id="subprice-form" class="stack">
+            <input type="hidden" id="subp_id" />
+            <div class="grid-3">
+              <div>
+                <label for="subp_email">Customer Email</label>
+                <input id="subp_email" type="email" required list="admin-customer-emails" />
+              </div>
+              <div>
+                <label for="subp_amount">Amount ($)</label>
+                <input id="subp_amount" type="number" min="1" step="1" required />
+              </div>
+              <div>
+                <label for="subp_interval">Interval</label>
+                <select id="subp_interval" required>
+                  <option value="week">Weekly</option>
+                  <option value="month" selected>Monthly</option>
+                  <option value="year">Yearly</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="inline">
+              <button class="button button--primary" type="submit">Save Recurring Price</button>
+              <button id="subp_reset" class="button" type="button">Reset</button>
+            </div>
+            <p id="subp_status" class="muted"></p>
+          </form>
+
+          <div class="table-wrap" style="margin-top:.75rem;">
+            <table id="subprice_table">
+              <thead><tr><th>Customer</th><th>Amount</th><th>Interval</th><th>Actions</th></tr></thead>
+              <tbody><!-- rows --></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -523,27 +569,8 @@
     </p>
   </div>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="js/identity.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      TNKIdentity.init({
-        onInit(user) {
-          const role = sessionStorage.getItem("tnk_role") || (user ? TNKIdentity.role() : null);
-          if (role !== "admin") location.replace("login.html");
-        },
-        onLogout() {
-          location.replace("login.html");
-        }
-      });
-
-      document.getElementById("admin-logout").addEventListener("click", (e) => {
-        e.preventDefault();
-        TNKIdentity.logout();
-      });
-    });
-  </script>
-
+  <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script defer src="js/tnk-identity.js"></script>
   <script src="js/admin.js" defer></script>
 </body>
 </html>
