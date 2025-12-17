@@ -27,7 +27,7 @@
     <h1>Employee Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button class="button" id="emp-logout">Log Out</button>
+      <button class="button" id="emp-logout" type="button">Log Out</button>
     </div>
   </header>
 
@@ -35,13 +35,13 @@
     <p class="muted" style="text-align:center;margin-top:0;">See your schedule, log hours, upload job photos, request PTO, and view paystubs.</p>
 
     <div class="tabs" role="tablist" aria-label="Employee Sections">
-      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="today">Today</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="week">This Week</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="complete">Complete Job</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="hours">Hours</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs">Paystubs</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="pto">Request Time Off</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments">Job Comments</button>
+      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="today" type="button">Today</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="week" type="button">This Week</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="complete" type="button">Complete Job</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="hours" type="button">Hours</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="paystubs" type="button">Paystubs</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="pto" type="button">Request Time Off</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments" type="button">Job Comments</button>
     </div>
 
     <!-- Today -->
@@ -52,7 +52,7 @@
           <div class="table-wrap">
             <table id="emp_today_jobs">
               <thead><tr><th>Time</th><th>Customer</th><th>Title</th><th>Notes</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -67,7 +67,7 @@
     <section class="panel" id="panel-week">
       <div class="card">
         <h2>This Week’s Schedule</h2>
-        <div id="emp_week_calendar"><!-- render --></div>
+        <div id="emp_week_calendar"></div>
       </div>
     </section>
 
@@ -79,7 +79,7 @@
           <form id="emp-complete-form" class="stack" enctype="multipart/form-data">
             <div>
               <label for="c_job">Job</label>
-              <select id="c_job" required><!-- jobs assigned to employee --></select>
+              <select id="c_job" required></select>
             </div>
             <div>
               <label for="c_notes">Notes</label>
@@ -99,7 +99,7 @@
           <div class="table-wrap">
             <table id="emp_completions">
               <thead><tr><th>Date</th><th>Job</th><th>Status</th><th>Notes</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -133,7 +133,7 @@
           <div class="table-wrap">
             <table id="emp_hours_table">
               <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -147,7 +147,7 @@
         <div class="table-wrap">
           <table id="emp_paystubs">
             <thead><tr><th>Period</th><th>Hours</th><th>Gross</th><th>Status</th><th>Download</th></tr></thead>
-            <tbody><!-- rows --></tbody>
+            <tbody></tbody>
           </table>
         </div>
       </div>
@@ -180,7 +180,7 @@
           <div class="table-wrap">
             <table id="pto_table_emp">
               <thead><tr><th>From</th><th>To</th><th>Reason</th><th>Status</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -195,7 +195,7 @@
           <form id="emp-comment-form" class="stack">
             <div>
               <label for="cmpl_job">Job</label>
-              <select id="cmpl_job" required><!-- completed jobs --></select>
+              <select id="cmpl_job" required></select>
             </div>
             <label for="cmpl_notes">Comment</label>
             <textarea id="cmpl_notes" rows="3" placeholder="Notes for admin review"></textarea>
@@ -208,7 +208,7 @@
           <div class="table-wrap">
             <table id="emp_comments_table">
               <thead><tr><th>Date</th><th>Job</th><th>Comment</th><th>Status</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -220,13 +220,11 @@
     </p>
   </div>
 
-  <!-- Netlify Identity + TNK wrapper (single source of truth) -->
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script defer src="js/identity.js"></script>
-  <script defer>
-    window.TNKIdentity?.init?.();
+  <script>
+    document.addEventListener("DOMContentLoaded", () => window.TNKIdentity?.init?.());
   </script>
-
   <script src="js/employee.js" defer></script>
 </body>
 </html>
