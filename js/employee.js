@@ -1,4 +1,4 @@
-/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, FAIL LOUDLY) */
+/* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -6,69 +6,81 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
-  function fail(msg, err) {
-    console.error("[Employee]", msg, err || "");
-    const el = byId("global_error");
-    if (el) {
-      el.textContent = msg;
-      el.style.display = "block";
-    } else {
-      alert(msg);
-    }
-  }
-
-  function requireEmpOrAdmin() {
-    const role = window.TNKIdentity?.role?.() || sessionStorage.getItem("tnk_role");
+  // ----- Auth: employee or admin -----
+  function assertAllowed() {
+    const role = sessionStorage.getItem("tnk_role");
     if (role === "employee" || role === "admin") return true;
     location.replace("login.html");
     return false;
   }
-  if (!requireEmpOrAdmin()) return;
+  if (!assertAllowed()) return;
 
   byId("emp-logout")?.addEventListener("click", (e) => {
     e.preventDefault();
     window.TNKIdentity?.logout?.();
   });
 
-  const myEmail = () => (sessionStorage.getItem("tnk_user_email") || window.TNKIdentity?.email?.() || "").toLowerCase();
+  const myEmail = () =>
+    (sessionStorage.getItem("tnk_user_email") ||
+      window.TNKIdentity?.email?.() ||
+      window.netlifyIdentity?.currentUser?.()?.email ||
+      "").toLowerCase();
 
-  async function jwt() {
-    const token = await window.TNKIdentity?.token?.();
-    if (!token) throw new Error("Not authenticated.");
-    return token;
-  }
-
-  async function fetchJSON(url, opts = {}) {
-    const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
-    const token = await jwt();
-    headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(url, { ...opts, headers });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  // ----- Strict Collections API (NO local fallback) -----
+  async function token() {
+    try {
+      const t = await window.TNKIdentity?.token?.();
+      if (t) return t;
+    } catch {}
+    try {
+      const u = window.netlifyIdentity?.currentUser?.();
+      if (!u) return null;
+      return await u.jwt(true);
+    } catch {
+      return null;
     }
-    return res.json();
   }
 
-  const API = {
-    async get(name) {
-      const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`GET ${name} failed: HTTP ${res.status}: ${text || res.statusText}`);
+  async function apiGet(name) {
+    const t = await token();
+    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
       }
-      const j = await res.json();
-      return j?.data ?? null;
-    },
-    async set(name, data) {
-      await fetchJSON(`/.netlify/functions/collections`, {
-        method: "PUT",
-        body: JSON.stringify({ name, data })
-      });
-    }
-  };
+    });
+    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    return (j && j.data) ?? null;
+  }
+
+  async function apiSet(name, data) {
+    const t = await token();
+    const res = await fetch(`/.netlify/functions/collections`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
+      },
+      body: JSON.stringify({ name, data })
+    });
+    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
+  }
+
+  function showFatal(err) {
+    console.error(err);
+    const root = byId("emp-root") || document.body;
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.border = "1px solid #e6b6b6";
+    div.innerHTML = `
+      <h2 style="color:#7b1f1f;margin-top:0;">Data Error</h2>
+      <p class="muted">The employee portal could not load/save data from Netlify.</p>
+      <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e6b6b6;padding:.75rem;border-radius:10px;">${String(err?.message || err)}</pre>
+    `;
+    root.prepend(div);
+    throw err;
+  }
 
   const KEYS = {
     jobs: "tnk_jobs",
@@ -79,7 +91,7 @@
     emp_comments: "tnk_emp_comments"
   };
 
-  // Tabs
+  // ----- tabs (clean) -----
   (function initTabs() {
     const tabs = $$(".tab-btn");
     const panels = $$(".panel, .tab-panel");
@@ -96,9 +108,21 @@
     if (current) activate(current);
   })();
 
-  async function loadJobs() { return (await API.get(KEYS.jobs)) || []; }
+  // ----- data loads/saves -----
+  async function loadJobs() { return (await apiGet(KEYS.jobs)) || []; }
+  async function loadReviews() { return (await apiGet(KEYS.reviews)) || []; }
+  async function loadTimesheets() { return (await apiGet(KEYS.timesheets)) || []; }
+  async function loadPaystubs() { return (await apiGet(KEYS.paystubs)) || []; }
+  async function loadPTO() { return (await apiGet(KEYS.pto)) || []; }
+  async function loadEmpComments() { return (await apiGet(KEYS.emp_comments)) || []; }
 
-  // Today jobs
+  async function saveJobs(v) { await apiSet(KEYS.jobs, v); }
+  async function saveReviews(v) { await apiSet(KEYS.reviews, v); }
+  async function saveTimesheets(v) { await apiSet(KEYS.timesheets, v); }
+  async function savePTO(v) { await apiSet(KEYS.pto, v); }
+  async function saveEmpComments(v) { await apiSet(KEYS.emp_comments, v); }
+
+  // ----- jobs: Today -----
   const todayBody = $("#emp_today_jobs tbody");
   const jobDrawer = byId("emp_job_drawer");
 
@@ -110,23 +134,19 @@
       .sort((a, b) => (a.start || "").localeCompare(b.start || ""))
       .map((j) => `<tr data-id="${j.id}"><td>${j.start || ""}</td><td>${j.customer || ""}</td><td>${j.title || ""}</td><td>${j.notes || ""}</td></tr>`)
       .join("");
-    todayBody.innerHTML = rows || `<tr><td colspan="4" class="muted">No jobs today.</td></tr>`;
+    if (todayBody) todayBody.innerHTML = rows || `<tr><td colspan="4" class="muted">No jobs today.</td></tr>`;
   }
 
   todayBody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
-    try {
-      const j = (await loadJobs()).find((x) => x.id === tr.dataset.id);
-      if (!j) return;
-      jobDrawer.innerHTML = `
-        <p><strong>${j.title || ""}</strong></p>
-        <p><strong>Customer:</strong> ${j.customer || ""}</p>
-        <p><strong>When:</strong> ${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</p>
-        <p><strong>Notes:</strong> ${j.notes || ""}</p>
-        <p><strong>Status:</strong> ${j.status || "scheduled"}</p>`;
-    } catch (err) {
-      fail("Failed to load job details.", err);
-    }
+    const j = (await loadJobs()).find((x) => x.id === tr.dataset.id);
+    if (!j) return;
+    jobDrawer.innerHTML =
+      `<p><strong>${j.title || ""}</strong></p>
+       <p><strong>Customer:</strong> ${j.customer || ""}</p>
+       <p><strong>When:</strong> ${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</p>
+       <p><strong>Notes:</strong> ${j.notes || ""}</p>
+       <p><strong>Status:</strong> ${j.status || "scheduled"}</p>`;
   });
 
   async function renderWeek() {
@@ -134,14 +154,12 @@
     const rows = (await loadJobs())
       .filter((j) => !j.assignee || (j.assignee || "").toLowerCase() === me)
       .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""))
-      .map((j) => `<div class="slot"><div>${j.date} ${j.start || ""}</div><div><strong>${(j.customer || "").split("@")[0]}</strong> — ${j.title || ""}</div></div>`)
+      .map((j) => `<div class="slot"><div>${j.date || ""} ${j.start || ""}</div><div><strong>${(j.customer || "").split("@")[0]}</strong> — ${j.title || ""}</div></div>`)
       .join("");
-    byId("emp_week_calendar").innerHTML = rows || '<p class="muted">No jobs.</p>';
+    byId("emp_week_calendar").innerHTML = rows || `<p class="muted">No jobs.</p>`;
   }
 
-  // Complete job → review queue
-  async function loadReviews() { return (await API.get(KEYS.reviews)) || []; }
-
+  // ----- complete job -----
   const cForm = byId("emp-complete-form");
   const cSel = byId("c_job");
   const cStatus = byId("c_status");
@@ -152,7 +170,10 @@
     cSel.innerHTML =
       `<option value="">Select…</option>` +
       jobs
-        .filter((j) => (!j.assignee || (j.assignee || "").toLowerCase() === me) && (j.status === "scheduled" || j.status === "in_progress"))
+        .filter((j) =>
+          (!j.assignee || (j.assignee || "").toLowerCase() === me) &&
+          (j.status === "scheduled" || j.status === "in_progress")
+        )
         .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
         .map((j) => `<option value="${j.id}">${j.date} • ${j.title} (${j.customer})</option>`)
         .join("");
@@ -170,73 +191,42 @@
 
   cForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      const id = cSel.value;
-      if (!id) { cStatus.textContent = "Pick a job."; return; }
+    const id = cSel.value;
+    if (!id) { cStatus.textContent = "Pick a job."; return; }
 
-      const jobs = await loadJobs();
-      const j = jobs.find((x) => x.id === id);
-      if (!j) { cStatus.textContent = "Job not found."; return; }
+    const jobs = await loadJobs();
+    const j = jobs.find((x) => x.id === id);
+    if (!j) { cStatus.textContent = "Job not found."; return; }
 
-      const photos = Array.from(byId("c_photos").files || []).map((f) => f.name);
+    const photos = Array.from(byId("c_photos").files || []).map((f) => f.name);
+    const list = await loadReviews();
 
-      const list = await loadReviews();
-      list.push({
-        id: crypto.randomUUID(),
-        job_id: j.id,
-        date: j.date,
-        customer: j.customer,
-        title: j.title,
-        notes: byId("c_notes").value.trim(),
-        photos,
-        employee: myEmail(),
-        status: "pending"
-      });
+    list.push({
+      id: crypto.randomUUID(),
+      job_id: j.id,
+      date: j.date,
+      customer: j.customer,
+      title: j.title,
+      notes: byId("c_notes").value.trim(),
+      photos,
+      employee: myEmail(),
+      status: "pending"
+    });
 
-      await API.set(KEYS.reviews, list);
+    await saveReviews(list);
 
-      j.status = "complete_pending_review";
-      await API.set(KEYS.jobs, jobs);
+    j.status = "complete_pending_review";
+    await saveJobs(jobs);
 
-      cStatus.textContent = "Submitted for admin review.";
-      cForm.reset();
-
-      await refreshCompleteSelect();
-      await renderCompletions();
-      await renderToday();
-      await renderWeek();
-    } catch (err) {
-      fail("Failed to submit completion for review.", err);
-    }
+    cStatus.textContent = "Submitted for admin review.";
+    cForm.reset();
+    await refreshCompleteSelect();
+    await renderCompletions();
   });
 
-  // Hours
-  async function loadTimesheets() { return (await API.get(KEYS.timesheets)) || []; }
+  // ----- hours -----
   const hForm = byId("emp-hours-form");
   const hStatus = byId("eh_status");
-
-  hForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      const list = await loadTimesheets();
-      list.push({
-        id: crypto.randomUUID(),
-        employee_email: myEmail(),
-        date: byId("eh_date").value,
-        hours: Number(byId("eh_hours").value || 0),
-        start_time: "",
-        end_time: "",
-        notes: byId("eh_notes").value.trim(),
-        approved: false
-      });
-      await API.set(KEYS.timesheets, list);
-      hStatus.textContent = "Saved.";
-      hForm.reset();
-      await renderHours();
-    } catch (err) {
-      fail("Failed to save hours.", err);
-    }
-  });
 
   async function renderHours() {
     const me = myEmail();
@@ -248,8 +238,26 @@
     $("#emp_hours_table tbody").innerHTML = rows;
   }
 
-  // Paystubs (read only)
-  async function loadPaystubs() { return (await API.get(KEYS.paystubs)) || []; }
+  hForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const list = await loadTimesheets();
+    list.push({
+      id: crypto.randomUUID(),
+      employee_email: myEmail(),
+      date: byId("eh_date").value,
+      hours: Number(byId("eh_hours").value || 0),
+      start_time: "",
+      end_time: "",
+      notes: byId("eh_notes").value.trim(),
+      approved: false
+    });
+    await saveTimesheets(list);
+    hStatus.textContent = "Saved.";
+    hForm.reset();
+    await renderHours();
+  });
+
+  // ----- paystubs -----
   async function renderPaystubs() {
     const me = myEmail();
     const rows = (await loadPaystubs())
@@ -260,31 +268,9 @@
     $("#emp_paystubs tbody").innerHTML = rows;
   }
 
-  // PTO
-  async function loadPTO() { return (await API.get(KEYS.pto)) || []; }
+  // ----- PTO -----
   const ptoForm = byId("pto-form");
   const ptoStatus = byId("pto_status");
-
-  ptoForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      const list = await loadPTO();
-      list.push({
-        id: crypto.randomUUID(),
-        employee: myEmail(),
-        from: byId("pto_from").value,
-        to: byId("pto_to").value,
-        reason: byId("pto_reason").value.trim(),
-        status: "pending"
-      });
-      await API.set(KEYS.pto, list);
-      ptoStatus.textContent = "Request submitted.";
-      ptoForm.reset();
-      await renderPTO();
-    } catch (err) {
-      fail("Failed to submit PTO request.", err);
-    }
-  });
 
   async function renderPTO() {
     const me = myEmail();
@@ -296,8 +282,24 @@
     $("#pto_table_emp tbody").innerHTML = rows;
   }
 
-  // Employee comments
-  async function loadEmpComments() { return (await API.get(KEYS.emp_comments)) || []; }
+  ptoForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const list = await loadPTO();
+    list.push({
+      id: crypto.randomUUID(),
+      employee: myEmail(),
+      from: byId("pto_from").value,
+      to: byId("pto_to").value,
+      reason: byId("pto_reason").value.trim(),
+      status: "pending"
+    });
+    await savePTO(list);
+    ptoStatus.textContent = "Request submitted.";
+    ptoForm.reset();
+    await renderPTO();
+  });
+
+  // ----- comments on completed jobs -----
   const cmForm = byId("emp-comment-form");
   const cmStatus = byId("cmpl_status");
   const cmSel = byId("cmpl_job");
@@ -310,29 +312,6 @@
       '<option value="">No completed jobs yet</option>';
   }
 
-  cmForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    try {
-      const jobId = cmSel.value;
-      if (!jobId) { cmStatus.textContent = "No job selected."; return; }
-      const list = await loadEmpComments();
-      list.push({
-        id: crypto.randomUUID(),
-        employee: myEmail(),
-        job_review_id: jobId,
-        text: byId("cmpl_notes").value.trim(),
-        date: todayISO(),
-        status: "submitted"
-      });
-      await API.set(KEYS.emp_comments, list);
-      cmStatus.textContent = "Comment submitted.";
-      cmForm.reset();
-      await renderEmpComments();
-    } catch (err) {
-      fail("Failed to submit comment.", err);
-    }
-  });
-
   async function renderEmpComments() {
     const me = myEmail();
     const rows = (await loadEmpComments())
@@ -343,9 +322,31 @@
     $("#emp_comments_table tbody").innerHTML = rows;
   }
 
-  // Init
+  cmForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const jobId = cmSel.value;
+    if (!jobId) { cmStatus.textContent = "No job selected."; return; }
+    const list = await loadEmpComments();
+    list.push({
+      id: crypto.randomUUID(),
+      employee: myEmail(),
+      job_review_id: jobId,
+      text: byId("cmpl_notes").value.trim(),
+      date: todayISO(),
+      status: "submitted"
+    });
+    await saveEmpComments(list);
+    cmStatus.textContent = "Comment submitted.";
+    cmForm.reset();
+    await renderEmpComments();
+  });
+
+  // ----- init -----
   (async function init() {
     try {
+      const email = myEmail();
+      if (!email) throw new Error("No logged-in user email found in session/identity.");
+
       await renderToday();
       await renderWeek();
       await refreshCompleteSelect();
@@ -355,8 +356,8 @@
       await renderPTO();
       await refreshCompletedJobsForComments();
       await renderEmpComments();
-    } catch (err) {
-      fail("Employee portal failed to load data (Netlify function / auth).", err);
+    } catch (e) {
+      showFatal(e);
     }
   })();
 })();
