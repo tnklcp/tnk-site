@@ -1,64 +1,81 @@
 // tnk-site/netlify/functions/collections.js
 import { getStore } from "@netlify/blobs";
 
-export default async (req, context) => {
-  try {
-    const store = getStore({ name: "tnk-data" });
+const STORE_NAME = "tnk-data";
 
-    // Auth (Netlify Identity)
-    const user = context?.clientContext?.user || null;
+export async function handler(event) {
+  try {
+    // CORS / preflight
+    if (event.httpMethod === "OPTIONS") {
+      return resp(204, null);
+    }
+
+    const method = event.httpMethod;
+
+    // IMPORTANT: this dependency must be installed (package.json in tnk-site)
+    const store = getStore(STORE_NAME);
+
+    const user = event?.clientContext?.user || null;
     const isAuthed = !!user;
 
-    const url = new URL(req.url);
-    const method = req.method?.toUpperCase?.() || "GET";
-
     if (method === "GET") {
-      const name = url.searchParams.get("name");
-      if (!name) return json({ ok: false, error: "Missing name" }, 400);
+      const name = event.queryStringParameters?.name;
+      if (!name) return resp(400, { ok: false, error: "Missing ?name" });
 
       const key = `${name}.json`;
-      const blob = await store.get(key, { type: "json" });
-      return json({ ok: true, data: blob ?? null }, 200);
+
+      // If it doesn't exist yet, return null/empty (not an error)
+      const data = await store.get(key, { type: "json" });
+      return resp(200, { ok: true, data: data ?? null });
     }
 
     if (method === "PUT") {
-      if (!isAuthed) return json({ ok: false, error: "Auth required" }, 401);
+      if (!isAuthed) return resp(401, { ok: false, error: "Auth required" });
 
-      const bodyText = await req.text();
-      const body = bodyText ? safeJSON(bodyText) : {};
+      const body = safeJSON(event.body);
       const { name, data } = body || {};
-      if (!name) return json({ ok: false, error: "Missing name" }, 400);
+      if (!name) return resp(400, { ok: false, error: "Missing name" });
 
       const key = `${name}.json`;
+
+      // store.set accepts string/buffer; we store JSON string
       await store.set(key, JSON.stringify(data ?? null), {
-        metadata: { updatedAt: new Date().toISOString() },
+        metadata: { updatedAt: new Date().toISOString() }
       });
 
-      return json({ ok: true }, 200);
+      return resp(200, { ok: true });
     }
 
-    return json({ ok: false, error: "Method Not Allowed" }, 405);
-  } catch (e) {
-    return json({ ok: false, error: e?.message || "Server error" }, 500);
+    return resp(405, { ok: false, error: "Method Not Allowed" });
+  } catch (err) {
+    // This prevents opaque 502s and shows the real reason in your browser console/network tab.
+    return resp(500, {
+      ok: false,
+      error: "Collections function failed",
+      detail: err?.message || String(err)
+    });
   }
-};
+}
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      // same-origin fetches are fine, but CORS headers don't hurt
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
-  });
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS"
+  };
+}
+
+function resp(statusCode, obj) {
+  return {
+    statusCode,
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    body: obj === null ? "" : JSON.stringify(obj)
+  };
 }
 
 function safeJSON(text) {
   try {
-    return JSON.parse(text);
+    return text ? JSON.parse(text) : {};
   } catch {
     return {};
   }
