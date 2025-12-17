@@ -36,13 +36,13 @@
     <p class="muted" style="text-align:center;margin-top:0;">View invoices, manage services, request extras, and track your history.</p>
 
     <div class="tabs" role="tablist" aria-label="Customer Sections">
-      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="invoices" type="button">Invoices</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="payments" type="button">Payments & Balance</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="preferences" type="button">Service Preferences</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="extras" type="button">Request Extra Service</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments" type="button">Comments</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="history" type="button">Service History</button>
-      <button class="tab-btn" role="tab" aria-selected="false" data-tab="availability" type="button">Availability</button>
+      <button class="tab-btn" role="tab" aria-selected="true"  data-tab="invoices">Invoices</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="payments">Payments & Balance</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="preferences">Service Preferences</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="extras">Request Extra Service</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="comments">Comments</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="history">Service History</button>
+      <button class="tab-btn" role="tab" aria-selected="false" data-tab="availability">Availability</button>
     </div>
 
     <!-- Invoices -->
@@ -228,7 +228,8 @@
 
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script defer src="js/identity.js"></script>
-  <script>
+  <script defer src="js/api.js"></script>
+  <script defer>
     document.addEventListener("DOMContentLoaded", () => window.TNKIdentity?.init?.());
   </script>
   <script src="js/customer.js" defer></script>
