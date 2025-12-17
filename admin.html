@@ -523,9 +523,13 @@
     </p>
   </div>
 
+  <!-- Netlify Identity + TNK wrapper -->
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script defer src="js/tnk-identity.js"></script>
+  <script defer src="js/identity.js"></script>
+  <script defer>
+    window.TNKIdentity?.init?.();
+  </script>
+
   <script src="js/admin.js" defer></script>
 </body>
 </html>
-
