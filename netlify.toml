@@ -1,6 +1,7 @@
 # netlify.toml at repo root (since the site lives at repo root)
 [build]
   publish = "."
+  functions = "netlify/functions"
 
 # Pretty URLs for your portal pages
 [[redirects]]
@@ -28,3 +29,8 @@
   to = "/login-customer.html"
   status = 301
 
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
+
+[functions]
+  node_bundler = "esbuild"
