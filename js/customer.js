@@ -1,4 +1,4 @@
-/* TNK Customer Portal — Identity guard + tabs + Netlify-backed data (FAIL LOUDLY) */
+/* TNK Customer Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -6,33 +6,25 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
-  function fatal(msg, detail) {
-    const root = byId("cust-root") || document.body;
-    const box = document.createElement("div");
-    box.style.cssText =
-      "max-width:900px;margin:1rem auto;padding:1rem 1.1rem;border-radius:12px;" +
-      "background:#fff3f3;border:1px solid #e5b1b1;color:#7b1f1f;box-shadow:0 4px 12px rgba(0,0,0,.08)";
-    box.innerHTML = `
-      <h2 style="margin:.1rem 0 .35rem;">Data Unavailable</h2>
-      <p style="margin:.25rem 0 .6rem;">${msg}</p>
-      ${detail ? `<pre style="white-space:pre-wrap;margin:.5rem 0 0;opacity:.9;">${detail}</pre>` : ""}
-      <p style="margin:.75rem 0 0;">
-        <a class="button" href="index.html">← Back to Site</a>
-      </p>
-    `;
-    root.prepend(box);
-
-    // Disable interactive UI to avoid corrupt actions
-    document.querySelectorAll("button, input, select, textarea").forEach((el) => {
-      if (el.id === "cust-logout") return;
-      el.disabled = true;
-    });
+  function fatal(msg, err) {
+    console.error("[CUSTOMER]", msg, err || "");
+    const root = byId("cust-root");
+    if (root) {
+      root.innerHTML = `
+        <div class="card" style="max-width:900px;margin:2rem auto;">
+          <h2 style="margin:.25rem 0;color:var(--clr-primary-600)">System Error</h2>
+          <p class="muted">${msg}</p>
+          <p class="muted">Open DevTools → Console for details.</p>
+        </div>`;
+    } else alert(msg);
     throw new Error(msg);
   }
 
-  // ---- Auth guard ----
-  function guard() {
-    const role = window.TNKIdentity?.role?.();
+  if (!window.TNKIdentity) fatal("Missing TNKIdentity. Ensure js/identity.js is loaded.");
+  if (!window.TNK_API) fatal("Missing TNK_API. Ensure js/api.js is loaded.");
+
+  function routeByRole() {
+    const role = window.TNKIdentity.role?.();
     const r = sessionStorage.getItem("tnk_role");
     const finalRole = role || r;
 
@@ -41,48 +33,14 @@
     if (finalRole === "employee") return location.replace("employee.html");
     return location.replace("login-customer.html");
   }
-  guard();
+  routeByRole();
 
   byId("cust-logout")?.addEventListener("click", (e) => {
     e.preventDefault();
-    window.TNKIdentity?.logout?.();
+    window.TNKIdentity.logout();
   });
 
-  const myEmail = () =>
-    sessionStorage.getItem("tnk_user_email") ||
-    window.TNKIdentity?.email?.() ||
-    "";
-
-  async function jwt() {
-    try { return await window.netlifyIdentity?.currentUser()?.jwt(true); }
-    catch { return null; }
-  }
-
-  async function apiGet(collection) {
-    const token = await jwt();
-    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error(`GET ${collection} failed: ${res.status}`);
-    const j = await res.json();
-    return j?.data;
-  }
-
-  async function apiSet(collection, data) {
-    const token = await jwt();
-    const res = await fetch(`/.netlify/functions/collections`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ name: collection, data }),
-    });
-    if (!res.ok) throw new Error(`PUT ${collection} failed: ${res.status}`);
-  }
+  const myEmail = () => (sessionStorage.getItem("tnk_user_email") || window.TNKIdentity.email?.() || "").toLowerCase();
 
   const KEYS = {
     invoices: "tnk_invoices",
@@ -95,7 +53,7 @@
     balances: "tnk_cust_balances",
   };
 
-  // ---- tabs ----
+  // Tabs
   (function initTabs() {
     const tabs = $$(".tab-btn");
     const panels = $$(".panel, .tab-panel");
@@ -112,26 +70,29 @@
     if (current) activate(current);
   })();
 
-  // ---- invoices ----
+  // Invoices
   const invTbody = $("#cust_invoices tbody");
   const invStatus = byId("inv_status");
 
   async function renderInvoices() {
-    const email = (myEmail() || "").toLowerCase();
-    if (!email) return fatal("You are not signed in. Please log in again.");
+    const email = myEmail();
+    if (!email) fatal("Not signed in (missing email). Try logging in again.");
 
-    const all = (await apiGet(KEYS.invoices)) || [];
+    const all = await TNK_API.get(KEYS.invoices);
+    if (!Array.isArray(all)) fatal("Invoices store is corrupted (expected array).");
+
     const mine = all.filter((i) => (i.customer_email || "").toLowerCase() === email);
 
     invTbody.innerHTML =
       mine
-        .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map((i) => `
-          <tr data-id="${i.id}">
+        .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
+        .map(
+          (i) => `<tr data-id="${i.id}">
             <td>${i.number}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
             <td>${money(i.total)}</td><td>${i.status}</td>
             <td><button class="button js-view" type="button">View</button></td>
-          </tr>`)
+          </tr>`
+        )
         .join("") || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
 
     invStatus.textContent = "";
@@ -142,8 +103,11 @@
     if (!tr) return;
     if (!e.target.classList.contains("js-view")) return;
 
-    const all = (await apiGet(KEYS.invoices)) || [];
-    const inv = all.find((x) => x.id === tr.dataset.id);
+    const id = tr.dataset.id;
+    const all = await TNK_API.get(KEYS.invoices);
+    if (!Array.isArray(all)) fatal("Invoices store is corrupted (expected array).");
+
+    const inv = all.find((x) => x.id === id);
     if (!inv) return;
 
     const rows = (inv.items || [])
@@ -164,191 +128,222 @@
     try { win.focus(); } catch {}
   });
 
-  // ---- balance ----
+  // Balance
   async function renderBalance() {
-    const email = (myEmail() || "").toLowerCase();
-    if (!email) return;
-    const balances = (await apiGet(KEYS.balances)) || {};
-    byId("cust_balance").textContent = money(Number(balances[email] || 0));
+    const email = myEmail();
+    if (!email) fatal("Not signed in (missing email).");
+
+    const balances = (await TNK_API.get(KEYS.balances)) || {};
+    if (balances && typeof balances !== "object") fatal("Balances store is corrupted (expected object).");
+
+    const bal = Number(balances[email] || 0);
+    byId("cust_balance").textContent = money(bal);
   }
 
-  // ---- preferences ----
+  // Preferences (stored as object map: { [email]: {svc:[], storm:[]} })
   const prefForm = byId("pref-form");
   const prefStatus = byId("pref_status");
 
   async function loadPrefs() {
-    const map = (await apiGet(KEYS.cust_prefs)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_prefs)) || {};
+    if (map && typeof map !== "object") fatal("Preferences store is corrupted (expected object).");
     return map[email] || { svc: [], storm: [] };
   }
 
   async function savePrefs(p) {
-    const map = (await apiGet(KEYS.cust_prefs)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_prefs)) || {};
+    if (map && typeof map !== "object") fatal("Preferences store is corrupted (expected object).");
     map[email] = p;
-    await apiSet(KEYS.cust_prefs, map);
+    await TNK_API.set(KEYS.cust_prefs, map);
   }
 
   async function renderPrefs() {
     const p = await loadPrefs();
-    $$('input[name="svc"]').forEach((cb) => (cb.checked = p.svc.includes(cb.value)));
-    $$('input[name="storm"]').forEach((cb) => (cb.checked = p.storm.includes(cb.value)));
+    $$('input[name="svc"]').forEach((cb) => (cb.checked = (p.svc || []).includes(cb.value)));
+    $$('input[name="storm"]').forEach((cb) => (cb.checked = (p.storm || []).includes(cb.value)));
   }
 
   prefForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const svc = $$('input[name="svc"]:checked').map((i) => i.value);
-    const storm = $$('input[name="storm"]:checked').map((i) => i.value);
-    await savePrefs({ svc, storm });
-    prefStatus.textContent = "Preferences saved.";
+    try {
+      const svc = $$('input[name="svc"]:checked').map((i) => i.value);
+      const storm = $$('input[name="storm"]:checked').map((i) => i.value);
+      await savePrefs({ svc, storm });
+      prefStatus.textContent = "Preferences saved.";
+    } catch (err) {
+      fatal("Failed to save preferences.", err);
+    }
   });
 
-  // ---- extra service ----
+  // Extras (object map -> array per customer)
   const extraForm = byId("extra-form");
   const extraStatus = byId("extra_status");
 
   async function loadExtras() {
-    const map = (await apiGet(KEYS.cust_extras)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_extras)) || {};
+    if (map && typeof map !== "object") fatal("Extras store is corrupted (expected object).");
     return map[email] || [];
   }
 
   async function saveExtras(list) {
-    const map = (await apiGet(KEYS.cust_extras)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_extras)) || {};
+    if (map && typeof map !== "object") fatal("Extras store is corrupted (expected object).");
     map[email] = list;
-    await apiSet(KEYS.cust_extras, map);
+    await TNK_API.set(KEYS.cust_extras, map);
   }
 
   extraForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const list = await loadExtras();
-    list.push({
-      id: crypto.randomUUID(),
-      service: byId("x_service").value.trim(),
-      date: byId("x_date").value || "",
-      notes: byId("x_notes").value.trim(),
-      created_at: new Date().toISOString(),
-    });
-    await saveExtras(list);
-    extraStatus.textContent = "Request sent.";
-    extraForm.reset();
+    try {
+      const list = await loadExtras();
+      list.push({
+        id: crypto.randomUUID(),
+        service: byId("x_service").value.trim(),
+        date: byId("x_date").value || "",
+        notes: byId("x_notes").value.trim(),
+        created_at: new Date().toISOString(),
+      });
+      await saveExtras(list);
+      extraStatus.textContent = "Request sent.";
+      extraForm.reset();
+    } catch (err) {
+      fatal("Failed to submit extra service request.", err);
+    }
   });
 
-  // ---- special requests ----
+  // Specials (object map -> array per customer)
   const spForm = byId("special-form");
   const spStatus = byId("sp_status");
 
   async function loadSpecials() {
-    const map = (await apiGet(KEYS.cust_specials)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_specials)) || {};
+    if (map && typeof map !== "object") fatal("Specials store is corrupted (expected object).");
     return map[email] || [];
   }
 
   async function saveSpecials(list) {
-    const map = (await apiGet(KEYS.cust_specials)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_specials)) || {};
+    if (map && typeof map !== "object") fatal("Specials store is corrupted (expected object).");
     map[email] = list;
-    await apiSet(KEYS.cust_specials, map);
+    await TNK_API.set(KEYS.cust_specials, map);
   }
 
   spForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const list = await loadSpecials();
-    list.push({ id: crypto.randomUUID(), text: byId("sp_notes").value.trim(), date: todayISO() });
-    await saveSpecials(list);
-    spStatus.textContent = "Submitted.";
-    spForm.reset();
+    try {
+      const list = await loadSpecials();
+      list.push({ id: crypto.randomUUID(), text: byId("sp_notes").value.trim(), date: todayISO() });
+      await saveSpecials(list);
+      spStatus.textContent = "Submitted.";
+      spForm.reset();
+    } catch (err) {
+      fatal("Failed to submit special request.", err);
+    }
   });
 
-  // ---- comments / history ----
+  // History + Comments
   const cmForm = byId("comment-form");
   const cmStatus = byId("cmpl_status");
   const cmSel = byId("cmpl_service");
 
   async function loadHistory() {
-    const map = (await apiGet(KEYS.history)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.history)) || {};
+    if (map && typeof map !== "object") fatal("History store is corrupted (expected object).");
     return map[email] || [];
   }
 
   async function refreshHistorySelect() {
     const hist = await loadHistory();
-    cmSel.innerHTML =
-      hist.map((h) => `<option value="${h.id}">${h.date} • ${h.type}</option>`).join("") ||
-      '<option value="">No history</option>';
+    cmSel.innerHTML = hist.map((h) => `<option value="${h.id}">${h.date} • ${h.type}</option>`).join("") || '<option value="">No history</option>';
   }
 
   async function loadComments() {
-    const map = (await apiGet(KEYS.cust_comments)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_comments)) || {};
+    if (map && typeof map !== "object") fatal("Comments store is corrupted (expected object).");
     return map[email] || [];
   }
 
   async function saveComments(list) {
-    const map = (await apiGet(KEYS.cust_comments)) || {};
-    const email = (myEmail() || "").toLowerCase();
+    const email = myEmail();
+    const map = (await TNK_API.get(KEYS.cust_comments)) || {};
+    if (map && typeof map !== "object") fatal("Comments store is corrupted (expected object).");
     map[email] = list;
-    await apiSet(KEYS.cust_comments, map);
+    await TNK_API.set(KEYS.cust_comments, map);
   }
 
   async function renderComments() {
-    const rows = (await loadComments())
-      .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .map((c) => `<tr><td>${c.date}</td><td>${c.service || ""}</td><td>${c.text || ""}</td><td>${c.status || "submitted"}</td></tr>`)
-      .join("") || '<tr><td colspan="4" class="muted">No comments yet.</td></tr>';
+    const rows =
+      (await loadComments())
+        .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
+        .map((c) => `<tr><td>${c.date}</td><td>${c.service || ""}</td><td>${c.text || ""}</td><td>${c.status || "submitted"}</td></tr>`)
+        .join("") || '<tr><td colspan="4" class="muted">No comments yet.</td></tr>';
     $("#cust_comments tbody").innerHTML = rows;
   }
 
   cmForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const id = cmSel.value;
-    if (!id) { cmStatus.textContent = "No service selected."; return; }
+    try {
+      const id = cmSel.value;
+      if (!id) { cmStatus.textContent = "No service selected."; return; }
 
-    const hist = await loadHistory();
-    const svc = hist.find((h) => h.id === id);
+      const hist = await loadHistory();
+      const svc = hist.find((h) => h.id === id);
+      const list = await loadComments();
 
-    const list = await loadComments();
-    list.push({
-      id: crypto.randomUUID(),
-      service_id: id,
-      service: svc ? svc.type : "",
-      text: byId("cmpl_text").value.trim(),
-      date: todayISO(),
-      status: "submitted",
-    });
+      list.push({
+        id: crypto.randomUUID(),
+        service_id: id,
+        service: svc ? svc.type : "",
+        text: byId("cmpl_text").value.trim(),
+        date: todayISO(),
+        status: "submitted",
+      });
 
-    await saveComments(list);
-    cmStatus.textContent = "Comment sent.";
-    cmForm.reset();
-    renderComments();
+      await saveComments(list);
+      cmStatus.textContent = "Comment sent.";
+      cmForm.reset();
+      await renderComments();
+    } catch (err) {
+      fatal("Failed to submit comment.", err);
+    }
   });
 
   async function renderHistory() {
     const hist = await loadHistory();
     $("#cust_history tbody").innerHTML =
       hist
-        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
         .map((h) => `<tr><td>${h.date}</td><td>${h.type}</td><td>${h.notes || ""}</td><td>${h.tech || ""}</td></tr>`)
         .join("") || '<tr><td colspan="4" class="muted">No services yet.</td></tr>';
   }
 
-  // ---- availability ----
+  // Availability (array)
   const slotsWrap = byId("cust_slots");
-
   async function renderAvailability() {
-    const slots = (await apiGet(KEYS.availability)) || [];
+    const slots = await TNK_API.get(KEYS.availability);
+    if (!Array.isArray(slots)) fatal("Availability store is corrupted (expected array).");
+
     if (!slots.length) {
       slotsWrap.innerHTML = '<p class="muted">No open slots published yet.</p>';
       return;
     }
+
     slotsWrap.innerHTML = slots
-      .sort((a, b) => (a.date < b.date ? -1 : 1) || (a.start || "").localeCompare(b.start || ""))
-      .map((s) => `
-        <div class="slot">
+      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""))
+      .map(
+        (s) => `<div class="slot">
           <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
           <div><button class="button js-pick" type="button" data-pick='${JSON.stringify(s)}'>Pick</button></div>
-        </div>`)
+        </div>`
+      )
       .join("");
   }
 
@@ -365,7 +360,7 @@
     } catch {}
   });
 
-  // ---- init (fail loudly) ----
+  // Init
   (async function init() {
     try {
       await renderInvoices();
@@ -376,7 +371,7 @@
       await renderHistory();
       await renderAvailability();
     } catch (e) {
-      fatal("We couldn’t load your portal data. Please refresh, and if it continues contact us.", String(e?.message || e));
+      fatal("Customer portal failed to initialize.", e);
     }
   })();
 })();
