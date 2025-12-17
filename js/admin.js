@@ -31,8 +31,9 @@
   const API = {
     async get(collection, fallback) {
       try {
+        const token = await jwt();
         const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
-          headers: { "Content-Type": "application/json", ...(await jwt() ? { Authorization: `Bearer ${await jwt()}` } : {}) }
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }
         });
         if (!res.ok) throw new Error("bad status");
         const j = await res.json();
@@ -41,9 +42,10 @@
     },
     async set(collection, data) {
       try {
+        const token = await jwt();
         const res = await fetch(`/.netlify/functions/collections`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json", ...(await jwt() ? { Authorization: `Bearer ${await jwt()}` } : {}) },
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ name: collection, data })
         });
         if (!res.ok) throw new Error("bad status");
@@ -122,6 +124,7 @@
   async function saveAccounts(list) { await API.set(KEYS.accounts, list); await renderAccounts(); await refreshSelects(); }
 
   async function renderAccounts() {
+    if (!accTableBody) return;
     const role = accFilterRole?.value || "all";
     const q = (accSearch?.value || "").toLowerCase();
     const list = await loadAccounts();
@@ -158,10 +161,10 @@
     const i = list.findIndex((a) => a.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
     await saveAccounts(list);
-    accStatus.textContent = "Saved.";
+    if (accStatus) accStatus.textContent = "Saved.";
     accForm.reset(); accFields.id.value = "";
   });
-  byId("acc_reset")?.addEventListener("click", () => { accForm.reset(); accFields.id.value = ""; accStatus.textContent = ""; });
+  byId("acc_reset")?.addEventListener("click", () => { accForm?.reset(); accFields.id.value = ""; if (accStatus) accStatus.textContent = ""; });
   accFilterRole?.addEventListener("change", renderAccounts);
   accSearch?.addEventListener("input", renderAccounts);
 
@@ -170,6 +173,8 @@
     const id = tr.dataset.id;
     const list = await loadAccounts();
     const a = list.find((x) => x.id === id);
+    if (!a) return;
+
     if (e.target.classList.contains("js-edit")) {
       accFields.id.value = a.id; accFields.role.value = a.role; accFields.email.value = a.email;
       accFields.name.value = a.name; accFields.phone.value = a.phone || ""; accFields.address.value = a.address || "";
@@ -184,18 +189,40 @@
     const accounts = await loadAccounts();
     const customers = accounts.filter((a) => a.role === "customer");
     const employees = accounts.filter((a) => a.role === "employee");
-    const dlCust = byId("admin-customer-emails"); if (dlCust) dlCust.innerHTML = customers.map((c) => `<option value="${c.email}">`).join("");
+
+    // Customers datalist for invoices + jobs
+    const custOptions = customers.map((c) => `<option value="${c.email}">`).join("");
+    const dlCustInvoices = byId("admin-customer-emails");
+    if (dlCustInvoices) dlCustInvoices.innerHTML = custOptions;
+
+    const dlCustJobs = byId("admin-customers");
+    if (dlCustJobs) dlCustJobs.innerHTML = custOptions;
+
+    // Invoice customer filter dropdown
     const filterCust = byId("f_inv_customer");
     if (filterCust) {
       const keep = filterCust.value;
-      filterCust.innerHTML = `<option value="all">All Customers</option>` + customers.map((c) => `<option value="${c.email}">${c.name} (${c.email})</option>`).join("");
+      filterCust.innerHTML =
+        `<option value="all">All Customers</option>` +
+        customers.map((c) => `<option value="${c.email}">${c.name} (${c.email})</option>`).join("");
       if ([...filterCust.options].some((o) => o.value === keep)) filterCust.value = keep;
     }
-    const dlEmp = byId("admin-employees"); if (dlEmp) dlEmp.innerHTML = employees.map((e) => `<option value="${e.email}">`).join("");
+
+    // Employees datalist for jobs + timesheets
+    const empOptions = employees.map((e) => `<option value="${e.email}">`).join("");
+    const dlEmpJobs = byId("admin-employees");
+    if (dlEmpJobs) dlEmpJobs.innerHTML = empOptions;
+
+    const dlEmpTimesheets = byId("employee-emails");
+    if (dlEmpTimesheets) dlEmpTimesheets.innerHTML = empOptions;
+
+    // Timesheet filter dropdown
     const tsSel = byId("ts_filter_email");
     if (tsSel) {
       const keep = tsSel.value;
-      tsSel.innerHTML = `<option value="all">All Employees</option>` + employees.map((e) => `<option value="${e.email}">${e.name} (${e.email})</option>`).join("");
+      tsSel.innerHTML =
+        `<option value="all">All Employees</option>` +
+        employees.map((e) => `<option value="${e.email}">${e.name} (${e.email})</option>`).join("");
       if ([...tsSel.options].some((o) => o.value === keep)) tsSel.value = keep;
     }
   }
@@ -223,8 +250,8 @@
       const j = (await loadJobs()).find((x) => x.id === id); if (!j) return;
       ["job_id","job_customer","job_title","job_date","job_start","job_end","job_assignee","job_invoice","job_lat","job_lon","job_status","job_notes"]
         .forEach((k) => { const el2 = byId(k); if (el2) el2.value = j[k.replace("job_", "")] || ""; });
-      byId("job_risk_rain").value = j.risk_rain ?? 50;
-      byId("job_risk_gust").value = j.risk_gust ?? 35;
+      if (byId("job_risk_rain")) byId("job_risk_rain").value = j.risk_rain ?? 50;
+      if (byId("job_risk_gust")) byId("job_risk_gust").value = j.risk_gust ?? 35;
       window.scrollTo({ top: jobForm.offsetTop - 12, behavior: "smooth" });
     };
   }
@@ -243,8 +270,8 @@
       invoice: byId("job_invoice").value.trim(),
       lat: byId("job_lat").value || "",
       lon: byId("job_lon").value || "",
-      risk_rain: Number(byId("job_risk_rain").value || 50),
-      risk_gust: Number(byId("job_risk_gust").value || 35),
+      risk_rain: Number(byId("job_risk_rain")?.value || 50),
+      risk_gust: Number(byId("job_risk_gust")?.value || 35),
       status: byId("job_status").value,
       notes: byId("job_notes").value.trim()
     };
@@ -252,10 +279,10 @@
     const i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
     await saveJobs(list);
-    jobStatus.textContent = "Saved.";
+    if (jobStatus) jobStatus.textContent = "Saved.";
     jobForm.reset(); byId("job_id").value = "";
   });
-  byId("job_reset")?.addEventListener("click", () => { jobForm.reset(); byId("job_id").value = ""; jobStatus.textContent = ""; });
+  byId("job_reset")?.addEventListener("click", () => { jobForm?.reset(); byId("job_id").value = ""; if (jobStatus) jobStatus.textContent = ""; });
 
   // ===== INVOICES =====
   const invForm = byId("inv-form");
@@ -278,12 +305,13 @@
   }
 
   function addItemRow(item = { desc: "", qty: 1, unit: 35 }) {
+    if (!invItemsWrap) return;
     const row = document.createElement("div");
     row.className = "items-row";
     row.innerHTML = `
       <input type="text" class="it-desc" placeholder="Description" value="${item.desc || ""}" />
-      <input type="number" class="it-qty" min="0" step="1" value="${item.qty || 1}" />
-      <input type="number" class="it-unit" min="0" step="0.01" value="${item.unit || 0}" />
+      <input type="number" class="it-qty" min="0" step="1" value="${item.qty ?? 1}" />
+      <input type="number" class="it-unit" min="0" step="0.01" value="${item.unit ?? 0}" />
       <button type="button" class="btn-small js-del-item">Delete</button>`;
     invItemsWrap.appendChild(row);
     row.addEventListener("input", recalcInvoice);
@@ -291,6 +319,7 @@
     recalcInvoice();
   }
   function invoiceItems() {
+    if (!invItemsWrap) return [];
     return $$(".items-row", invItemsWrap)
       .map((r) => ({
         desc: $(".it-desc", r).value.trim(),
@@ -302,13 +331,14 @@
   function recalcInvoice() {
     const items = invoiceItems();
     const sub = items.reduce((s, i) => s + i.qty * i.unit, 0);
-    const taxPct = Number(byId("inv_tax").value || 0);
+    const taxPct = Number(byId("inv_tax")?.value || 0);
     const total = sub + sub * (taxPct / 100);
-    invTotalOut.textContent = money(total);
+    if (invTotalOut) invTotalOut.textContent = money(total);
   }
   invAddItemBtn?.addEventListener("click", () => addItemRow());
 
   function resetInvoiceForm() {
+    if (!byId("inv_id")) return;
     byId("inv_id").value = "";
     byId("inv_customer").value = "";
     byId("inv_number").value = autoInvoiceNumber();
@@ -317,9 +347,9 @@
     byId("inv_due").value = "";
     byId("inv_tax").value = "0";
     byId("inv_notes").value = "";
-    invItemsWrap.innerHTML = "";
+    if (invItemsWrap) invItemsWrap.innerHTML = "";
     addItemRow({ desc: "Mowing / Trimming", qty: 1, unit: 35 });
-    invStatusMsg.textContent = "";
+    if (invStatusMsg) invStatusMsg.textContent = "";
     recalcInvoice();
   }
 
@@ -328,7 +358,7 @@
     const id = byId("inv_id").value || crypto.randomUUID();
     const items = invoiceItems();
     const subtotal = items.reduce((s, i) => s + i.qty * i.unit, 0);
-    const taxPct = Number(byId("inv_tax").value || 0);
+    const taxPct = Number(byId("inv_tax")?.value || 0);
     const total = subtotal + subtotal * (taxPct / 100);
     const data = {
       id,
@@ -348,13 +378,19 @@
     const i = list.findIndex((x) => x.id === id);
     if (i >= 0) list[i] = data; else list.push(data);
     await saveInvoices(list);
-    invStatusMsg.textContent = "Invoice saved.";
+    if (invStatusMsg) invStatusMsg.textContent = "Invoice saved.";
     resetInvoiceForm();
   });
   invResetBtn?.addEventListener("click", resetInvoiceForm);
   byId("inv_tax")?.addEventListener("input", recalcInvoice);
 
+  // Make invoice filters actually work
+  fInvCustomer?.addEventListener("change", renderInvoices);
+  fInvStatus?.addEventListener("change", renderInvoices);
+  fInvQ?.addEventListener("input", renderInvoices);
+
   async function renderInvoices() {
+    if (!invTableBody) return;
     const list = await loadInvoices();
     const fCust = fInvCustomer?.value || "all";
     const fStat = fInvStatus?.value || "all";
@@ -386,11 +422,21 @@
     const id = tr.dataset.id;
     const list = await loadInvoices();
     const i = list.find((x) => x.id === id);
+    if (!i) return;
 
     if (e.target.classList.contains("js-edit")) {
-      byId("inv_id").value = i.id; byId("inv_customer").value = i.customer_email; byId("inv_number").value = i.number; byId("inv_status").value = i.status;
-      byId("inv_date").value = i.date || ""; byId("inv_due").value = i.due || ""; byId("inv_tax").value = i.tax_pct || 0; byId("inv_notes").value = i.notes || "";
-      invItemsWrap.innerHTML = ""; (i.items || []).forEach(addItemRow); if (!i.items || i.items.length === 0) addItemRow(); recalcInvoice();
+      byId("inv_id").value = i.id;
+      byId("inv_customer").value = i.customer_email;
+      byId("inv_number").value = i.number;
+      byId("inv_status").value = i.status;
+      byId("inv_date").value = i.date || "";
+      byId("inv_due").value = i.due || "";
+      byId("inv_tax").value = i.tax_pct || 0;
+      byId("inv_notes").value = i.notes || "";
+      if (invItemsWrap) invItemsWrap.innerHTML = "";
+      (i.items || []).forEach(addItemRow);
+      if (!i.items || i.items.length === 0) addItemRow();
+      recalcInvoice();
       window.scrollTo({ top: invForm.offsetTop - 12, behavior: "smooth" });
     }
     if (e.target.classList.contains("js-toggle")) { i.status = i.status === "paid" ? "unpaid" : "paid"; await saveInvoices(list); }
@@ -407,7 +453,10 @@
       <body><h1>${inv.number}</h1><div>${inv.date || ""} • ${inv.status}</div><div>Bill To: ${inv.customer_email}</div>
       <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
       <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
-    const win = window.open("", "_blank"); win.document.open(); win.document.write(html); win.document.close(); try { win.focus(); } catch {}
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.open(); win.document.write(html); win.document.close();
+    try { win.focus(); } catch {}
   }
 
   byId("inv_export_csv")?.addEventListener("click", async () => {
@@ -433,7 +482,17 @@
   const tsFilterEmail = byId("ts_filter_email");
   const tsFilterFrom = byId("ts_filter_from");
   const tsFilterTo = byId("ts_filter_to");
-  byId("ts_clear_filters")?.addEventListener("click", () => { tsFilterEmail.value = "all"; tsFilterFrom.value = ""; tsFilterTo.value = ""; renderTimesheets(); });
+  byId("ts_clear_filters")?.addEventListener("click", () => {
+    if (tsFilterEmail) tsFilterEmail.value = "all";
+    if (tsFilterFrom) tsFilterFrom.value = "";
+    if (tsFilterTo) tsFilterTo.value = "";
+    renderTimesheets();
+  });
+
+  // Ensure filters actually re-render
+  tsFilterEmail?.addEventListener("change", renderTimesheets);
+  tsFilterFrom?.addEventListener("change", renderTimesheets);
+  tsFilterTo?.addEventListener("change", renderTimesheets);
 
   function parseH(hm) { if (!hm) return 0; const [h, m] = hm.split(":").map(Number); return h + (m || 0) / 60; }
 
@@ -456,19 +515,25 @@
     const i = list.findIndex((x) => x.id === id);
     if (i >= 0) { data.approved = !!list[i].approved; list[i] = data; } else list.push(data);
     await saveTimesheets(list);
-    tsStatus.textContent = "Saved.";
+    if (tsStatus) tsStatus.textContent = "Saved.";
     tsForm.reset(); byId("ts_id").value = "";
   });
 
-  byId("ts_reset")?.addEventListener("click", () => { tsForm.reset(); byId("ts_id").value = ""; tsStatus.textContent = ""; });
+  byId("ts_reset")?.addEventListener("click", () => { tsForm?.reset(); if (byId("ts_id")) byId("ts_id").value = ""; if (tsStatus) tsStatus.textContent = ""; });
 
   tsTableBody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
     const id = tr.dataset.id;
     const list = await loadTimesheets();
     const t = list.find((x) => x.id === id);
+    if (!t) return;
+
     if (e.target.classList.contains("btn-edit")) {
-      ["ts_id", "ts_employee_email", "ts_date", "ts_start", "ts_end", "ts_notes"].forEach((k) => byId(k).value = (k === "ts_id" ? t.id : t[k.replace("ts_", "")]) || "");
+      ["ts_id", "ts_employee_email", "ts_date", "ts_start", "ts_end", "ts_notes"].forEach((k) => {
+        const el = byId(k);
+        if (!el) return;
+        el.value = (k === "ts_id" ? t.id : t[k.replace("ts_", "")]) || "";
+      });
       window.scrollTo({ top: tsForm.offsetTop - 12, behavior: "smooth" });
     }
     if (e.target.classList.contains("btn-del")) { if (confirm("Delete this timesheet?")) await saveTimesheets(list.filter((x) => x.id !== id)); }
@@ -476,6 +541,7 @@
   });
 
   async function renderTimesheets() {
+    if (!tsTableBody) return;
     const list = await loadTimesheets();
     const f = tsFilterEmail?.value || "all";
     const from = tsFilterFrom?.value ? new Date(tsFilterFrom.value) : null;
@@ -483,7 +549,12 @@
     tsTableBody.innerHTML =
       list
         .filter((t) => (f === "all" ? true : t.employee_email === f))
-        .filter((t) => { const d = new Date(t.date); if (from && d < from) return false; if (to && d > to) return false; return true; })
+        .filter((t) => {
+          const d = new Date(t.date);
+          if (from && d < from) return false;
+          if (to && d > to) return false;
+          return true;
+        })
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .map((t) => `<tr data-id="${t.id}">
           <td>${t.date}</td><td>${t.employee_email}</td><td>${t.start_time}</td><td>${t.end_time}</td>
@@ -516,14 +587,14 @@
   promoForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     await API.set(KEYS.promos, { title: byId("promo_title").value.trim(), subtitle: byId("promo_subtitle").value.trim(), active: byId("promo_active").value === "true" });
-    promoStatus.textContent = "Promotion saved.";
+    if (promoStatus) promoStatus.textContent = "Promotion saved.";
   });
   const priceForm = byId("price-form");
   const priceStatus = byId("price_status");
   priceForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     await API.set(KEYS.prices, { essential: Number(byId("p_essential").value || 35), standard: Number(byId("p_standard").value || 55), premium: Number(byId("p_premium").value || 85) });
-    priceStatus.textContent = "Prices saved.";
+    if (priceStatus) priceStatus.textContent = "Prices saved.";
   });
 
   // ----- init -----
