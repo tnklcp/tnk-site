@@ -30,68 +30,8 @@
     .stack { display:grid; gap:.75rem; }
   </style>
 
-  <!-- Netlify Identity Widget -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
-  <script>
-    // Prevent redirect ping-pong
-    function redirectOnce(url) {
-      const now = Date.now();
-      const last = Number(sessionStorage.getItem('tnk_redirect_lock') || 0);
-      if (now - last < 1500) return;
-      sessionStorage.setItem('tnk_redirect_lock', String(now));
-      window.location.replace(url);
-    }
-
-    function getRole(user) {
-      const appRoles = user?.app_metadata?.roles;
-      if (Array.isArray(appRoles) && appRoles.length) {
-        if (appRoles.includes('customer')) return 'customer';
-        if (appRoles.includes('admin')) return 'admin';
-        if (appRoles.includes('employee')) return 'employee';
-      }
-      const metaRole = (user?.user_metadata?.role || '').toLowerCase();
-      if (metaRole) return metaRole;
-      return 'customer';
-    }
-
-    function routeAfter(user) {
-      const role = getRole(user);
-      sessionStorage.setItem('tnk_user_email', (user?.email || '').toLowerCase());
-      sessionStorage.setItem('tnk_role', role);
-      if (role === 'admin') return redirectOnce('admin.html');
-      if (role === 'employee') return redirectOnce('employee.html');
-      return redirectOnce('customer.html');
-    }
-
-    function clearSession() {
-      sessionStorage.removeItem('tnk_user_email');
-      sessionStorage.removeItem('tnk_role');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      if (!window.netlifyIdentity) return;
-
-      netlifyIdentity.on('init', user => {
-        // Already logged in? Route immediately
-        if (user) routeAfter(user);
-      });
-
-      // Ensure role for self-signups (front-end hint; real roles should be managed in Identity)
-      netlifyIdentity.on('signup', user => {
-        try {
-          const meta = user.user_metadata || {};
-          meta.role = meta.role || 'customer';
-          sessionStorage.setItem('tnk_user_email', (user?.email || '').toLowerCase());
-          sessionStorage.setItem('tnk_role', meta.role);
-        } catch {}
-      });
-
-      netlifyIdentity.on('login', user => routeAfter(user));
-      netlifyIdentity.on('logout', () => { clearSession(); redirectOnce('login-customer.html'); });
-
-      netlifyIdentity.init();
-    });
-  </script>
+  <script src="js/identity.js" defer></script>
 </head>
 <body>
   <div class="auth-wrap">
@@ -103,11 +43,11 @@
       </div>
 
       <div class="stack" style="margin-top:1rem">
-        <button class="button button--primary button--xl" onclick="netlifyIdentity && netlifyIdentity.open('login')">
+        <button class="button button--primary button--xl" id="open-login">
           <span class="btn-icon" aria-hidden="true">🔐</span>
           <span>Log In</span>
         </button>
-        <button class="button" onclick="netlifyIdentity && netlifyIdentity.open('signup')">
+        <button class="button" id="open-signup">
           <span class="btn-icon" aria-hidden="true">✨</span>
           <span>Create Account</span>
         </button>
@@ -116,5 +56,25 @@
       </div>
     </div>
   </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      TNKIdentity.init({
+        onInit(user) {
+          if (user) TNKIdentity.routeAfterLogin(user);
+        },
+        onLogin(user) {
+          TNKIdentity.routeAfterLogin(user);
+        }
+      });
+
+      document.getElementById("open-login").addEventListener("click", () => {
+        if (window.netlifyIdentity) netlifyIdentity.open("login");
+      });
+      document.getElementById("open-signup").addEventListener("click", () => {
+        if (window.netlifyIdentity) netlifyIdentity.open("signup");
+      });
+    });
+  </script>
 </body>
 </html>
