@@ -1,4 +1,4 @@
-/* TNK Customer Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, FAIL LOUDLY) */
+/* TNK Customer Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -6,71 +6,84 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
-  function fail(msg, err) {
-    console.error("[Customer]", msg, err || "");
-    const el = byId("global_error");
-    if (el) {
-      el.textContent = msg;
-      el.style.display = "block";
-    } else {
-      alert(msg);
-    }
-  }
-
-  function requireRoleCustomer() {
-    const role = window.TNKIdentity?.role?.() || sessionStorage.getItem("tnk_role");
+  // ----- Auth: customer only -----
+  function assertCustomer() {
+    const role = sessionStorage.getItem("tnk_role");
     if (role === "customer") return true;
+    // If admin/employee lands here, route them out
     if (role === "admin") { location.replace("admin.html"); return false; }
     if (role === "employee") { location.replace("employee.html"); return false; }
     location.replace("login-customer.html");
     return false;
   }
-  if (!requireRoleCustomer()) return;
+  if (!assertCustomer()) return;
 
   byId("cust-logout")?.addEventListener("click", (e) => {
     e.preventDefault();
     window.TNKIdentity?.logout?.();
   });
 
-  const myEmail = () => (sessionStorage.getItem("tnk_user_email") || window.TNKIdentity?.email?.() || "").toLowerCase();
+  const myEmail = () =>
+    (sessionStorage.getItem("tnk_user_email") ||
+      window.TNKIdentity?.email?.() ||
+      window.netlifyIdentity?.currentUser?.()?.email ||
+      "").toLowerCase();
 
-  async function jwt() {
-    const token = await window.TNKIdentity?.token?.();
-    if (!token) throw new Error("Not authenticated.");
-    return token;
-  }
-
-  async function fetchJSON(url, opts = {}) {
-    const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
-    const token = await jwt();
-    headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(url, { ...opts, headers });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+  // ----- Strict Collections API (NO local fallback) -----
+  async function token() {
+    try {
+      const t = await window.TNKIdentity?.token?.();
+      if (t) return t;
+    } catch {}
+    try {
+      const u = window.netlifyIdentity?.currentUser?.();
+      if (!u) return null;
+      return await u.jwt(true);
+    } catch {
+      return null;
     }
-    return res.json();
   }
 
-  const API = {
-    async get(name) {
-      const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`GET ${name} failed: HTTP ${res.status}: ${text || res.statusText}`);
+  async function apiGet(name) {
+    const t = await token();
+    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
       }
-      const j = await res.json();
-      return j?.data ?? null;
-    },
-    async set(name, data) {
-      await fetchJSON(`/.netlify/functions/collections`, {
-        method: "PUT",
-        body: JSON.stringify({ name, data })
-      });
-    }
-  };
+    });
+    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    return (j && j.data) ?? null;
+  }
+
+  async function apiSet(name, data) {
+    const t = await token();
+    const res = await fetch(`/.netlify/functions/collections`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
+      },
+      body: JSON.stringify({ name, data })
+    });
+    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
+  }
+
+  function showFatal(err) {
+    console.error(err);
+    const root = byId("cust-root") || document.body;
+    const div = document.createElement("div");
+    div.className = "card";
+    div.style.border = "1px solid #e6b6b6";
+    div.innerHTML = `
+      <h2 style="color:#7b1f1f;margin-top:0;">Data Error</h2>
+      <p class="muted">The customer portal could not load/save data from Netlify.</p>
+      <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e6b6b6;padding:.75rem;border-radius:10px;">${String(err?.message || err)}</pre>
+    `;
+    root.prepend(div);
+    throw err;
+  }
 
   const KEYS = {
     invoices: "tnk_invoices",
@@ -83,7 +96,7 @@
     balances: "tnk_cust_balances"
   };
 
-  // Tabs
+  // ----- tabs -----
   (function initTabs() {
     const tabs = $$(".tab-btn");
     const panels = $$(".panel, .tab-panel");
@@ -100,79 +113,81 @@
     if (current) activate(current);
   })();
 
-  // Invoices
+  // ----- invoices -----
   const invTbody = $("#cust_invoices tbody");
   const invStatus = byId("inv_status");
 
+  async function loadInvoices() { return (await apiGet(KEYS.invoices)) || []; }
+
   async function renderInvoices() {
     const email = myEmail();
-    if (!email) throw new Error("Missing customer email in session.");
-
-    const all = (await API.get(KEYS.invoices)) || [];
+    if (!email) { invStatus.textContent = "Not signed in."; return; }
+    const all = await loadInvoices();
     const mine = all.filter((i) => (i.customer_email || "").toLowerCase() === email);
 
     invTbody.innerHTML =
       mine
         .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map((i) => `
-          <tr data-id="${i.id}">
-            <td>${i.number}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
-            <td>${money(i.total)}</td><td>${i.status}</td>
-            <td><button class="button js-view">View</button></td>
-          </tr>`)
+        .map(
+          (i) => `
+            <tr data-id="${i.id}">
+              <td>${i.number || ""}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
+              <td>${money(i.total)}</td><td>${i.status || ""}</td>
+              <td><button class="button js-view">View</button></td>
+            </tr>`
+        )
         .join("") || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
-
-    invStatus.textContent = mine.length ? "" : "No invoices yet.";
   }
 
   invTbody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
     if (!e.target.classList.contains("js-view")) return;
 
-    try {
-      const all = (await API.get(KEYS.invoices)) || [];
-      const inv = all.find((x) => x.id === tr.dataset.id);
-      if (!inv) return;
+    const id = tr.dataset.id;
+    const all = await loadInvoices();
+    const inv = all.find((x) => x.id === id);
+    if (!inv) return;
 
-      const rows = (inv.items || [])
-        .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
-        .join("");
+    const rows = (inv.items || [])
+      .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
+      .join("");
 
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>
-        <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
-        table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
-        <body><h1>${inv.number}</h1><div>${inv.date || ""} • ${inv.status}</div>
-        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
-        <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number || "Invoice"}</title>
+      <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
+      table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
+      <body><h1>${inv.number || ""}</h1><div>${inv.date || ""} • ${inv.status || ""}</div>
+      <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
+      <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
 
-      const win = window.open("", "_blank");
-      win.document.open(); win.document.write(html); win.document.close();
-      try { win.focus(); } catch {}
-    } catch (err) {
-      fail("Could not open invoice view. Check console.", err);
-    }
+    const win = window.open("", "_blank");
+    win.document.open(); win.document.write(html); win.document.close();
+    try { win.focus(); } catch {}
   });
 
-  // Balance
+  // ----- balance -----
   async function renderBalance() {
     const email = myEmail();
-    const balances = (await API.get(KEYS.balances)) || {};
-    byId("cust_balance").textContent = money(Number(balances[email] || 0));
+    const balances = (await apiGet(KEYS.balances)) || {};
+    const bal = Number(balances[email] || 0);
+    const out = byId("cust_balance");
+    if (out) out.textContent = money(bal);
   }
 
-  // Preferences
+  // ----- preferences -----
   const prefForm = byId("pref-form");
   const prefStatus = byId("pref_status");
 
   async function loadPrefs() {
-    const map = (await API.get(KEYS.cust_prefs)) || {};
-    return map[myEmail()] || { svc: [], storm: [] };
+    const map = (await apiGet(KEYS.cust_prefs)) || {};
+    const email = myEmail();
+    return map[email] || { svc: [], storm: [] };
   }
 
   async function savePrefs(p) {
-    const map = (await API.get(KEYS.cust_prefs)) || {};
-    map[myEmail()] = p;
-    await API.set(KEYS.cust_prefs, map);
+    const map = (await apiGet(KEYS.cust_prefs)) || {};
+    const email = myEmail();
+    map[email] = p;
+    await apiSet(KEYS.cust_prefs, map);
   }
 
   async function renderPrefs() {
@@ -183,85 +198,81 @@
 
   prefForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      const svc = $$('input[name="svc"]:checked').map((i) => i.value);
-      const storm = $$('input[name="storm"]:checked').map((i) => i.value);
-      await savePrefs({ svc, storm });
-      prefStatus.textContent = "Preferences saved.";
-    } catch (err) {
-      fail("Failed to save preferences.", err);
-    }
+    const svc = $$('input[name="svc"]:checked').map((i) => i.value);
+    const storm = $$('input[name="storm"]:checked').map((i) => i.value);
+    await savePrefs({ svc, storm });
+    prefStatus.textContent = "Preferences saved.";
   });
 
-  // Extra service
+  // ----- extra service -----
   const extraForm = byId("extra-form");
   const extraStatus = byId("extra_status");
 
   async function loadExtras() {
-    const map = (await API.get(KEYS.cust_extras)) || {};
-    return map[myEmail()] || [];
+    const map = (await apiGet(KEYS.cust_extras)) || {};
+    const email = myEmail();
+    return map[email] || [];
   }
+
   async function saveExtras(list) {
-    const map = (await API.get(KEYS.cust_extras)) || {};
-    map[myEmail()] = list;
-    await API.set(KEYS.cust_extras, map);
+    const map = (await apiGet(KEYS.cust_extras)) || {};
+    const email = myEmail();
+    map[email] = list;
+    await apiSet(KEYS.cust_extras, map);
   }
 
   extraForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      const list = await loadExtras();
-      list.push({
-        id: crypto.randomUUID(),
-        service: byId("x_service").value.trim(),
-        date: byId("x_date").value || "",
-        notes: byId("x_notes").value.trim(),
-        created_at: new Date().toISOString()
-      });
-      await saveExtras(list);
-      extraStatus.textContent = "Request sent.";
-      extraForm.reset();
-    } catch (err) {
-      fail("Failed to send extra service request.", err);
-    }
+    const list = await loadExtras();
+    list.push({
+      id: crypto.randomUUID(),
+      service: byId("x_service").value.trim(),
+      date: byId("x_date").value || "",
+      notes: byId("x_notes").value.trim(),
+      created_at: new Date().toISOString()
+    });
+    await saveExtras(list);
+    extraStatus.textContent = "Request sent.";
+    extraForm.reset();
   });
 
-  // Special requests
+  // ----- special requests -----
   const spForm = byId("special-form");
   const spStatus = byId("sp_status");
 
   async function loadSpecials() {
-    const map = (await API.get(KEYS.cust_specials)) || {};
-    return map[myEmail()] || [];
+    const map = (await apiGet(KEYS.cust_specials)) || {};
+    const email = myEmail();
+    return map[email] || [];
   }
+
   async function saveSpecials(list) {
-    const map = (await API.get(KEYS.cust_specials)) || {};
-    map[myEmail()] = list;
-    await API.set(KEYS.cust_specials, map);
+    const map = (await apiGet(KEYS.cust_specials)) || {};
+    const email = myEmail();
+    map[email] = list;
+    await apiSet(KEYS.cust_specials, map);
   }
 
   spForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      const list = await loadSpecials();
-      list.push({ id: crypto.randomUUID(), text: byId("sp_notes").value.trim(), date: todayISO() });
-      await saveSpecials(list);
-      spStatus.textContent = "Submitted.";
-      spForm.reset();
-    } catch (err) {
-      fail("Failed to submit special request.", err);
-    }
+    const list = await loadSpecials();
+    list.push({ id: crypto.randomUUID(), text: byId("sp_notes").value.trim(), date: todayISO() });
+    await saveSpecials(list);
+    spStatus.textContent = "Submitted.";
+    spForm.reset();
   });
 
-  // History + comments
+  // ----- comments / history -----
   const cmForm = byId("comment-form");
   const cmStatus = byId("cmpl_status");
   const cmSel = byId("cmpl_service");
 
   async function loadHistory() {
-    const map = (await API.get(KEYS.history)) || {};
-    return map[myEmail()] || [];
+    const map = (await apiGet(KEYS.history)) || {};
+    const email = myEmail();
+    return map[email] || [];
   }
+
   async function refreshHistorySelect() {
     const hist = await loadHistory();
     cmSel.innerHTML =
@@ -269,14 +280,26 @@
       '<option value="">No history</option>';
   }
 
-  async function loadComments() {
-    const map = (await API.get(KEYS.cust_comments)) || {};
-    return map[myEmail()] || [];
+  async function renderHistory() {
+    const hist = await loadHistory();
+    $("#cust_history tbody").innerHTML =
+      hist
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+        .map((h) => `<tr><td>${h.date}</td><td>${h.type}</td><td>${h.notes || ""}</td><td>${h.tech || ""}</td></tr>`)
+        .join("") || '<tr><td colspan="4" class="muted">No services yet.</td></tr>';
   }
+
+  async function loadComments() {
+    const map = (await apiGet(KEYS.cust_comments)) || {};
+    const email = myEmail();
+    return map[email] || [];
+  }
+
   async function saveComments(list) {
-    const map = (await API.get(KEYS.cust_comments)) || {};
-    map[myEmail()] = list;
-    await API.set(KEYS.cust_comments, map);
+    const map = (await apiGet(KEYS.cust_comments)) || {};
+    const email = myEmail();
+    map[email] = list;
+    await apiSet(KEYS.cust_comments, map);
   }
 
   async function renderComments() {
@@ -289,52 +312,40 @@
 
   cmForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      const id = cmSel.value;
-      if (!id) { cmStatus.textContent = "No service selected."; return; }
-
-      const hist = await loadHistory();
-      const svc = hist.find((h) => h.id === id);
-
-      const list = await loadComments();
-      list.push({
-        id: crypto.randomUUID(),
-        service_id: id,
-        service: svc ? svc.type : "",
-        text: byId("cmpl_text").value.trim(),
-        date: todayISO(),
-        status: "submitted"
-      });
-      await saveComments(list);
-      cmStatus.textContent = "Comment sent.";
-      cmForm.reset();
-      await renderComments();
-    } catch (err) {
-      fail("Failed to submit comment.", err);
-    }
+    const id = cmSel.value;
+    if (!id) { cmStatus.textContent = "No service selected."; return; }
+    const hist = await loadHistory();
+    const svc = hist.find((h) => h.id === id);
+    const list = await loadComments();
+    list.push({
+      id: crypto.randomUUID(),
+      service_id: id,
+      service: svc ? svc.type : "",
+      text: byId("cmpl_text").value.trim(),
+      date: todayISO(),
+      status: "submitted"
+    });
+    await saveComments(list);
+    cmStatus.textContent = "Comment sent.";
+    cmForm.reset();
+    await renderComments();
   });
 
-  async function renderHistory() {
-    const hist = await loadHistory();
-    $("#cust_history tbody").innerHTML =
-      hist
-        .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map((h) => `<tr><td>${h.date}</td><td>${h.type}</td><td>${h.notes || ""}</td><td>${h.tech || ""}</td></tr>`)
-        .join("") || '<tr><td colspan="4" class="muted">No services yet.</td></tr>';
-  }
-
-  // Availability
+  // ----- availability -----
   const slotsWrap = byId("cust_slots");
+
   async function renderAvailability() {
-    const slots = (await API.get(KEYS.availability)) || [];
+    const slots = (await apiGet(KEYS.availability)) || [];
     if (!slots.length) { slotsWrap.innerHTML = '<p class="muted">No open slots published yet.</p>'; return; }
     slotsWrap.innerHTML = slots
       .sort((a, b) => (a.date < b.date ? -1 : 1) || (a.start || "").localeCompare(b.start || ""))
-      .map((s) => `
-        <div class="slot">
-          <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
-          <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
-        </div>`)
+      .map(
+        (s) => `
+          <div class="slot">
+            <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
+            <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
+          </div>`
+      )
       .join("");
   }
 
@@ -351,9 +362,12 @@
     } catch {}
   });
 
-  // Init
+  // ----- init -----
   (async function init() {
     try {
+      const email = myEmail();
+      if (!email) throw new Error("No logged-in user email found in session/identity.");
+
       await renderInvoices();
       await renderBalance();
       await renderPrefs();
@@ -361,8 +375,8 @@
       await renderComments();
       await renderHistory();
       await renderAvailability();
-    } catch (err) {
-      fail("Customer portal failed to load data (Netlify function / auth).", err);
+    } catch (e) {
+      showFatal(e);
     }
   })();
 })();
