@@ -5,39 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    .admin-wrap { max-width: 1200px; margin: 2rem auto; }
-    .muted { opacity:.85; font-size:.95rem; }
-    .admin-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin:.75rem 0 1rem; }
-    .tab-btn { background:#fff; border:1px solid #d8d3c8; padding:.55rem .9rem; border-radius:999px; cursor:pointer; font-weight:700; color:var(--clr-primary-600); }
-    .tab-btn[aria-selected="true"] { background: var(--clr-accent); color:#1e2f1e; border-color:var(--clr-accent); }
-    .tab-panel { display:none; }
-    .tab-panel.active { display:block; }
-    .admin-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1.25rem; }
-    .admin-card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1rem; }
-    .admin-card h2, .admin-card h3 { margin:.25rem 0 .65rem; color:var(--clr-primary-600); }
-    .table-wrap { overflow:auto; border:1px solid #e6e1d6; border-radius:12px; }
-    table { width:100%; border-collapse:collapse; background:#fff; }
-    th, td { padding:.6rem .7rem; border-bottom:1px solid #eee5d3; text-align:left; }
-    thead th { background:#faf6ec; position:sticky; top:0; z-index:1; }
-    tr:hover td { background:#fffdf7; }
-    .btn-small { padding:.35rem .6rem; border-radius:8px; border:1px solid #d8d3c8; background:#fff; cursor:pointer; font-weight:600; }
-    .btn-small--danger { border-color:#e6b6b6; color:#7b1f1f; background:#fff; }
-    .btn-small--ok { border-color:#b6d7b6; color:#1f5f1f; }
-    .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.75rem; }
-    .grid-3 { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.75rem; }
-    .stack { display:grid; gap:.6rem; }
-    .inline { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-    .items-head, .items-row { display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
-    @media (max-width: 900px){ .admin-grid { grid-template-columns: 1fr; } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
-  </style>
+  <link rel="stylesheet" href="css/admin.css" />
 </head>
 <body data-role-guard="admin">
   <header class="hero">
     <h1>Admin Portal</h1>
     <div class="cta-row">
       <a class="button" href="index.html">← Back to Site</a>
-      <button class="button" id="admin-logout" onclick="if (window.TNKIdentity) { TNKIdentity.logout(); } else { try { sessionStorage.clear(); } catch(e){} location.replace('index.html'); } return false;">Log Out</button>
+      <button class="button" id="admin-logout" type="button">Log Out</button>
     </div>
   </header>
 
@@ -114,7 +89,7 @@
           <div class="table-wrap">
             <table id="acc_table">
               <thead><tr><th>Role</th><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -126,7 +101,7 @@
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Calendar</h2>
-          <div id="admin-calendar" aria-live="polite"><!-- calendar render --></div>
+          <div id="admin-calendar" aria-live="polite"></div>
         </div>
         <div class="admin-card">
           <h2>New / Edit Job</h2>
@@ -136,7 +111,7 @@
               <div>
                 <label for="job_customer">Customer</label>
                 <input id="job_customer" list="admin-customers" placeholder="type email/name…" required />
-                <datalist id="admin-customers"><!-- injected --></datalist>
+                <datalist id="admin-customers"></datalist>
               </div>
               <div>
                 <label for="job_title">Job Title</label>
@@ -161,7 +136,7 @@
               <div>
                 <label for="job_assignee">Assign Employee</label>
                 <input id="job_assignee" list="admin-employees" placeholder="email or name" />
-                <datalist id="admin-employees"><!-- injected --></datalist>
+                <datalist id="admin-employees"></datalist>
               </div>
               <div>
                 <label for="job_invoice">Attach Invoice #</label>
@@ -220,7 +195,7 @@
               <div>
                 <label for="inv_customer">Customer Email</label>
                 <input id="inv_customer" type="email" required list="admin-customer-emails" />
-                <datalist id="admin-customer-emails"><!-- injected --></datalist>
+                <datalist id="admin-customer-emails"></datalist>
               </div>
               <div>
                 <label for="inv_number">Invoice #</label>
@@ -254,7 +229,7 @@
               <div class="items-head">
                 <div>Description</div><div>Qty</div><div>Unit $</div><div></div>
               </div>
-              <div id="items-rows" class="stack"><!-- rows --></div>
+              <div id="items-rows" class="stack"></div>
               <div><button id="add-item" type="button" class="btn-small">+ Add Line Item</button></div>
             </div>
 
@@ -290,7 +265,7 @@
           <div class="table-wrap">
             <table id="inv_table">
               <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -308,7 +283,7 @@
               <div>
                 <label for="ts_employee_email">Employee Email</label>
                 <input id="ts_employee_email" type="email" required list="employee-emails" />
-                <datalist id="employee-emails"><!-- injected --></datalist>
+                <datalist id="employee-emails"></datalist>
               </div>
               <div>
                 <label for="ts_date">Date</label>
@@ -351,42 +326,18 @@
           <div class="table-wrap">
             <table id="ts_table">
               <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>End</th><th>Total (hrs)</th><th>Notes</th><th>Approved</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
 
         <div class="admin-card">
           <h2>Payroll</h2>
-          <form id="payroll-form" class="stack">
-            <div class="grid-3">
-              <div>
-                <label for="pr_period">Pay Period</label>
-                <select id="pr_period">
-                  <option value="biweekly">Biweekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-              <div>
-                <label for="pr_from">From</label>
-                <input id="pr_from" type="date" />
-              </div>
-              <div>
-                <label for="pr_to">To</label>
-                <input id="pr_to" type="date" />
-              </div>
-            </div>
-            <div class="inline">
-              <button id="pr_run" class="button button--primary" type="button">Run Payroll</button>
-              <button id="pr_lock" class="button" type="button">Approve & Lock</button>
-            </div>
-            <p id="pr_status" class="muted"></p>
-          </form>
-
+          <p class="muted">Payroll UI is present but not wired yet (safe to leave for launch).</p>
           <div class="table-wrap" style="margin-top:.6rem;">
             <table id="pr_table">
               <thead><tr><th>Employee</th><th>Total Hours</th><th>Gross</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody><tr><td colspan="5" class="muted">Not implemented yet.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -398,49 +349,18 @@
       <div class="admin-grid">
         <div class="admin-card">
           <h2>Service Items</h2>
-          <form id="svc-form" class="stack">
-            <input type="hidden" id="svc_id" />
-            <div class="grid-3">
-              <div>
-                <label for="svc_name">Name</label>
-                <input id="svc_name" required placeholder="e.g., Lawn Mowing" />
-              </div>
-              <div>
-                <label for="svc_tier">Tier</label>
-                <select id="svc_tier">
-                  <option value="essential">Essential</option>
-                  <option value="standard">Standard</option>
-                  <option value="premium">Premium</option>
-                </select>
-              </div>
-              <div>
-                <label for="svc_price">Price From ($)</label>
-                <input id="svc_price" type="number" min="0" step="1" value="35" />
-              </div>
-            </div>
-            <label for="svc_desc">Description</label>
-            <textarea id="svc_desc" rows="3"></textarea>
-            <div class="inline">
-              <button class="button button--primary" type="submit">Save Item</button>
-              <button id="svc_reset" class="button" type="button">Reset</button>
-            </div>
-            <p id="svc_status" class="muted"></p>
-          </form>
-        </div>
-
-        <div class="admin-card">
-          <h2>Catalog</h2>
+          <p class="muted">Catalog table renders from storage (editing not wired in admin.js yet).</p>
           <div class="table-wrap">
             <table id="svc_table">
               <thead><tr><th>Tier</th><th>Name</th><th>Price From</th><th>Description</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============ Job Reviews (employee completions) ============ -->
+    <!-- ============ Job Reviews ============ -->
     <section class="tab-panel" id="panel-reviews">
       <div class="admin-grid">
         <div class="admin-card">
@@ -448,7 +368,7 @@
           <div class="table-wrap">
             <table id="review_table">
               <thead><tr><th>Date</th><th>Customer</th><th>Title</th><th>Photos</th><th>Notes</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -458,7 +378,7 @@
           <div class="table-wrap">
             <table id="pto_table">
               <thead><tr><th>Employee</th><th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody><!-- rows --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -525,7 +445,8 @@
 
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script defer src="js/identity.js"></script>
-  <script>
+  <script defer src="js/api.js"></script>
+  <script defer>
     document.addEventListener("DOMContentLoaded", () => window.TNKIdentity?.init?.());
   </script>
   <script src="js/admin.js" defer></script>
