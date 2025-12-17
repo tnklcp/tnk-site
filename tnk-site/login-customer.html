@@ -60,11 +60,18 @@
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       TNKIdentity.init({
+        autoRoute: false, // IMPORTANT: prevents redirect race
+
         onInit(user) {
           if (user) TNKIdentity.routeAfterLogin(user);
         },
+
         onLogin(user) {
           TNKIdentity.routeAfterLogin(user);
+        },
+
+        onLogout() {
+          location.replace("login-customer.html");
         }
       });
 
