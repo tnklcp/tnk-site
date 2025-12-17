@@ -10,7 +10,7 @@
      TNKIdentity.email()
      TNKIdentity.token()
      TNKIdentity.logout()
-     TNKIdentity.routeAfterLogin(user)   <-- ADDED (fixes your error)
+     TNKIdentity.routeAfterLogin(user)
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
@@ -100,7 +100,6 @@
       try { return await u.jwt(true); } catch { return null; }
     },
 
-    // ===== ADDED: public routing function =====
     routeAfterLogin(user) {
       const role = normalizeRole(user) || "customer";
       try {
@@ -128,6 +127,9 @@
     init(opts = {}) {
       this.configure(opts);
 
+      // default true; login pages should pass autoRoute:false to prevent redirect races
+      const autoRoute = opts.autoRoute !== false;
+
       ensureWidgetLoaded(() => {
         const id = w.netlifyIdentity;
         if (!id) return;
@@ -141,15 +143,13 @@
           } catch {}
         }
 
-        // Allow pages to hook init/login/logout if they want
         id.on("init", (user) => {
           try { opts.onInit && opts.onInit(user); } catch {}
         });
 
         id.on("login", (user) => {
           try { opts.onLogin && opts.onLogin(user); } catch {}
-          // Default behavior: route after login
-          this.routeAfterLogin(user);
+          if (autoRoute) this.routeAfterLogin(user);
         });
 
         id.on("logout", () => {
@@ -158,8 +158,7 @@
             sessionStorage.removeItem("tnk_user_email");
           } catch {}
           try { opts.onLogout && opts.onLogout(); } catch {}
-          // Default behavior: go home
-          redirectOnce(this._redirects.home);
+          if (autoRoute) redirectOnce(this._redirects.home);
         });
 
         id.on("error", (e) => {
@@ -173,4 +172,3 @@
 
   w.TNKIdentity = TNKIdentity;
 })(window, document);
-
