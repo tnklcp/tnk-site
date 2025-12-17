@@ -1,7 +1,8 @@
 /* =========================================================
    TNK Identity wrapper for Netlify Identity
-   - No localStorage
-   - Normalizes roles from app_metadata.roles OR user_metadata.role
+   - Loads widget if missing
+   - Normalizes roles (NO localStorage)
+   - Handles login/logout redirects
    - Exposes: TNKIdentity.user(), role(), email(), token(), logout(), init()
    ========================================================= */
 (function (w, d) {
@@ -18,41 +19,34 @@
   function normalizeRole(user) {
     if (!user) return null;
 
+    // Preferred: app_metadata.roles (array)
     const roles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
     if (roles.includes("admin")) return "admin";
     if (roles.includes("employee")) return "employee";
     if (roles.includes("customer")) return "customer";
 
-    const metaRole = String(user?.user_metadata?.role || "").toLowerCase();
+    // Fallback: user_metadata.role (string)
+    const metaRole = String(user?.user_metadata?.role || "").toLowerCase().trim();
     if (metaRole === "admin" || metaRole === "employee" || metaRole === "customer") return metaRole;
 
+    // Default
     return "customer";
   }
 
   const TNKIdentity = {
-    _redirects: {
-      admin: "admin.html",
-      employee: "employee.html",
-      customer: "customer.html",
-      home: "index.html",
-      loginEmployee: "login.html",
-      loginCustomer: "login-customer.html",
-    },
+    _redirects: { admin: "admin.html", employee: "employee.html", customer: "customer.html", home: "index.html" },
 
     configure(opts = {}) {
       this._redirects = { ...this._redirects, ...(opts.redirects || {}) };
     },
 
     user() {
-      try {
-        return w.netlifyIdentity?.currentUser() || null;
-      } catch {
-        return null;
-      }
+      try { return w.netlifyIdentity?.currentUser() || null; } catch { return null; }
     },
 
     role() {
       const u = this.user();
+      if (!u) return null;
       return normalizeRole(u);
     },
 
@@ -63,7 +57,7 @@
     async token() {
       const u = this.user();
       if (!u) return null;
-      return u.jwt(true);
+      try { return await u.jwt(true); } catch { return null; }
     },
 
     logout() {
@@ -71,19 +65,34 @@
         sessionStorage.removeItem("tnk_role");
         sessionStorage.removeItem("tnk_user_email");
       } catch {}
-      if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) w.netlifyIdentity.logout();
-      else location.replace(this._redirects.home);
+      if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
+        w.netlifyIdentity.logout();
+      } else {
+        location.replace(this._redirects.home);
+      }
     },
 
-    _syncSession(user) {
-      const role = normalizeRole(user);
+    _persistSession(user) {
+      const role = normalizeRole(user) || "customer";
       try {
-        if (role) sessionStorage.setItem("tnk_role", role);
-        else sessionStorage.removeItem("tnk_role");
-        if (user?.email) sessionStorage.setItem("tnk_user_email", String(user.email).toLowerCase());
-        else sessionStorage.removeItem("tnk_user_email");
+        sessionStorage.setItem("tnk_role", role);
+        sessionStorage.setItem("tnk_user_email", (user?.email || "").toLowerCase());
       } catch {}
       return role;
+    },
+
+    _onLogin(user) {
+      const role = this._persistSession(user);
+      const dest = this._redirects[role] || this._redirects.customer;
+      location.replace(dest);
+    },
+
+    _onLogout() {
+      try {
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
+      } catch {}
+      location.replace(this._redirects.home);
     },
 
     init(opts = {}) {
@@ -93,19 +102,10 @@
         if (!id) return;
 
         const u = id.currentUser();
-        if (u) this._syncSession(u);
+        if (u) this._persistSession(u);
 
-        id.on("login", (user) => {
-          this._syncSession(user);
-        });
-
-        id.on("logout", () => {
-          try {
-            sessionStorage.removeItem("tnk_role");
-            sessionStorage.removeItem("tnk_user_email");
-          } catch {}
-          location.replace(this._redirects.home);
-        });
+        id.on("login", (user) => this._onLogin(user));
+        id.on("logout", () => this._onLogout());
 
         id.init();
       });
