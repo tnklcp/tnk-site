@@ -10,7 +10,6 @@
   function assertCustomer() {
     const role = sessionStorage.getItem("tnk_role");
     if (role === "customer") return true;
-    // If admin/employee lands here, route them out
     if (role === "admin") { location.replace("admin.html"); return false; }
     if (role === "employee") { location.replace("employee.html"); return false; }
     location.replace("login-customer.html");
@@ -96,6 +95,22 @@
     balances: "tnk_cust_balances"
   };
 
+  // ----- Stripe: create checkout for an invoice -----
+  async function startInvoiceCheckout(invoiceId) {
+    const res = await fetch(`/.netlify/functions/stripe_create_checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceId })
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`Stripe checkout failed: ${res.status} ${res.statusText}${t ? ` — ${t}` : ""}`);
+    }
+    const j = await res.json();
+    if (!j?.url) throw new Error("Stripe checkout did not return a URL.");
+    location.href = j.url;
+  }
+
   // ----- tabs -----
   (function initTabs() {
     const tabs = $$(".tab-btn");
@@ -122,28 +137,53 @@
   async function renderInvoices() {
     const email = myEmail();
     if (!email) { invStatus.textContent = "Not signed in."; return; }
+
     const all = await loadInvoices();
     const mine = all.filter((i) => (i.customer_email || "").toLowerCase() === email);
 
     invTbody.innerHTML =
       mine
         .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map(
-          (i) => `
+        .map((i) => {
+          const isPaid = String(i.status || "").toLowerCase() === "paid";
+          const canPay = !isPaid && Number(i.total || 0) > 0;
+          return `
             <tr data-id="${i.id}">
-              <td>${i.number || ""}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
-              <td>${money(i.total)}</td><td>${i.status || ""}</td>
-              <td><button class="button js-view">View</button></td>
-            </tr>`
-        )
+              <td>${i.number || ""}</td>
+              <td>${i.date || ""}</td>
+              <td>${i.due || ""}</td>
+              <td>${money(i.total)}</td>
+              <td>${i.status || ""}</td>
+              <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="button js-view" type="button">View</button>
+                <button class="button button--primary js-pay" type="button" ${canPay ? "" : "disabled"}>
+                  ${isPaid ? "Paid" : "Pay"}
+                </button>
+              </td>
+            </tr>`;
+        })
         .join("") || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
   }
 
   invTbody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
+    const id = tr.dataset.id;
+
+    // Pay
+    if (e.target.classList.contains("js-pay")) {
+      try {
+        e.target.disabled = true;
+        await startInvoiceCheckout(id);
+      } catch (err) {
+        e.target.disabled = false;
+        showFatal(err);
+      }
+      return;
+    }
+
+    // View
     if (!e.target.classList.contains("js-view")) return;
 
-    const id = tr.dataset.id;
     const all = await loadInvoices();
     const inv = all.find((x) => x.id === id);
     if (!inv) return;
@@ -339,13 +379,11 @@
     if (!slots.length) { slotsWrap.innerHTML = '<p class="muted">No open slots published yet.</p>'; return; }
     slotsWrap.innerHTML = slots
       .sort((a, b) => (a.date < b.date ? -1 : 1) || (a.start || "").localeCompare(b.start || ""))
-      .map(
-        (s) => `
-          <div class="slot">
-            <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
-            <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
-          </div>`
-      )
+      .map((s) => `
+        <div class="slot">
+          <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
+          <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
+        </div>`)
       .join("");
   }
 
