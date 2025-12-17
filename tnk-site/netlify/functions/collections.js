@@ -1,82 +1,53 @@
-// tnk-site/netlify/functions/collections.js
+// Generic collection get/set using Netlify Blobs (stable + JSON-safe)
 import { getStore } from "@netlify/blobs";
 
-const STORE_NAME = "tnk-data";
+export async function handler(event, context) {
+  const method = event.httpMethod;
+  const store = getStore({ name: "tnk-data" }); // <-- FIXED: correct signature
 
-export async function handler(event) {
+  // Require Identity for writes only (GET is public)
+  const user = context?.clientContext?.user || event?.clientContext?.user || null;
+  const isAuthed = !!user;
+
   try {
-    // CORS / preflight
-    if (event.httpMethod === "OPTIONS") {
-      return resp(204, null);
-    }
-
-    const method = event.httpMethod;
-
-    // IMPORTANT: this dependency must be installed (package.json in tnk-site)
-    const store = getStore(STORE_NAME);
-
-    const user = event?.clientContext?.user || null;
-    const isAuthed = !!user;
-
     if (method === "GET") {
       const name = event.queryStringParameters?.name;
-      if (!name) return resp(400, { ok: false, error: "Missing ?name" });
+      if (!name) return json(400, { ok: false, error: "Missing name" });
 
       const key = `${name}.json`;
-
-      // If it doesn't exist yet, return null/empty (not an error)
-      const data = await store.get(key, { type: "json" });
-      return resp(200, { ok: true, data: data ?? null });
+      const blob = await store.get(key, { type: "json" });
+      return json(200, { ok: true, data: blob ?? null });
     }
 
     if (method === "PUT") {
-      if (!isAuthed) return resp(401, { ok: false, error: "Auth required" });
+      if (!isAuthed) return json(401, { ok: false, error: "Auth required" });
 
       const body = safeJSON(event.body);
       const { name, data } = body || {};
-      if (!name) return resp(400, { ok: false, error: "Missing name" });
+      if (!name) return json(400, { ok: false, error: "Missing name" });
 
       const key = `${name}.json`;
-
-      // store.set accepts string/buffer; we store JSON string
-      await store.set(key, JSON.stringify(data ?? null), {
+      await store.setJSON(key, data ?? null, {
         metadata: { updatedAt: new Date().toISOString() }
       });
 
-      return resp(200, { ok: true });
+      return json(200, { ok: true });
     }
 
-    return resp(405, { ok: false, error: "Method Not Allowed" });
-  } catch (err) {
-    // This prevents opaque 502s and shows the real reason in your browser console/network tab.
-    return resp(500, {
-      ok: false,
-      error: "Collections function failed",
-      detail: err?.message || String(err)
-    });
+    return json(405, { ok: false, error: "Method Not Allowed" });
+  } catch (e) {
+    return json(500, { ok: false, error: e?.message || "Server error" });
   }
 }
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS"
-  };
+function safeJSON(txt) {
+  try { return txt ? JSON.parse(txt) : {}; } catch { return {}; }
 }
 
-function resp(statusCode, obj) {
+function json(status, obj) {
   return {
-    statusCode,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
-    body: obj === null ? "" : JSON.stringify(obj)
+    statusCode: status,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(obj),
   };
-}
-
-function safeJSON(text) {
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    return {};
-  }
 }
