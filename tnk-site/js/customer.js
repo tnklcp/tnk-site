@@ -51,10 +51,7 @@
         ...(t ? { Authorization: `Bearer ${t}` } : {})
       }
     });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}\n${txt}`);
-    }
+    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
     const j = await res.json();
     return (j && j.data) ?? null;
   }
@@ -69,10 +66,7 @@
       },
       body: JSON.stringify({ name, data })
     });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}\n${txt}`);
-    }
+    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
   }
 
   function showFatal(err) {
@@ -118,17 +112,21 @@
     if (current) activate(current);
   })();
 
-  // ----- Stripe: Pay invoice via Checkout redirect -----
-  async function payInvoice(invoiceId) {
-    const res = await fetch("/.netlify/functions/stripe_checkout", {
+  // ----- Stripe pay flow -----
+  async function startCheckout(invoiceId) {
+    const t = await token();
+    const res = await fetch("/.netlify/functions/stripe-create-checkout", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
+      },
       body: JSON.stringify({ invoiceId })
     });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j?.error || `Stripe checkout failed: ${res.status}`);
-    if (!j?.url) throw new Error("Stripe checkout did not return a session url.");
-    location.href = j.url;
+    if (!res.ok) throw new Error(`Stripe checkout failed: ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    if (!j?.url) throw new Error("Stripe checkout did not return a session URL.");
+    location.assign(j.url);
   }
 
   // ----- invoices -----
@@ -140,7 +138,6 @@
   async function renderInvoices() {
     const email = myEmail();
     if (!email) { invStatus.textContent = "Not signed in."; return; }
-
     const all = await loadInvoices();
     const mine = all.filter((i) => (i.customer_email || "").toLowerCase() === email);
 
@@ -149,17 +146,15 @@
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .map((i) => {
           const isPaid = String(i.status || "").toLowerCase() === "paid";
+          const actionBtn = isPaid
+            ? `<button class="button js-view">View</button>`
+            : `<button class="button button--primary js-pay">Pay</button>
+               <button class="button js-view">View</button>`;
           return `
             <tr data-id="${i.id}">
-              <td>${i.number || ""}</td>
-              <td>${i.date || ""}</td>
-              <td>${i.due || ""}</td>
-              <td>${money(i.total)}</td>
-              <td>${i.status || ""}</td>
-              <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
-                <button class="button js-view">View</button>
-                ${isPaid ? "" : `<button class="button button--primary js-pay" data-pay="${i.id}">Pay</button>`}
-              </td>
+              <td>${i.number || ""}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
+              <td>${money(i.total)}</td><td>${i.status || ""}</td>
+              <td style="display:flex;gap:.5rem;flex-wrap:wrap;">${actionBtn}</td>
             </tr>`;
         })
         .join("") || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
@@ -167,44 +162,37 @@
 
   invTbody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
+    const id = tr.dataset.id;
 
-    // View
-    if (e.target.classList.contains("js-view")) {
-      const id = tr.dataset.id;
-      const all = await loadInvoices();
-      const inv = all.find((x) => x.id === id);
-      if (!inv) return;
-
-      const rows = (inv.items || [])
-        .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
-        .join("");
-
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number || "Invoice"}</title>
-        <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
-        table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
-        <body><h1>${inv.number || ""}</h1><div>${inv.date || ""} • ${inv.status || ""}</div>
-        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
-        <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
-
-      const win = window.open("", "_blank");
-      win.document.open(); win.document.write(html); win.document.close();
-      try { win.focus(); } catch {}
+    if (e.target.classList.contains("js-pay")) {
+      try {
+        await startCheckout(id);
+      } catch (err) {
+        alert(err?.message || String(err));
+      }
       return;
     }
 
-    // Pay
-    if (e.target.classList.contains("js-pay")) {
-      const invoiceId = e.target.getAttribute("data-pay");
-      e.target.disabled = true;
-      e.target.textContent = "Redirecting…";
-      try {
-        await payInvoice(invoiceId);
-      } catch (err) {
-        e.target.disabled = false;
-        e.target.textContent = "Pay";
-        showFatal(err);
-      }
-    }
+    if (!e.target.classList.contains("js-view")) return;
+
+    const all = await loadInvoices();
+    const inv = all.find((x) => x.id === id);
+    if (!inv) return;
+
+    const rows = (inv.items || [])
+      .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
+      .join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number || "Invoice"}</title>
+      <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
+      table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
+      <body><h1>${inv.number || ""}</h1><div>${inv.date || ""} • ${inv.status || ""}</div>
+      <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
+      <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
+
+    const win = window.open("", "_blank");
+    win.document.open(); win.document.write(html); win.document.close();
+    try { win.focus(); } catch {}
   });
 
   // ----- balance -----
@@ -225,20 +213,17 @@
     const email = myEmail();
     return map[email] || { svc: [], storm: [] };
   }
-
   async function savePrefs(p) {
     const map = (await apiGet(KEYS.cust_prefs)) || {};
     const email = myEmail();
     map[email] = p;
     await apiSet(KEYS.cust_prefs, map);
   }
-
   async function renderPrefs() {
     const p = await loadPrefs();
     $$('input[name="svc"]').forEach((cb) => (cb.checked = p.svc.includes(cb.value)));
     $$('input[name="storm"]').forEach((cb) => (cb.checked = p.storm.includes(cb.value)));
   }
-
   prefForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const svc = $$('input[name="svc"]:checked').map((i) => i.value);
@@ -256,14 +241,12 @@
     const email = myEmail();
     return map[email] || [];
   }
-
   async function saveExtras(list) {
     const map = (await apiGet(KEYS.cust_extras)) || {};
     const email = myEmail();
     map[email] = list;
     await apiSet(KEYS.cust_extras, map);
   }
-
   extraForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const list = await loadExtras();
@@ -288,14 +271,12 @@
     const email = myEmail();
     return map[email] || [];
   }
-
   async function saveSpecials(list) {
     const map = (await apiGet(KEYS.cust_specials)) || {};
     const email = myEmail();
     map[email] = list;
     await apiSet(KEYS.cust_specials, map);
   }
-
   spForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const list = await loadSpecials();
@@ -315,14 +296,12 @@
     const email = myEmail();
     return map[email] || [];
   }
-
   async function refreshHistorySelect() {
     const hist = await loadHistory();
     cmSel.innerHTML =
       hist.map((h) => `<option value="${h.id}">${h.date} • ${h.type}</option>`).join("") ||
       '<option value="">No history</option>';
   }
-
   async function renderHistory() {
     const hist = await loadHistory();
     $("#cust_history tbody").innerHTML =
@@ -337,14 +316,12 @@
     const email = myEmail();
     return map[email] || [];
   }
-
   async function saveComments(list) {
     const map = (await apiGet(KEYS.cust_comments)) || {};
     const email = myEmail();
     map[email] = list;
     await apiSet(KEYS.cust_comments, map);
   }
-
   async function renderComments() {
     const rows = (await loadComments())
       .sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -376,7 +353,6 @@
 
   // ----- availability -----
   const slotsWrap = byId("cust_slots");
-
   async function renderAvailability() {
     const slots = (await apiGet(KEYS.availability)) || [];
     if (!slots.length) { slotsWrap.innerHTML = '<p class="muted">No open slots published yet.</p>'; return; }
@@ -389,7 +365,6 @@
           </div>`)
       .join("");
   }
-
   slotsWrap?.addEventListener("click", (e) => {
     const pick = e.target?.dataset?.pick;
     if (!pick) return;
