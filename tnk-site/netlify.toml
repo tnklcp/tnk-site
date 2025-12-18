@@ -1,12 +1,13 @@
 [build]
   base = "tnk-site"
-  publish = "."
-  functions = "netlify/functions"
-  command = "npm install"
+  publish = "tnk-site"
+  functions = "tnk-site/netlify/functions"
+  command = "npm install --prefix tnk-site"
 
 [functions]
   node_bundler = "esbuild"
 
+# Pretty URLs
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
