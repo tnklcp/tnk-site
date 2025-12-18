@@ -51,7 +51,10 @@
         ...(t ? { Authorization: `Bearer ${t}` } : {})
       }
     });
-    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}\n${txt}`);
+    }
     const j = await res.json();
     return (j && j.data) ?? null;
   }
@@ -66,7 +69,10 @@
       },
       body: JSON.stringify({ name, data })
     });
-    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}\n${txt}`);
+    }
   }
 
   function showFatal(err) {
@@ -95,22 +101,6 @@
     balances: "tnk_cust_balances"
   };
 
-  // ----- Stripe: create checkout for an invoice -----
-  async function startInvoiceCheckout(invoiceId) {
-    const res = await fetch(`/.netlify/functions/stripe_create_checkout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ invoiceId })
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Stripe checkout failed: ${res.status} ${res.statusText}${t ? ` — ${t}` : ""}`);
-    }
-    const j = await res.json();
-    if (!j?.url) throw new Error("Stripe checkout did not return a URL.");
-    location.href = j.url;
-  }
-
   // ----- tabs -----
   (function initTabs() {
     const tabs = $$(".tab-btn");
@@ -127,6 +117,19 @@
     const current = tabs.find((b) => b.getAttribute("aria-selected") === "true") || tabs[0];
     if (current) activate(current);
   })();
+
+  // ----- Stripe: Pay invoice via Checkout redirect -----
+  async function payInvoice(invoiceId) {
+    const res = await fetch("/.netlify/functions/stripe_checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceId })
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j?.error || `Stripe checkout failed: ${res.status}`);
+    if (!j?.url) throw new Error("Stripe checkout did not return a session url.");
+    location.href = j.url;
+  }
 
   // ----- invoices -----
   const invTbody = $("#cust_invoices tbody");
@@ -146,7 +149,6 @@
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .map((i) => {
           const isPaid = String(i.status || "").toLowerCase() === "paid";
-          const canPay = !isPaid && Number(i.total || 0) > 0;
           return `
             <tr data-id="${i.id}">
               <td>${i.number || ""}</td>
@@ -155,10 +157,8 @@
               <td>${money(i.total)}</td>
               <td>${i.status || ""}</td>
               <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
-                <button class="button js-view" type="button">View</button>
-                <button class="button button--primary js-pay" type="button" ${canPay ? "" : "disabled"}>
-                  ${isPaid ? "Paid" : "Pay"}
-                </button>
+                <button class="button js-view">View</button>
+                ${isPaid ? "" : `<button class="button button--primary js-pay" data-pay="${i.id}">Pay</button>`}
               </td>
             </tr>`;
         })
@@ -167,41 +167,44 @@
 
   invTbody?.addEventListener("click", async (e) => {
     const tr = e.target.closest("tr"); if (!tr) return;
-    const id = tr.dataset.id;
 
-    // Pay
-    if (e.target.classList.contains("js-pay")) {
-      try {
-        e.target.disabled = true;
-        await startInvoiceCheckout(id);
-      } catch (err) {
-        e.target.disabled = false;
-        showFatal(err);
-      }
+    // View
+    if (e.target.classList.contains("js-view")) {
+      const id = tr.dataset.id;
+      const all = await loadInvoices();
+      const inv = all.find((x) => x.id === id);
+      if (!inv) return;
+
+      const rows = (inv.items || [])
+        .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
+        .join("");
+
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number || "Invoice"}</title>
+        <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
+        table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
+        <body><h1>${inv.number || ""}</h1><div>${inv.date || ""} • ${inv.status || ""}</div>
+        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
+        <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
+
+      const win = window.open("", "_blank");
+      win.document.open(); win.document.write(html); win.document.close();
+      try { win.focus(); } catch {}
       return;
     }
 
-    // View
-    if (!e.target.classList.contains("js-view")) return;
-
-    const all = await loadInvoices();
-    const inv = all.find((x) => x.id === id);
-    if (!inv) return;
-
-    const rows = (inv.items || [])
-      .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
-      .join("");
-
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number || "Invoice"}</title>
-      <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
-      table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
-      <body><h1>${inv.number || ""}</h1><div>${inv.date || ""} • ${inv.status || ""}</div>
-      <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
-      <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
-
-    const win = window.open("", "_blank");
-    win.document.open(); win.document.write(html); win.document.close();
-    try { win.focus(); } catch {}
+    // Pay
+    if (e.target.classList.contains("js-pay")) {
+      const invoiceId = e.target.getAttribute("data-pay");
+      e.target.disabled = true;
+      e.target.textContent = "Redirecting…";
+      try {
+        await payInvoice(invoiceId);
+      } catch (err) {
+        e.target.disabled = false;
+        e.target.textContent = "Pay";
+        showFatal(err);
+      }
+    }
   });
 
   // ----- balance -----
@@ -380,10 +383,10 @@
     slotsWrap.innerHTML = slots
       .sort((a, b) => (a.date < b.date ? -1 : 1) || (a.start || "").localeCompare(b.start || ""))
       .map((s) => `
-        <div class="slot">
-          <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
-          <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
-        </div>`)
+          <div class="slot">
+            <div>${s.date} • ${s.start || ""}${s.end ? "–" + s.end : ""}</div>
+            <div><button class="button js-pick" data-pick='${JSON.stringify(s)}'>Pick</button></div>
+          </div>`)
       .join("");
   }
 
