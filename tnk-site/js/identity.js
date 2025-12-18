@@ -1,16 +1,19 @@
 /* =========================================================
-   TNK Identity wrapper for Netlify Identity (no localStorage)
-   Exposes: TNKIdentity.user(), role(), email(), token(), routeAfterLogin(), logout(), init()
+   TNK Identity wrapper for Netlify Identity (NO localStorage)
+   - Single owner of routing to prevent redirect race
+   - Exposes: TNKIdentity.init(), user(), role(), email(), token(), logout(), routeAfterLogin()
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
 
-  function ensureWidgetLoaded(cb) {
-    if (w.netlifyIdentity) return cb();
-    const s = d.createElement("script");
-    s.src = WIDGET_SRC;
-    s.onload = cb;
-    d.head.appendChild(s);
+  function ensureWidgetLoaded() {
+    return new Promise((resolve) => {
+      if (w.netlifyIdentity) return resolve();
+      const s = d.createElement("script");
+      s.src = WIDGET_SRC;
+      s.onload = () => resolve();
+      d.head.appendChild(s);
+    });
   }
 
   function normalizeRole(user) {
@@ -21,37 +24,16 @@
     return "customer";
   }
 
-  function setSession(user) {
-    try {
-      if (!user) {
-        sessionStorage.removeItem("tnk_role");
-        sessionStorage.removeItem("tnk_user_email");
-        return;
-      }
-      sessionStorage.setItem("tnk_role", normalizeRole(user) || "customer");
-      sessionStorage.setItem("tnk_user_email", user.email || "");
-    } catch {}
-  }
-
-  function redirectOnce(url) {
-    try {
-      const now = Date.now();
-      const last = Number(sessionStorage.getItem("tnk_redirect_lock") || 0);
-      if (now - last < 1200) return; // prevent ping-pong
-      sessionStorage.setItem("tnk_redirect_lock", String(now));
-    } catch {}
-    w.location.replace(url);
-  }
-
   const TNKIdentity = {
     _redirects: { admin: "admin.html", employee: "employee.html", customer: "customer.html", home: "index.html" },
+    _routingLock: false,
 
     configure(opts = {}) {
       this._redirects = { ...this._redirects, ...(opts.redirects || {}) };
     },
 
     user() {
-      try { return w.netlifyIdentity?.currentUser() || null; } catch { return null; }
+      try { return w.netlifyIdentity?.currentUser?.() || null; } catch { return null; }
     },
 
     role() {
@@ -68,54 +50,114 @@
       try { return await u.jwt(true); } catch { return null; }
     },
 
-    routeAfterLogin(user) {
-      const role = normalizeRole(user) || "customer";
-      setSession(user);
-      const dest = this._redirects[role] || this._redirects.customer;
-      redirectOnce(dest);
-    },
-
     logout() {
-      setSession(null);
       try {
-        if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
-          w.netlifyIdentity.logout();
-          return;
-        }
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
       } catch {}
-      redirectOnce(this._redirects.home);
+      try {
+        if (w.netlifyIdentity?.currentUser?.()) w.netlifyIdentity.logout();
+        else location.replace(this._redirects.home);
+      } catch {
+        location.replace(this._redirects.home);
+      }
     },
 
-    init(opts = {}) {
+    // The ONE official redirect function (prevents page-level race)
+    routeAfterLogin(user) {
+      if (this._routingLock) return;
+      this._routingLock = true;
+
+      const role = normalizeRole(user) || "customer";
+
+      try {
+        sessionStorage.setItem("tnk_role", role);
+        sessionStorage.setItem("tnk_user_email", user?.email || "");
+      } catch {}
+
+      const dest = this._redirects[role] || this._redirects.customer;
+      location.replace(dest);
+    },
+
+    _applyGuard(guard, user) {
+      // guard values:
+      // "admin", "employee-or-admin", "customer"
+      if (!guard) return;
+
+      if (!user) {
+        if (guard === "customer") return location.replace("login-customer.html");
+        return location.replace("login.html");
+      }
+
+      const role = normalizeRole(user);
+
+      if (guard === "admin") {
+        if (role !== "admin") return location.replace(role === "employee" ? "employee.html" : "login.html");
+      }
+
+      if (guard === "employee-or-admin") {
+        if (role !== "employee" && role !== "admin") return location.replace("login.html");
+      }
+
+      if (guard === "customer") {
+        if (role !== "customer") return location.replace(role === "admin" ? "admin.html" : "employee.html");
+      }
+    },
+
+    async init(opts = {}) {
       this.configure(opts);
 
-      ensureWidgetLoaded(() => {
-        const id = w.netlifyIdentity;
-        if (!id) return;
+      await ensureWidgetLoaded();
+      const id = w.netlifyIdentity;
+      if (!id) return;
 
-        let initCalled = false;
+      const guard = opts.guard || d.body.getAttribute("data-role-guard") || null;
 
-        id.on("init", (user) => {
-          setSession(user);
-          if (!initCalled) {
-            initCalled = true;
-            opts.onInit && opts.onInit(user);
-          }
-        });
+      // Ensure init runs only once per page load
+      if (id.__tnk_bound) {
+        const u = id.currentUser();
+        if (u) {
+          try {
+            sessionStorage.setItem("tnk_role", normalizeRole(u) || "customer");
+            sessionStorage.setItem("tnk_user_email", u.email || "");
+          } catch {}
+        }
+        this._applyGuard(guard, u);
+        if (opts.onInit) opts.onInit(u);
+        return;
+      }
+      id.__tnk_bound = true;
 
-        id.on("login", (user) => {
-          setSession(user);
-          opts.onLogin ? opts.onLogin(user) : this.routeAfterLogin(user);
-        });
-
-        id.on("logout", () => {
-          setSession(null);
-          opts.onLogout ? opts.onLogout() : redirectOnce(this._redirects.home);
-        });
-
-        id.init();
+      id.on("init", (user) => {
+        if (user) {
+          try {
+            sessionStorage.setItem("tnk_role", normalizeRole(user) || "customer");
+            sessionStorage.setItem("tnk_user_email", user.email || "");
+          } catch {}
+        }
+        this._applyGuard(guard, user);
+        if (opts.onInit) opts.onInit(user);
       });
-    },
+
+      id.on("login", (user) => {
+        // do NOT auto-route unless caller wants it
+        try {
+          sessionStorage.setItem("tnk_role", normalizeRole(user) || "customer");
+          sessionStorage.setItem("tnk_user_email", user.email || "");
+        } catch {}
+        if (opts.onLogin) opts.onLogin(user);
+      });
+
+      id.on("logout", () => {
+        try {
+          sessionStorage.removeItem("tnk_role");
+          sessionStorage.removeItem("tnk_user_email");
+        } catch {}
+        if (opts.onLogout) opts.onLogout();
+      });
+
+      id.init();
+    }
   };
 
   w.TNKIdentity = TNKIdentity;
