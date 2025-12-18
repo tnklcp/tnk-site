@@ -1,70 +1,67 @@
-// tnk-site/netlify/functions/collections.js
+// Generic collection get/set using Netlify Blobs (browser-safe, CORS, loud errors)
 import { getStore } from "@netlify/blobs";
 
-/**
- * Netlify Functions v2 style (req, context)
- * - GET is public (read-only)
- * - PUT requires Netlify Identity auth (context.clientContext.user)
- */
-export default async (req, context) => {
-  const store = getStore("tnk-data");
-  const url = new URL(req.url);
+export async function handler(event) {
+  const method = event.httpMethod;
 
-  // CORS (basic)
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+  // CORS preflight
+  if (method === "OPTIONS") return json(204, null);
+
+  try {
+    // IMPORTANT: use the object form consistently
+    const store = getStore({ name: "tnk-data" });
+
+    // Netlify injects this when a valid Identity JWT is provided via Authorization: Bearer <token>
+    const user = event.clientContext?.user || null;
+    const isAuthed = !!user;
+
+    if (method === "GET") {
+      const name = event.queryStringParameters?.name;
+      if (!name) return json(400, { ok: false, error: "Missing name" });
+
+      const key = `${name}.json`;
+      const blob = await store.get(key, { type: "json" });
+      return json(200, { ok: true, data: blob ?? null });
+    }
+
+    if (method === "PUT") {
+      if (!isAuthed) return json(401, { ok: false, error: "Auth required" });
+
+      const body = safeJSON(event.body);
+      const { name, data } = body || {};
+      if (!name) return json(400, { ok: false, error: "Missing name" });
+
+      const key = `${name}.json`;
+      await store.set(key, JSON.stringify(data ?? null), {
+        metadata: { updatedAt: new Date().toISOString(), updatedBy: user?.email || "unknown" }
+      });
+
+      return json(200, { ok: true });
+    }
+
+    return json(405, { ok: false, error: "Method Not Allowed" });
+  } catch (e) {
+    // This prevents “502 mystery meat” and gives you an actual message in Network tab
+    return json(500, { ok: false, error: e?.message || String(e) });
   }
-
-  if (req.method === "GET") {
-    const name = url.searchParams.get("name");
-    if (!name) return json({ ok: false, error: "Missing ?name" }, 400);
-
-    const key = `${name}.json`;
-    const data = await store.get(key, { type: "json" });
-    return json({ ok: true, data: data ?? null }, 200);
-  }
-
-  if (req.method === "PUT") {
-    const user = context?.clientContext?.user || null;
-    if (!user) return json({ ok: false, error: "Auth required" }, 401);
-
-    const body = await safeJson(req);
-    const name = body?.name;
-    const data = body?.data;
-
-    if (!name) return json({ ok: false, error: "Missing name" }, 400);
-
-    const key = `${name}.json`;
-    await store.setJSON(key, data ?? null, {
-      metadata: { updatedAt: new Date().toISOString() }
-    });
-
-    return json({ ok: true }, 200);
-  }
-
-  return json({ ok: false, error: "Method Not Allowed" }, 405);
-};
+}
 
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization"
   };
 }
 
-function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
+function json(status, obj) {
+  return {
+    statusCode: status,
     headers: { "Content-Type": "application/json", ...corsHeaders() },
-  });
+    body: obj === null ? "" : JSON.stringify(obj)
+  };
 }
 
-async function safeJson(req) {
-  try {
-    const t = await req.text();
-    return t ? JSON.parse(t) : {};
-  } catch {
-    return {};
-  }
+function safeJSON(text) {
+  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
 }
