@@ -1,61 +1,57 @@
-// tnk-site/netlify/functions/stripe_webhook.js
+// tnk-site/netlify/functions/stripe-webhook.js
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-function rawJson(statusCode, bodyObj) {
-  return {
-    statusCode,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(bodyObj),
-  };
-}
+export default async (req) => {
+  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-export async function handler(event) {
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+    return new Response("Missing Stripe env vars", { status: 500 });
+  }
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new Response("Missing stripe-signature", { status: 400 });
+
+  const rawBody = await req.text();
+
+  let event;
   try {
-    if (event.httpMethod !== "POST") return rawJson(405, { ok: false, error: "Method Not Allowed" });
+    event = stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    return new Response(`Webhook signature verification failed: ${err.message}`, { status: 400 });
+  }
 
-    const stripeSecret = process.env.STRIPE_SECRET_KEY;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!stripeSecret) return rawJson(500, { ok: false, error: "Missing STRIPE_SECRET_KEY" });
-    if (!webhookSecret) return rawJson(500, { ok: false, error: "Missing STRIPE_WEBHOOK_SECRET" });
+  // We mark invoice paid when checkout completes successfully
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const invoiceId = session?.metadata?.invoice_id;
 
-    const stripe = new Stripe(stripeSecret);
+    if (invoiceId) {
+      const store = getStore("tnk-data");
+      const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
+      const idx = invoices.findIndex((x) => x.id === invoiceId);
 
-    const sig =
-      event.headers?.["stripe-signature"] ||
-      event.headers?.["Stripe-Signature"] ||
-      event.headers?.["STRIPE-SIGNATURE"];
-
-    if (!sig) return rawJson(400, { ok: false, error: "Missing Stripe signature header" });
-
-    const rawBody = event.body || "";
-    let evt;
-    try {
-      evt = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } catch (err) {
-      return rawJson(400, { ok: false, error: `Signature verification failed: ${err?.message || err}` });
-    }
-
-    if (evt.type === "checkout.session.completed") {
-      const session = evt.data.object;
-      const invoiceId = session?.metadata?.invoice_id;
-
-      if (invoiceId) {
-        const store = getStore("tnk-data");
-        const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
-        const idx = invoices.findIndex((x) => x.id === invoiceId);
-
-        if (idx >= 0) {
-          invoices[idx].status = "paid";
-          invoices[idx].paid_at = new Date().toISOString();
-          invoices[idx].stripe_session_id = session.id;
-          await store.setJSON("tnk_invoices.json", invoices);
-        }
+      if (idx >= 0) {
+        invoices[idx] = {
+          ...invoices[idx],
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          stripe: {
+            session_id: session.id,
+            payment_intent: session.payment_intent || null,
+          },
+        };
+        await store.setJSON("tnk_invoices.json", invoices, {
+          metadata: { updatedAt: new Date().toISOString() }
+        });
       }
     }
-
-    return rawJson(200, { ok: true });
-  } catch (e) {
-    return rawJson(500, { ok: false, error: e?.message || String(e), stack: e?.stack || null });
   }
-}
+
+  return new Response("ok", { status: 200 });
+};
