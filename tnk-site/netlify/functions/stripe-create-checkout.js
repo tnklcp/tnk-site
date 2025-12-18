@@ -1,97 +1,100 @@
+// tnk-site/netlify/functions/stripe-create-checkout.js
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-export async function handler(event, context) {
-  if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method Not Allowed" });
+export default async (req, context) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
+  if (req.method !== "POST") return json({ ok: false, error: "Method Not Allowed" }, 405);
 
-  const secret = process.env.STRIPE_SECRET_KEY;
-  if (!secret) return json(500, { ok: false, error: "Missing STRIPE_SECRET_KEY" });
+  const user = context?.clientContext?.user || null;
+  if (!user?.email) return json({ ok: false, error: "Unauthorized" }, 401);
 
-  const siteUrl = (process.env.SITE_URL || "").replace(/\/$/, "");
-  if (!siteUrl) return json(500, { ok: false, error: "Missing SITE_URL env var (e.g. https://yourdomain.com)" });
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  if (!STRIPE_SECRET_KEY) return json({ ok: false, error: "Missing STRIPE_SECRET_KEY" }, 500);
 
-  const user = context?.clientContext?.user || event?.clientContext?.user || null;
-  if (!user?.email) return json(401, { ok: false, error: "Unauthorized" });
+  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
 
-  const body = safeJSON(event.body);
+  const body = await safeJson(req);
   const invoiceId = body?.invoiceId;
-  if (!invoiceId) return json(400, { ok: false, error: "Missing invoiceId" });
+  if (!invoiceId) return json({ ok: false, error: "Missing invoiceId" }, 400);
 
-  const store = getStore({ name: "tnk-data" });
-  const key = "tnk_invoices.json";
-  const invoices = (await store.get(key, { type: "json" })) || [];
+  // Load invoices from Netlify Blobs (same store your portals use)
+  const store = getStore("tnk-data");
+  const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
+
   const inv = invoices.find((x) => x.id === invoiceId);
-  if (!inv) return json(404, { ok: false, error: "Invoice not found" });
+  if (!inv) return json({ ok: false, error: "Invoice not found" }, 404);
 
-  const payerEmail = String(user.email).toLowerCase();
-  const invEmail = String(inv.customer_email || "").toLowerCase();
-  if (!invEmail || invEmail !== payerEmail) return json(403, { ok: false, error: "Invoice does not belong to this user" });
+  const customerEmail = String(inv.customer_email || "").toLowerCase();
+  const authedEmail = String(user.email || "").toLowerCase();
 
-  const total = Number(inv.total || 0);
-  if (!Number.isFinite(total) || total <= 0) return json(400, { ok: false, error: "Invoice total must be > 0" });
+  // Customer can only pay their own invoice
+  if (customerEmail !== authedEmail) return json({ ok: false, error: "Forbidden" }, 403);
 
-  const stripe = new Stripe(secret, { apiVersion: "2024-06-20" });
+  if (inv.status === "paid") return json({ ok: false, error: "Invoice already paid" }, 400);
 
-  const invoiceLabel = inv.number ? `Invoice ${inv.number}` : "Invoice";
+  const siteUrl =
+    process.env.URL || // Netlify provides URL at build/runtime
+    `${req.headers.get("x-forwarded-proto") || "https"}://${req.headers.get("host")}`;
 
-  // If items exist, use them; otherwise a single line item for total.
-  const items = Array.isArray(inv.items) && inv.items.length
-    ? inv.items
-        .filter(it => (it?.desc || "").trim())
-        .map((it) => {
-          const qty = Math.max(1, Number(it.qty || 1));
-          const unit = Math.max(0, Number(it.unit || 0));
-          return {
-            price_data: {
-              currency: "usd",
-              product_data: { name: it.desc },
-              unit_amount: Math.round(unit * 100),
-            },
-            quantity: qty,
-          };
-        })
-    : [{
+  // Convert invoice items to Stripe line_items
+  const items = Array.isArray(inv.items) ? inv.items : [];
+  const line_items = items.length
+    ? items.map((it) => ({
+        quantity: Math.max(1, Number(it.qty || 1)),
         price_data: {
           currency: "usd",
-          product_data: { name: invoiceLabel },
-          unit_amount: Math.round(total * 100),
+          unit_amount: Math.max(0, Math.round(Number(it.unit || 0) * 100)),
+          product_data: {
+            name: String(it.desc || "Service"),
+          },
         },
-        quantity: 1,
-      }];
-
-  // If tax_pct is set, keep it simple for now (invoice already includes total)
-  // Stripe tax rules can be added later.
+      }))
+    : [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.max(0, Math.round(Number(inv.total || 0) * 100)),
+            product_data: { name: `Invoice ${inv.number || ""}`.trim() || "Invoice" },
+          },
+        },
+      ];
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    customer_email: payerEmail,
-    line_items: items,
+    customer_email: authedEmail,
+    line_items,
     success_url: `${siteUrl}/customer.html?paid=1&invoice=${encodeURIComponent(inv.id)}`,
     cancel_url: `${siteUrl}/customer.html?canceled=1&invoice=${encodeURIComponent(inv.id)}`,
     metadata: {
       invoice_id: String(inv.id),
       invoice_number: String(inv.number || ""),
-      customer_email: payerEmail,
+      customer_email: authedEmail,
     },
   });
 
-  // Save session id onto invoice for traceability (no status flip here)
-  inv.stripe_session_id = session.id;
-  inv.stripe_session_url = session.url;
+  return json({ ok: true, url: session.url }, 200);
+};
 
-  await store.setJSON(key, invoices, { metadata: { updatedAt: new Date().toISOString() } });
-
-  return json(200, { ok: true, url: session.url });
-}
-
-function safeJSON(txt) {
-  try { return txt ? JSON.parse(txt) : {}; } catch { return {}; }
-}
-
-function json(status, obj) {
+function corsHeaders() {
   return {
-    statusCode: status,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(obj),
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
+}
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
+  });
+}
+async function safeJson(req) {
+  try {
+    const t = await req.text();
+    return t ? JSON.parse(t) : {};
+  } catch {
+    return {};
+  }
 }
