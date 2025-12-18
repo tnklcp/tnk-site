@@ -1,20 +1,9 @@
 /* =========================================================
-   TNK Identity wrapper for Netlify Identity
-   - Loads widget if missing
-   - Normalizes roles
-   - Handles login/logout redirects
-   - Exposes:
-     TNKIdentity.init()
-     TNKIdentity.user()
-     TNKIdentity.role()
-     TNKIdentity.email()
-     TNKIdentity.token()
-     TNKIdentity.logout()
-     TNKIdentity.routeAfterLogin(user)
+   TNK Identity wrapper for Netlify Identity (no localStorage)
+   Exposes: TNKIdentity.user(), role(), email(), token(), routeAfterLogin(), logout(), init()
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
-  const REDIRECT_LOCK_KEY = "tnk_redirect_lock";
 
   function ensureWidgetLoaded(cb) {
     if (w.netlifyIdentity) return cb();
@@ -24,57 +13,38 @@
     d.head.appendChild(s);
   }
 
-  function redirectOnce(url) {
-    const now = Date.now();
-    const last = Number(sessionStorage.getItem(REDIRECT_LOCK_KEY) || 0);
-    if (now - last < 1500) return;
-    sessionStorage.setItem(REDIRECT_LOCK_KEY, String(now));
-    w.location.replace(url);
-  }
-
-  // Optional testing helpers (kept, but safe)
-  function emailLists() {
-    try {
-      return {
-        admins: (JSON.parse(localStorage.getItem("tnk_admin_emails")) || []).map(x => String(x).toLowerCase()),
-        employees: (JSON.parse(localStorage.getItem("tnk_employee_emails")) || []).map(x => String(x).toLowerCase()),
-      };
-    } catch {
-      return { admins: [], employees: [] };
-    }
-  }
-
   function normalizeRole(user) {
     if (!user) return null;
-
-    // Prefer app_metadata.roles
     const roles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
     if (roles.includes("admin")) return "admin";
     if (roles.includes("employee")) return "employee";
-    if (roles.includes("customer")) return "customer";
-
-    // Fallback: user_metadata.role
-    const metaRole = (user?.user_metadata?.role || "").toLowerCase();
-    if (metaRole === "admin" || metaRole === "employee" || metaRole === "customer") return metaRole;
-
-    // LAST fallback: email allowlists (useful while testing)
-    const em = String(user.email || "").toLowerCase();
-    const lists = emailLists();
-    if (lists.admins.includes(em)) return "admin";
-    if (lists.employees.includes(em)) return "employee";
-
     return "customer";
   }
 
+  function setSession(user) {
+    try {
+      if (!user) {
+        sessionStorage.removeItem("tnk_role");
+        sessionStorage.removeItem("tnk_user_email");
+        return;
+      }
+      sessionStorage.setItem("tnk_role", normalizeRole(user) || "customer");
+      sessionStorage.setItem("tnk_user_email", user.email || "");
+    } catch {}
+  }
+
+  function redirectOnce(url) {
+    try {
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem("tnk_redirect_lock") || 0);
+      if (now - last < 1200) return; // prevent ping-pong
+      sessionStorage.setItem("tnk_redirect_lock", String(now));
+    } catch {}
+    w.location.replace(url);
+  }
+
   const TNKIdentity = {
-    _redirects: {
-      admin: "admin.html",
-      employee: "employee.html",
-      customer: "customer.html",
-      home: "index.html",
-      loginEmployee: "login.html",
-      loginCustomer: "login-customer.html",
-    },
+    _redirects: { admin: "admin.html", employee: "employee.html", customer: "customer.html", home: "index.html" },
 
     configure(opts = {}) {
       this._redirects = { ...this._redirects, ...(opts.redirects || {}) };
@@ -85,9 +55,7 @@
     },
 
     role() {
-      const u = this.user();
-      if (!u) return null;
-      return normalizeRole(u);
+      return normalizeRole(this.user());
     },
 
     email() {
@@ -102,67 +70,47 @@
 
     routeAfterLogin(user) {
       const role = normalizeRole(user) || "customer";
-      try {
-        sessionStorage.setItem("tnk_role", role);
-        sessionStorage.setItem("tnk_user_email", user?.email || "");
-      } catch {}
-
+      setSession(user);
       const dest = this._redirects[role] || this._redirects.customer;
       redirectOnce(dest);
     },
 
     logout() {
+      setSession(null);
       try {
-        sessionStorage.removeItem("tnk_role");
-        sessionStorage.removeItem("tnk_user_email");
+        if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
+          w.netlifyIdentity.logout();
+          return;
+        }
       } catch {}
-
-      if (w.netlifyIdentity && w.netlifyIdentity.currentUser()) {
-        w.netlifyIdentity.logout();
-      } else {
-        redirectOnce(this._redirects.home);
-      }
+      redirectOnce(this._redirects.home);
     },
 
     init(opts = {}) {
       this.configure(opts);
 
-      // default true; login pages should pass autoRoute:false to prevent redirect races
-      const autoRoute = opts.autoRoute !== false;
-
       ensureWidgetLoaded(() => {
         const id = w.netlifyIdentity;
         if (!id) return;
 
-        // If already logged in, ensure sessionStorage is set
-        const u = id.currentUser();
-        if (u) {
-          try {
-            sessionStorage.setItem("tnk_role", normalizeRole(u) || "customer");
-            sessionStorage.setItem("tnk_user_email", u.email || "");
-          } catch {}
-        }
+        let initCalled = false;
 
         id.on("init", (user) => {
-          try { opts.onInit && opts.onInit(user); } catch {}
+          setSession(user);
+          if (!initCalled) {
+            initCalled = true;
+            opts.onInit && opts.onInit(user);
+          }
         });
 
         id.on("login", (user) => {
-          try { opts.onLogin && opts.onLogin(user); } catch {}
-          if (autoRoute) this.routeAfterLogin(user);
+          setSession(user);
+          opts.onLogin ? opts.onLogin(user) : this.routeAfterLogin(user);
         });
 
         id.on("logout", () => {
-          try {
-            sessionStorage.removeItem("tnk_role");
-            sessionStorage.removeItem("tnk_user_email");
-          } catch {}
-          try { opts.onLogout && opts.onLogout(); } catch {}
-          if (autoRoute) redirectOnce(this._redirects.home);
-        });
-
-        id.on("error", (e) => {
-          try { opts.onError && opts.onError(e); } catch {}
+          setSession(null);
+          opts.onLogout ? opts.onLogout() : redirectOnce(this._redirects.home);
         });
 
         id.init();
