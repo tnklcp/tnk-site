@@ -1,34 +1,52 @@
-// Generic collection get/set using Netlify Blobs (stable + JSON-safe)
+// tnk-site/netlify/functions/collections.js
 import { getStore } from "@netlify/blobs";
 
+function json(statusCode, bodyObj, extraHeaders = {}) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      ...extraHeaders,
+    },
+    body: JSON.stringify(bodyObj),
+  };
+}
+
 export async function handler(event, context) {
-  const method = event.httpMethod;
-  const store = getStore({ name: "tnk-data" }); // <-- FIXED: correct signature
-
-  // Require Identity for writes only (GET is public)
-  const user = context?.clientContext?.user || event?.clientContext?.user || null;
-  const isAuthed = !!user;
-
   try {
+    const method = event.httpMethod || "GET";
+
+    // CORS
+    if (method === "OPTIONS") return json(204, {}, {});
+
+    const store = getStore("tnk-data");
+
     if (method === "GET") {
       const name = event.queryStringParameters?.name;
-      if (!name) return json(400, { ok: false, error: "Missing name" });
+      if (!name) return json(400, { ok: false, error: "Missing ?name" });
 
       const key = `${name}.json`;
-      const blob = await store.get(key, { type: "json" });
-      return json(200, { ok: true, data: blob ?? null });
+      const data = await store.get(key, { type: "json" });
+      return json(200, { ok: true, data: data ?? null });
     }
 
     if (method === "PUT") {
-      if (!isAuthed) return json(401, { ok: false, error: "Auth required" });
+      // Require Identity for writes
+      const user = context?.clientContext?.user || null;
+      if (!user) return json(401, { ok: false, error: "Auth required" });
 
-      const body = safeJSON(event.body);
+      let body = {};
+      try { body = event.body ? JSON.parse(event.body) : {}; } catch { body = {}; }
+
       const { name, data } = body || {};
       if (!name) return json(400, { ok: false, error: "Missing name" });
 
       const key = `${name}.json`;
       await store.setJSON(key, data ?? null, {
-        metadata: { updatedAt: new Date().toISOString() }
+        metadata: { updatedAt: new Date().toISOString() },
       });
 
       return json(200, { ok: true });
@@ -36,18 +54,11 @@ export async function handler(event, context) {
 
     return json(405, { ok: false, error: "Method Not Allowed" });
   } catch (e) {
-    return json(500, { ok: false, error: e?.message || "Server error" });
+    // Don’t 502 silently—return real error.
+    return json(500, {
+      ok: false,
+      error: e?.message || String(e),
+      stack: e?.stack || null,
+    });
   }
-}
-
-function safeJSON(txt) {
-  try { return txt ? JSON.parse(txt) : {}; } catch { return {}; }
-}
-
-function json(status, obj) {
-  return {
-    statusCode: status,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(obj),
-  };
 }
