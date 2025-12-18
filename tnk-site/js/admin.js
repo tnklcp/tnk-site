@@ -1,12 +1,16 @@
-/* TNK Admin Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, FAIL LOUDLY) */
+/* TNK Admin Portal — Netlify Identity guard + tabs + Netlify-backed collections (NO localStorage, fail loudly)
+   Fixes: PUT 401 by waiting for Identity to be ready BEFORE any writes.
+*/
 (function () {
+  // ----------------- helpers -----------------
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const byId = (id) => document.getElementById(id);
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
+  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
 
-  // ---------- hard-fail UI ----------
-  function showFatal(title, err) {
+  function showFatal(err) {
     console.error(err);
     const root = byId("admin-root") || document.body;
     const div = document.createElement("div");
@@ -14,7 +18,7 @@
     div.style.border = "1px solid #e6b6b6";
     div.style.marginBottom = "1rem";
     div.innerHTML = `
-      <h2 style="color:#7b1f1f;margin-top:0;">${title}</h2>
+      <h2 style="color:#7b1f1f;margin-top:0;">Admin Portal Init Failed</h2>
       <p class="muted">The admin portal could not load/save data from Netlify.</p>
       <pre style="white-space:pre-wrap;background:#fff;border:1px solid #e6b6b6;padding:.75rem;border-radius:10px;">${String(err?.message || err)}</pre>
     `;
@@ -22,89 +26,107 @@
     throw err;
   }
 
-  // ---------- Auth guard ----------
-  function assertAdmin() {
-    const role = sessionStorage.getItem("tnk_role");
-    if (role === "admin") return true;
-    location.replace("login.html");
-    return false;
+  // ----------------- Identity readiness (THE FIX) -----------------
+  async function waitForIdentityUser({ timeoutMs = 12000 } = {}) {
+    // Ensure wrapper is initialized ASAP (safe if already bound)
+    if (window.TNKIdentity?.init) {
+      try {
+        await window.TNKIdentity.init({ guard: "admin" });
+      } catch {}
+    }
+
+    const start = Date.now();
+
+    // If already available, return immediately
+    const immediate = window.netlifyIdentity?.currentUser?.();
+    if (immediate) return immediate;
+
+    // Wait for the Identity widget to finish init
+    return await new Promise((resolve, reject) => {
+      const id = window.netlifyIdentity;
+      if (!id || !id.on) return reject(new Error("Netlify Identity widget is not available on this page."));
+
+      const timer = setInterval(() => {
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error("Timed out waiting for Netlify Identity. Are you logged in as an admin?"));
+        }
+      }, 200);
+
+      // Some builds don’t fire init reliably; also poll for currentUser
+      const poll = setInterval(() => {
+        const u = id.currentUser?.();
+        if (u) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(u);
+        }
+      }, 150);
+
+      id.on("init", (user) => {
+        if (user) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(user);
+        }
+      });
+
+      // Kick identity init if needed
+      try { id.init(); } catch {}
+    });
   }
-  if (!assertAdmin()) return;
 
-  byId("admin-logout")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    window.TNKIdentity?.logout?.();
-  });
-
-  // ---------- Token + strict API (NO local fallback) ----------
-  async function getTokenStrict() {
-    // prefer wrapper if present
+  async function tokenStrict() {
+    // Prefer wrapper token if available
     try {
       const t = await window.TNKIdentity?.token?.();
       if (t) return t;
     } catch {}
 
-    // fallback to netlifyIdentity widget
-    const u = window.netlifyIdentity?.currentUser?.();
-    if (!u) throw new Error("Not logged in (netlifyIdentity.currentUser() is null).");
-    const t = await u.jwt(true);
-    if (!t) throw new Error("Could not obtain JWT (user.jwt(true) returned empty).");
-    return t;
+    const u = await waitForIdentityUser();
+    const jwt = await u.jwt(true);
+    if (!jwt) throw new Error("No JWT available from Netlify Identity user.");
+    return jwt;
   }
 
-  async function apiGet(collection, fallback) {
-    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(collection)}`, {
+  // ----------------- Collections API -----------------
+  async function apiGet(name, fallback) {
+    const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
       headers: { "Content-Type": "application/json" }
     });
-    if (!res.ok) throw new Error(`GET ${collection} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
     const j = await res.json();
     return (j && j.data) ?? fallback;
   }
 
-  async function apiSet(collection, data) {
-    const token = await getTokenStrict();
+  async function apiSet(name, data) {
+    // IMPORTANT: JWT must be present for PUT
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: collection, data })
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ name, data })
     });
-    if (!res.ok) throw new Error(`PUT ${collection} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
   }
 
+  // ----------------- Keys -----------------
   const KEYS = {
     accounts: "tnk_accounts",
-    timesheets: "tnk_timesheets",
-    prices: "tnk_prices",
-    promos: "tnk_promotions",
-    invoices: "tnk_invoices",
-    services: "tnk_services",
     jobs: "tnk_jobs",
+    invoices: "tnk_invoices",
+    timesheets: "tnk_timesheets",
+    paystubs: "tnk_paystubs",
+    services: "tnk_services",
     reviews: "tnk_reviews",
     pto: "tnk_pto",
-    paystubs: "tnk_paystubs",
-    availability: "tnk_availability"
+    promos: "tnk_promos",
+    prices: "tnk_prices",
+    availability: "tnk_availability",
+    balances: "tnk_cust_balances"
   };
 
-  // ---------- seed if store is empty ----------
-  async function seedIfMissing() {
-    // If store returns null (never set), seed collections so UI has something to work with
-    const exists = await apiGet(KEYS.accounts, null);
-    if (exists !== null) return;
-
-    await apiSet(KEYS.accounts, []);
-    await apiSet(KEYS.timesheets, []);
-    await apiSet(KEYS.prices, { essential: 35, standard: 55, premium: 85 });
-    await apiSet(KEYS.promos, { title: "Storm-Season Check", subtitle: "Inspection + Light Debris Removal", active: true });
-    await apiSet(KEYS.invoices, []);
-    await apiSet(KEYS.services, []);
-    await apiSet(KEYS.jobs, []);
-    await apiSet(KEYS.reviews, []);
-    await apiSet(KEYS.pto, []);
-    await apiSet(KEYS.paystubs, []);
-    await apiSet(KEYS.availability, []);
-  }
-
-  // ---------- Tabs ----------
+  // ----------------- Tabs -----------------
   (function initTabs() {
     const tabs = $$(".tab-btn");
     const panels = $$(".tab-panel, .panel");
@@ -121,86 +143,142 @@
     if (current) activate(current);
   })();
 
-  // =========================
-  // ===== ACCOUNTS =====
-  // =========================
+  // ----------------- Accounts -----------------
   const accForm = byId("acc-form");
+  const accStatus = byId("acc_status");
   const accTableBody = $("#acc_table tbody");
   const accFilterRole = byId("acc_filter_role");
   const accSearch = byId("acc_search");
-  const accStatus = byId("acc_status");
+  const accReset = byId("acc_reset");
 
-  const accFields = {
-    id: byId("acc_id"),
-    role: byId("acc_role"),
-    email: byId("acc_email"),
-    name: byId("acc_name"),
-    phone: byId("acc_phone"),
-    address: byId("acc_address")
-  };
+  async function loadAccounts() { return (await apiGet(KEYS.accounts, [])) || []; }
+  async function saveAccounts(list) { await apiSet(KEYS.accounts, list); }
 
-  async function loadAccounts() { return await apiGet(KEYS.accounts, []); }
-  async function saveAccounts(list) {
-    await apiSet(KEYS.accounts, list);
-    await renderAccounts();
-    await refreshSelects();
+  function fillAccountForm(a) {
+    byId("acc_id").value = a?.id || "";
+    byId("acc_role").value = a?.role || "customer";
+    byId("acc_email").value = a?.email || "";
+    byId("acc_name").value = a?.name || "";
+    byId("acc_phone").value = a?.phone || "";
+    byId("acc_address").value = a?.address || "";
+  }
+
+  function accountMatches(a) {
+    const role = accFilterRole?.value || "all";
+    const q = (accSearch?.value || "").toLowerCase().trim();
+    if (role !== "all" && (a.role || "") !== role) return false;
+    if (!q) return true;
+    return (
+      String(a.name || "").toLowerCase().includes(q) ||
+      String(a.email || "").toLowerCase().includes(q)
+    );
   }
 
   async function renderAccounts() {
-    const role = accFilterRole?.value || "all";
-    const q = (accSearch?.value || "").toLowerCase();
-    const list = await loadAccounts();
+    const list = (await loadAccounts()).slice();
+    const rows = list
+      .filter(accountMatches)
+      .sort((a, b) => String(a.role || "").localeCompare(String(b.role || "")) || String(a.email || "").localeCompare(String(b.email || "")))
+      .map((a) => `
+        <tr data-id="${a.id}">
+          <td>${a.role || ""}</td>
+          <td>${a.name || ""}</td>
+          <td>${a.email || ""}</td>
+          <td>${a.phone || ""}</td>
+          <td>${a.address || ""}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-edit">Edit</button>
+            <button class="btn-small btn-small--danger js-del">Delete</button>
+          </td>
+        </tr>
+      `)
+      .join("");
 
-    accTableBody.innerHTML =
-      list
-        .filter((a) => (role === "all" ? true : a.role === role))
-        .filter((a) => !q || (a.name || "").toLowerCase().includes(q) || (a.email || "").toLowerCase().includes(q))
-        .map((a) => `
-          <tr data-id="${a.id}">
-            <td>${a.role}</td><td>${a.name}</td><td>${a.email}</td>
-            <td>${a.phone || ""}</td><td>${a.role === "customer" ? a.address || "" : ""}</td>
-            <td>
-              <button class="btn-small js-edit">Edit</button>
-              <button class="btn-small btn-small--danger js-del">Delete</button>
-            </td>
-          </tr>`)
-        .join("") || '<tr><td colspan="6" class="muted">No accounts.</td></tr>';
+    accTableBody.innerHTML = rows || `<tr><td colspan="6" class="muted">No accounts.</td></tr>`;
+
+    // Update datalists used elsewhere
+    await refreshAccountDatalists(list);
+  }
+
+  async function refreshAccountDatalists(accounts) {
+    // customers list (schedule, invoices)
+    const custs = accounts.filter((a) => a.role === "customer");
+    const emps = accounts.filter((a) => a.role === "employee" || a.role === "admin");
+
+    const dlCustomers = byId("admin-customers");
+    const dlCustomerEmails = byId("admin-customer-emails");
+    const dlEmployees = byId("admin-employees");
+    const dlEmpEmails = byId("employee-emails");
+
+    if (dlCustomers) dlCustomers.innerHTML = custs.map((c) => `<option value="${c.email}">${c.name || c.email}</option>`).join("");
+    if (dlCustomerEmails) dlCustomerEmails.innerHTML = custs.map((c) => `<option value="${c.email}"></option>`).join("");
+    if (dlEmployees) dlEmployees.innerHTML = emps.map((e) => `<option value="${e.email}">${e.name || e.email}</option>`).join("");
+    if (dlEmpEmails) dlEmpEmails.innerHTML = emps.map((e) => `<option value="${e.email}"></option>`).join("");
+
+    // invoice filter select
+    const invFilterCustomer = byId("f_inv_customer");
+    if (invFilterCustomer) {
+      const cur = invFilterCustomer.value || "all";
+      invFilterCustomer.innerHTML =
+        `<option value="all">All Customers</option>` +
+        custs
+          .sort((a, b) => String(a.email || "").localeCompare(String(b.email || "")))
+          .map((c) => `<option value="${c.email}">${c.email}</option>`)
+          .join("");
+      invFilterCustomer.value = cur;
+    }
+
+    // timesheet filter select
+    const tsFilterEmail = byId("ts_filter_email");
+    if (tsFilterEmail) {
+      const cur = tsFilterEmail.value || "all";
+      tsFilterEmail.innerHTML =
+        `<option value="all">All Employees</option>` +
+        emps
+          .sort((a, b) => String(a.email || "").localeCompare(String(b.email || "")))
+          .map((e) => `<option value="${e.email}">${e.email}</option>`)
+          .join("");
+      tsFilterEmail.value = cur;
+    }
   }
 
   accForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const id = accFields.id.value || crypto.randomUUID();
-      const data = {
-        id,
-        role: accFields.role.value,
-        email: accFields.email.value.trim(),
-        name: accFields.name.value.trim(),
-        phone: accFields.phone.value.trim(),
-        address: accFields.address.value.trim()
-      };
+      const id = byId("acc_id").value || uid();
+      const role = byId("acc_role").value;
+      const email = (byId("acc_email").value || "").trim().toLowerCase();
+      const name = (byId("acc_name").value || "").trim();
+      const phone = (byId("acc_phone").value || "").trim();
+      const address = (byId("acc_address").value || "").trim();
+
+      if (!email) throw new Error("Email required.");
+
       const list = await loadAccounts();
-      const i = list.findIndex((a) => a.id === id);
-      if (i >= 0) list[i] = data; else list.push(data);
+      const idx = list.findIndex((x) => x.id === id);
+      const next = { ...(idx >= 0 ? list[idx] : {}), id, role, email, name, phone, address };
+
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
+
       await saveAccounts(list);
       accStatus.textContent = "Saved.";
-      accForm.reset(); accFields.id.value = "";
+      fillAccountForm(null);
+      await renderAccounts();
     } catch (err) {
-      showFatal("Data Error — Failed saving accounts.", err);
+      accStatus.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  byId("acc_reset")?.addEventListener("click", () => {
-    accForm.reset();
-    accFields.id.value = "";
+  accReset?.addEventListener("click", () => {
+    fillAccountForm(null);
     accStatus.textContent = "";
   });
 
-  accFilterRole?.addEventListener("change", () => renderAccounts().catch(e => showFatal("Data Error — Accounts failed.", e)));
-  accSearch?.addEventListener("input", () => renderAccounts().catch(e => showFatal("Data Error — Accounts failed.", e)));
-
   accTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
     const id = tr.dataset.id;
     try {
       const list = await loadAccounts();
@@ -208,612 +286,844 @@
       if (!a) return;
 
       if (e.target.classList.contains("js-edit")) {
-        accFields.id.value = a.id;
-        accFields.role.value = a.role;
-        accFields.email.value = a.email;
-        accFields.name.value = a.name;
-        accFields.phone.value = a.phone || "";
-        accFields.address.value = a.address || "";
-        window.scrollTo({ top: byId("panel-accounts").offsetTop - 12, behavior: "smooth" });
+        fillAccountForm(a);
+        accStatus.textContent = "";
       }
 
       if (e.target.classList.contains("js-del")) {
-        if (confirm("Delete this account?")) {
-          await saveAccounts(list.filter((x) => x.id !== id));
-        }
+        const next = list.filter((x) => x.id !== id);
+        await saveAccounts(next);
+        await renderAccounts();
       }
     } catch (err) {
-      showFatal("Data Error — Failed updating accounts.", err);
+      showFatal(err);
     }
   });
 
-  async function refreshSelects() {
-    const accounts = await loadAccounts();
-    const customers = accounts.filter((a) => a.role === "customer");
-    const employees = accounts.filter((a) => a.role === "employee");
+  accFilterRole?.addEventListener("change", () => renderAccounts().catch(showFatal));
+  accSearch?.addEventListener("input", () => renderAccounts().catch(showFatal));
 
-    // job form customer datalist (admin.html uses id="admin-customers")
-    const dlCustJobs = byId("admin-customers");
-    if (dlCustJobs) dlCustJobs.innerHTML = customers.map((c) => `<option value="${c.email}">`).join("");
-
-    // invoice customer datalist
-    const dlCustInv = byId("admin-customer-emails");
-    if (dlCustInv) dlCustInv.innerHTML = customers.map((c) => `<option value="${c.email}">`).join("");
-
-    // job assignee datalist
-    const dlEmpJobs = byId("admin-employees");
-    if (dlEmpJobs) dlEmpJobs.innerHTML = employees.map((e) => `<option value="${e.email}">`).join("");
-
-    // timesheet entry datalist (admin.html uses id="employee-emails")
-    const dlEmpTs = byId("employee-emails");
-    if (dlEmpTs) dlEmpTs.innerHTML = employees.map((e) => `<option value="${e.email}">`).join("");
-
-    // invoice filter dropdown
-    const filterCust = byId("f_inv_customer");
-    if (filterCust) {
-      const keep = filterCust.value;
-      filterCust.innerHTML =
-        `<option value="all">All Customers</option>` +
-        customers.map((c) => `<option value="${c.email}">${c.name} (${c.email})</option>`).join("");
-      if ([...filterCust.options].some((o) => o.value === keep)) filterCust.value = keep;
-    }
-
-    // timesheet filter dropdown
-    const tsSel = byId("ts_filter_email");
-    if (tsSel) {
-      const keep = tsSel.value;
-      tsSel.innerHTML =
-        `<option value="all">All Employees</option>` +
-        employees.map((e) => `<option value="${e.email}">${e.name} (${e.email})</option>`).join("");
-      if ([...tsSel.options].some((o) => o.value === keep)) tsSel.value = keep;
-    }
-  }
-
-  // =========================
-  // ===== SCHEDULE / JOBS =====
-  // =========================
+  // ----------------- Jobs (schedule) -----------------
   const jobForm = byId("job-form");
-  const jobStatus = byId("job_status_msg");
+  const jobMsg = byId("job_status_msg");
+  const jobReset = byId("job_reset");
+  const calWrap = byId("admin-calendar");
 
-  async function loadJobs() { return await apiGet(KEYS.jobs, []); }
-  async function saveJobs(list) {
-    await apiSet(KEYS.jobs, list);
-    await renderAdminCalendar();
+  async function loadJobs() { return (await apiGet(KEYS.jobs, [])) || []; }
+  async function saveJobs(list) { await apiSet(KEYS.jobs, list); }
+
+  function fillJobForm(j) {
+    byId("job_id").value = j?.id || "";
+    byId("job_customer").value = j?.customer || "";
+    byId("job_title").value = j?.title || "";
+    byId("job_date").value = j?.date || "";
+    byId("job_start").value = j?.start || "";
+    byId("job_end").value = j?.end || "";
+    byId("job_assignee").value = j?.assignee || "";
+    byId("job_invoice").value = j?.invoice || "";
+    byId("job_lat").value = j?.lat || "";
+    byId("job_lon").value = j?.lon || "";
+    byId("job_risk_rain").value = Number(j?.risk_rain ?? 50);
+    byId("job_risk_gust").value = Number(j?.risk_gust ?? 35);
+    byId("job_status").value = j?.status || "scheduled";
+    byId("job_notes").value = j?.notes || "";
   }
 
-  async function renderAdminCalendar() {
-    const cal = byId("admin-calendar");
-    if (!cal) return;
+  async function renderCalendar() {
+    const jobs = await loadJobs();
+    if (!calWrap) return;
 
-    const jobs = (await loadJobs())
-      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.start || "").localeCompare(b.start || ""));
+    const byDate = new Map();
+    for (const j of jobs) {
+      const d = j.date || "";
+      if (!byDate.has(d)) byDate.set(d, []);
+      byDate.get(d).push(j);
+    }
 
-    if (jobs.length === 0) { cal.innerHTML = "<p class='muted'>No jobs scheduled.</p>"; return; }
-
-    cal.innerHTML = jobs.map((j) => {
-      const cust = (j.customer || "").split("@")[0];
-      return `<div class="slot" data-id="${j.id}">
-        <div><strong>${cust || j.customer}</strong> — ${j.title || ""}</div>
-        <div>${j.date || ""} ${j.start || ""}${j.end ? "–" + j.end : ""}</div>
-      </div>`;
+    const dates = Array.from(byDate.keys()).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const html = dates.map((d) => {
+      const items = (byDate.get(d) || [])
+        .sort((a, b) => String(a.start || "").localeCompare(String(b.start || "")))
+        .map((j) => `
+          <div class="slot" data-id="${j.id}" style="cursor:pointer;">
+            <div>
+              <strong>${j.start || ""}</strong> ${j.title || ""}
+              <div class="muted">${j.customer || ""} ${j.assignee ? "• " + j.assignee : ""}</div>
+            </div>
+            <div class="muted">${j.status || "scheduled"}</div>
+          </div>
+        `).join("");
+      return `<div class="admin-card" style="margin-bottom:.75rem;"><h3 style="margin:.25rem 0 .5rem;">${d}</h3>${items || '<p class="muted">No jobs</p>'}</div>`;
     }).join("");
 
-    cal.onclick = async (e) => {
-      const el = e.target.closest(".slot"); if (!el) return;
-      const id = el.dataset.id;
-      const j = (await loadJobs()).find((x) => x.id === id);
-      if (!j) return;
-
-      const map = {
-        job_id: "id",
-        job_customer: "customer",
-        job_title: "title",
-        job_date: "date",
-        job_start: "start",
-        job_end: "end",
-        job_assignee: "assignee",
-        job_invoice: "invoice",
-        job_lat: "lat",
-        job_lon: "lon",
-        job_status: "status",
-        job_notes: "notes"
-      };
-
-      Object.keys(map).forEach((k) => {
-        const el2 = byId(k);
-        if (el2) el2.value = j[map[k]] || "";
-      });
-
-      if (byId("job_risk_rain")) byId("job_risk_rain").value = j.risk_rain ?? 50;
-      if (byId("job_risk_gust")) byId("job_risk_gust").value = j.risk_gust ?? 35;
-
-      window.scrollTo({ top: jobForm.offsetTop - 12, behavior: "smooth" });
-    };
+    calWrap.innerHTML = html || `<p class="muted">No jobs scheduled yet.</p>`;
   }
+
+  calWrap?.addEventListener("click", async (e) => {
+    const el = e.target.closest("[data-id]");
+    if (!el) return;
+    try {
+      const id = el.getAttribute("data-id");
+      const jobs = await loadJobs();
+      const j = jobs.find((x) => x.id === id);
+      if (j) fillJobForm(j);
+    } catch (err) {
+      showFatal(err);
+    }
+  });
 
   jobForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const id = byId("job_id").value || crypto.randomUUID();
-      const data = {
+      const list = await loadJobs();
+      const id = byId("job_id").value || uid();
+      const idx = list.findIndex((x) => x.id === id);
+
+      const next = {
+        ...(idx >= 0 ? list[idx] : {}),
         id,
-        customer: byId("job_customer").value.trim(),
-        title: byId("job_title").value.trim(),
+        customer: (byId("job_customer").value || "").trim(),
+        title: (byId("job_title").value || "").trim(),
         date: byId("job_date").value,
         start: byId("job_start").value,
         end: byId("job_end").value,
-        assignee: byId("job_assignee").value.trim(),
-        invoice: byId("job_invoice").value.trim(),
-        lat: byId("job_lat").value || "",
-        lon: byId("job_lon").value || "",
-        risk_rain: Number(byId("job_risk_rain")?.value || 50),
-        risk_gust: Number(byId("job_risk_gust")?.value || 35),
+        assignee: (byId("job_assignee").value || "").trim(),
+        invoice: (byId("job_invoice").value || "").trim(),
+        lat: (byId("job_lat").value || "").trim(),
+        lon: (byId("job_lon").value || "").trim(),
+        risk_rain: Number(byId("job_risk_rain").value || 0),
+        risk_gust: Number(byId("job_risk_gust").value || 0),
         status: byId("job_status").value,
-        notes: byId("job_notes").value.trim()
+        notes: (byId("job_notes").value || "").trim()
       };
 
-      const list = await loadJobs();
-      const i = list.findIndex((x) => x.id === id);
-      if (i >= 0) list[i] = data; else list.push(data);
+      if (!next.customer) throw new Error("Customer is required.");
+      if (!next.title) throw new Error("Job title is required.");
+      if (!next.date) throw new Error("Date is required.");
+
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
 
       await saveJobs(list);
-      jobStatus.textContent = "Saved.";
-      jobForm.reset(); byId("job_id").value = "";
+      jobMsg.textContent = "Saved.";
+      fillJobForm(null);
+      await renderCalendar();
     } catch (err) {
-      showFatal("Data Error — Failed saving jobs.", err);
+      jobMsg.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  byId("job_reset")?.addEventListener("click", () => {
-    jobForm.reset();
-    byId("job_id").value = "";
-    jobStatus.textContent = "";
+  jobReset?.addEventListener("click", () => {
+    fillJobForm(null);
+    jobMsg.textContent = "";
   });
 
-  // =========================
-  // ===== INVOICES =====
-  // =========================
+  // ----------------- Invoices -----------------
   const invForm = byId("inv-form");
-  const invItemsWrap = byId("items-rows");
-  const invAddItemBtn = byId("add-item");
+  const invMsg = byId("inv_status_msg");
+  const invReset = byId("inv_reset");
+  const itemsRows = byId("items-rows");
+  const addItemBtn = byId("add-item");
   const invTableBody = $("#inv_table tbody");
+  const invTotalOut = byId("inv_total");
+
   const fInvCustomer = byId("f_inv_customer");
   const fInvStatus = byId("f_inv_status");
   const fInvQ = byId("f_inv_q");
-  const invStatusMsg = byId("inv_status_msg");
-  const invResetBtn = byId("inv_reset");
-  const invTotalOut = byId("inv_total");
+  const invExportBtn = byId("inv_export_csv");
 
-  async function loadInvoices() { return await apiGet(KEYS.invoices, []); }
-  async function saveInvoices(list) {
-    await apiSet(KEYS.invoices, list);
-    await renderInvoices();
-  }
+  async function loadInvoices() { return (await apiGet(KEYS.invoices, [])) || []; }
+  async function saveInvoices(list) { await apiSet(KEYS.invoices, list); }
 
-  function autoInvoiceNumber() {
-    // IMPORTANT: localStorage disallowed. Use a timestamp-based invoice number instead.
-    // Example: INV-20251218-194530
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const num = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    return `INV-${num}`;
-  }
-
-  function addItemRow(item = { desc: "", qty: 1, unit: 35 }) {
+  function addItemRow(item = {}) {
     const row = document.createElement("div");
     row.className = "items-row";
     row.innerHTML = `
-      <input type="text" class="it-desc" placeholder="Description" value="${item.desc || ""}" />
-      <input type="number" class="it-qty" min="0" step="1" value="${item.qty ?? 1}" />
-      <input type="number" class="it-unit" min="0" step="0.01" value="${item.unit ?? 0}" />
-      <button type="button" class="btn-small js-del-item">Delete</button>`;
-    invItemsWrap.appendChild(row);
-    row.addEventListener("input", recalcInvoice);
-    row.querySelector(".js-del-item").addEventListener("click", () => { row.remove(); recalcInvoice(); });
-    recalcInvoice();
+      <input class="it-desc" placeholder="Description" value="${item.desc || ""}">
+      <input class="it-qty" type="number" min="0" step="1" value="${Number(item.qty || 0)}">
+      <input class="it-unit" type="number" min="0" step="0.01" value="${Number(item.unit || 0)}">
+      <button type="button" class="btn-small js-del-item">Remove</button>
+    `;
+    itemsRows.appendChild(row);
+    recalcInvoiceTotal();
   }
 
-  function invoiceItems() {
-    return $$(".items-row", invItemsWrap)
-      .map((r) => ({
-        desc: $(".it-desc", r).value.trim(),
-        qty: Number($(".it-qty", r).value || 0),
-        unit: Number($(".it-unit", r).value || 0)
-      }))
-      .filter((i) => i.desc || i.qty || i.unit);
+  function collectItems() {
+    return $$(".items-row", itemsRows).map((r) => {
+      const desc = $(".it-desc", r).value.trim();
+      const qty = Number($(".it-qty", r).value || 0);
+      const unit = Number($(".it-unit", r).value || 0);
+      return { desc, qty, unit };
+    }).filter((x) => x.desc || x.qty || x.unit);
   }
 
-  function recalcInvoice() {
-    const items = invoiceItems();
-    const sub = items.reduce((s, i) => s + i.qty * i.unit, 0);
-    const taxPct = Number(byId("inv_tax")?.value || 0);
-    const total = sub + sub * (taxPct / 100);
+  function recalcInvoiceTotal() {
+    const items = collectItems();
+    const subtotal = items.reduce((sum, it) => sum + (Number(it.qty || 0) * Number(it.unit || 0)), 0);
+    const taxPct = Number(byId("inv_tax").value || 0);
+    const total = subtotal + (subtotal * (taxPct / 100));
     if (invTotalOut) invTotalOut.textContent = money(total);
+    return total;
   }
 
-  invAddItemBtn?.addEventListener("click", () => addItemRow());
+  itemsRows?.addEventListener("input", () => recalcInvoiceTotal());
+  itemsRows?.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("js-del-item")) return;
+    e.target.closest(".items-row")?.remove();
+    recalcInvoiceTotal();
+  });
 
-  function resetInvoiceForm() {
-    byId("inv_id").value = "";
-    byId("inv_customer").value = "";
-    byId("inv_number").value = autoInvoiceNumber();
-    byId("inv_status").value = "unpaid";
-    byId("inv_date").valueAsDate = new Date();
-    byId("inv_due").value = "";
-    byId("inv_tax").value = "0";
-    byId("inv_notes").value = "";
-    invItemsWrap.innerHTML = "";
-    addItemRow({ desc: "Mowing / Trimming", qty: 1, unit: 35 });
-    invStatusMsg.textContent = "";
-    recalcInvoice();
+  addItemBtn?.addEventListener("click", () => addItemRow());
+
+  function fillInvoiceForm(inv) {
+    byId("inv_id").value = inv?.id || "";
+    byId("inv_customer").value = inv?.customer_email || "";
+    byId("inv_number").value = inv?.number || "";
+    byId("inv_status").value = inv?.status || "unpaid";
+    byId("inv_date").value = inv?.date || "";
+    byId("inv_due").value = inv?.due || "";
+    byId("inv_tax").value = Number(inv?.tax || 0);
+
+    if (itemsRows) itemsRows.innerHTML = "";
+    (inv?.items || []).forEach(addItemRow);
+    if (!inv?.items?.length) addItemRow();
+
+    byId("inv_notes").value = inv?.notes || "";
+    recalcInvoiceTotal();
+  }
+
+  function invoiceMatches(inv) {
+    const cust = fInvCustomer?.value || "all";
+    const st = fInvStatus?.value || "all";
+    const q = (fInvQ?.value || "").toLowerCase().trim();
+    if (cust !== "all" && String(inv.customer_email || "") !== cust) return false;
+    if (st !== "all" && String(inv.status || "") !== st) return false;
+    if (!q) return true;
+    return (
+      String(inv.number || "").toLowerCase().includes(q) ||
+      String(inv.customer_email || "").toLowerCase().includes(q)
+    );
+  }
+
+  async function renderInvoices() {
+    const list = (await loadInvoices()).slice();
+    const rows = list
+      .filter(invoiceMatches)
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+      .map((inv) => `
+        <tr data-id="${inv.id}">
+          <td>${inv.number || ""}</td>
+          <td>${inv.customer_email || ""}</td>
+          <td>${inv.date || ""}</td>
+          <td>${inv.due || ""}</td>
+          <td>${money(inv.total || 0)}</td>
+          <td>${inv.status || ""}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-edit">Edit</button>
+            <button class="btn-small btn-small--danger js-del">Delete</button>
+          </td>
+        </tr>
+      `).join("");
+
+    invTableBody.innerHTML = rows || `<tr><td colspan="7" class="muted">No invoices.</td></tr>`;
   }
 
   invForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const id = byId("inv_id").value || crypto.randomUUID();
-      const items = invoiceItems();
-      const subtotal = items.reduce((s, i) => s + i.qty * i.unit, 0);
-      const taxPct = Number(byId("inv_tax").value || 0);
-      const total = subtotal + subtotal * (taxPct / 100);
+      const list = await loadInvoices();
+      const id = byId("inv_id").value || uid();
+      const idx = list.findIndex((x) => x.id === id);
 
-      const data = {
+      const items = collectItems();
+      const total = recalcInvoiceTotal();
+
+      const next = {
+        ...(idx >= 0 ? list[idx] : {}),
         id,
-        customer_email: byId("inv_customer").value.trim(),
-        number: byId("inv_number").value.trim() || autoInvoiceNumber(),
-        status: byId("inv_status").value,
+        customer_email: (byId("inv_customer").value || "").trim().toLowerCase(),
+        number: (byId("inv_number").value || "").trim() || `INV-${String(Date.now()).slice(-6)}`,
+        status: byId("inv_status").value || "unpaid",
         date: byId("inv_date").value,
         due: byId("inv_due").value,
-        tax_pct: taxPct,
+        tax: Number(byId("inv_tax").value || 0),
         items,
-        subtotal,
-        tax: subtotal * (taxPct / 100),
         total,
-        notes: byId("inv_notes").value.trim()
+        notes: (byId("inv_notes").value || "").trim()
       };
 
-      const list = await loadInvoices();
-      const i = list.findIndex((x) => x.id === id);
-      if (i >= 0) list[i] = data; else list.push(data);
+      if (!next.customer_email) throw new Error("Customer email is required.");
+      if (!next.date) throw new Error("Invoice date is required.");
+
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
 
       await saveInvoices(list);
-      invStatusMsg.textContent = "Invoice saved.";
-      resetInvoiceForm();
+      invMsg.textContent = "Saved.";
+      fillInvoiceForm(null);
+      await renderInvoices();
     } catch (err) {
-      showFatal("Data Error — Failed saving invoices.", err);
+      invMsg.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  invResetBtn?.addEventListener("click", resetInvoiceForm);
-  byId("inv_tax")?.addEventListener("input", recalcInvoice);
-
-  async function renderInvoices() {
-    const list = await loadInvoices();
-    const fCust = fInvCustomer?.value || "all";
-    const fStat = fInvStatus?.value || "all";
-    const q = (fInvQ?.value || "").toLowerCase();
-
-    invTableBody.innerHTML =
-      list
-        .filter((i) => (fCust === "all" ? true : i.customer_email === fCust))
-        .filter((i) => (fStat === "all" ? true : i.status === fStat))
-        .filter((i) => !q || (i.number || "").toLowerCase().includes(q) || (i.customer_email || "").toLowerCase().includes(q))
-        .sort((a, b) => ((a.date || "") < (b.date || "") ? 1 : -1))
-        .map((i) => `
-          <tr data-id="${i.id}">
-            <td>${i.number}</td><td>${i.customer_email}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
-            <td>${money(i.total)}</td><td>${i.status}</td>
-            <td>
-              <button class="btn-small js-view">View</button>
-              <button class="btn-small js-edit">Edit</button>
-              <button class="btn-small ${i.status === "paid" ? "" : "btn-small--ok"} js-toggle">
-                ${i.status === "paid" ? "Mark Unpaid" : "Mark Paid"}
-              </button>
-              <button class="btn-small btn-small--danger js-del">Delete</button>
-            </td>
-          </tr>`)
-        .join("") || '<tr><td colspan="7" class="muted">No invoices.</td></tr>';
-  }
+  invReset?.addEventListener("click", () => {
+    fillInvoiceForm(null);
+    invMsg.textContent = "";
+  });
 
   invTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
     const id = tr.dataset.id;
-
     try {
       const list = await loadInvoices();
       const inv = list.find((x) => x.id === id);
       if (!inv) return;
 
-      if (e.target.classList.contains("js-edit")) {
-        byId("inv_id").value = inv.id;
-        byId("inv_customer").value = inv.customer_email;
-        byId("inv_number").value = inv.number;
-        byId("inv_status").value = inv.status;
-        byId("inv_date").value = inv.date || "";
-        byId("inv_due").value = inv.due || "";
-        byId("inv_tax").value = inv.tax_pct || 0;
-        byId("inv_notes").value = inv.notes || "";
-        invItemsWrap.innerHTML = "";
-        (inv.items || []).forEach(addItemRow);
-        if (!inv.items || inv.items.length === 0) addItemRow();
-        recalcInvoice();
-        window.scrollTo({ top: invForm.offsetTop - 12, behavior: "smooth" });
-      }
-
-      if (e.target.classList.contains("js-toggle")) {
-        inv.status = inv.status === "paid" ? "unpaid" : "paid";
-        await saveInvoices(list);
-      }
+      if (e.target.classList.contains("js-edit")) fillInvoiceForm(inv);
 
       if (e.target.classList.contains("js-del")) {
-        if (confirm("Delete this invoice?")) await saveInvoices(list.filter((x) => x.id !== id));
-      }
-
-      if (e.target.classList.contains("js-view")) {
-        openInvoiceWindow(inv);
+        const next = list.filter((x) => x.id !== id);
+        await saveInvoices(next);
+        await renderInvoices();
       }
     } catch (err) {
-      showFatal("Data Error — Failed updating invoices.", err);
+      showFatal(err);
     }
   });
 
-  function openInvoiceWindow(inv) {
-    const rows = (inv.items || [])
-      .map((it) => `<tr><td>${it.desc || ""}</td><td>${it.qty || 0}</td><td>${money(it.unit || 0)}</td><td>${money((it.qty || 0) * (it.unit || 0))}</td></tr>`)
-      .join("");
+  fInvCustomer?.addEventListener("change", () => renderInvoices().catch(showFatal));
+  fInvStatus?.addEventListener("change", () => renderInvoices().catch(showFatal));
+  fInvQ?.addEventListener("input", () => renderInvoices().catch(showFatal));
 
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${inv.number}</title>
-      <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #e8e1d6;padding:8px;text-align:left}</style></head>
-      <body><h1>${inv.number}</h1><div>${inv.date || ""} • ${inv.status}</div><div>Bill To: ${inv.customer_email}</div>
-      <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>${rows || "<tr><td colspan='4'>No items</td></tr>"}</tbody></table>
-      <p><strong>Total: ${money(inv.total || 0)}</strong></p></body></html>`;
-
-    const win = window.open("", "_blank");
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-    try { win.focus(); } catch {}
-  }
-
-  byId("inv_export_csv")?.addEventListener("click", async () => {
+  invExportBtn?.addEventListener("click", async () => {
     try {
-      const list = await loadInvoices();
-      const rows = [
-        ["number", "customer_email", "date", "due", "status", "subtotal", "tax", "total", "notes"],
-        ...list.map((i) => [
-          i.number,
-          i.customer_email,
-          i.date || "",
-          i.due || "",
-          i.status,
-          i.subtotal,
-          i.tax,
-          i.total,
-          (i.notes || "").replaceAll('"', '""')
-        ])
-      ];
+      const list = (await loadInvoices()).filter(invoiceMatches);
+      const header = ["number","customer_email","date","due","total","status"];
+      const csv = [header.join(",")]
+        .concat(list.map((inv) => header.map((k) => `"${String(inv[k] ?? "").replace(/"/g,'""')}"`).join(",")))
+        .join("\n");
 
-      const csv = rows.map((r) =>
-        r.map((v) => {
-          const s = String(v ?? "");
-          return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-        }).join(",")
-      ).join("\n");
-
-      const blob = new Blob([csv], { type: "text/csv" });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "invoices.csv";
+      a.download = `invoices_${todayISO()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      showFatal("Data Error — Failed exporting invoices.", err);
+      showFatal(err);
     }
   });
 
-  // =========================
-  // ===== TIMESHEETS =====
-  // =========================
+  // ----------------- Timesheets & Payroll (lightweight) -----------------
   const tsForm = byId("ts-form");
   const tsStatus = byId("ts_status");
+  const tsReset = byId("ts_reset");
   const tsTableBody = $("#ts_table tbody");
   const tsFilterEmail = byId("ts_filter_email");
-  const tsFilterFrom = byId("ts_filter_from");
-  const tsFilterTo = byId("ts_filter_to");
+  const tsFrom = byId("ts_filter_from");
+  const tsTo = byId("ts_filter_to");
+  const tsClear = byId("ts_clear_filters");
 
-  byId("ts_clear_filters")?.addEventListener("click", () => {
-    tsFilterEmail.value = "all";
-    tsFilterFrom.value = "";
-    tsFilterTo.value = "";
-    renderTimesheets().catch(e => showFatal("Data Error — Timesheets failed.", e));
-  });
+  async function loadTimesheets() { return (await apiGet(KEYS.timesheets, [])) || []; }
+  async function saveTimesheets(list) { await apiSet(KEYS.timesheets, list); }
 
-  function parseH(hm) {
-    if (!hm) return 0;
-    const [h, m] = hm.split(":").map(Number);
-    return h + (m || 0) / 60;
+  function parseHHMM(t) {
+    if (!t) return null;
+    const [h, m] = String(t).split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
   }
 
-  async function loadTimesheets() { return await apiGet(KEYS.timesheets, []); }
-  async function saveTimesheets(list) {
-    await apiSet(KEYS.timesheets, list);
-    await renderTimesheets();
+  function hoursBetween(start, end) {
+    const s = parseHHMM(start);
+    const e = parseHHMM(end);
+    if (s == null || e == null) return 0;
+    const diff = e - s;
+    return diff > 0 ? diff / 60 : 0;
+  }
+
+  function tsMatches(t) {
+    const em = tsFilterEmail?.value || "all";
+    const from = tsFrom?.value || "";
+    const to = tsTo?.value || "";
+    if (em !== "all" && String(t.employee_email || "") !== em) return false;
+    if (from && String(t.date || "") < from) return false;
+    if (to && String(t.date || "") > to) return false;
+    return true;
+  }
+
+  function fillTSForm(t) {
+    byId("ts_id").value = t?.id || "";
+    byId("ts_employee_email").value = t?.employee_email || "";
+    byId("ts_date").value = t?.date || "";
+    byId("ts_start").value = t?.start || "";
+    byId("ts_end").value = t?.end || "";
+    byId("ts_notes").value = t?.notes || "";
+  }
+
+  async function renderTimesheets() {
+    const list = (await loadTimesheets()).filter(tsMatches);
+    const rows = list
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+      .map((t) => `
+        <tr data-id="${t.id}">
+          <td>${t.date || ""}</td>
+          <td>${t.employee_email || ""}</td>
+          <td>${t.start || ""}</td>
+          <td>${t.end || ""}</td>
+          <td>${hoursBetween(t.start, t.end).toFixed(2)}</td>
+          <td>${t.notes || ""}</td>
+          <td>${t.approved ? "yes" : "no"}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-edit">Edit</button>
+            <button class="btn-small js-toggle">${t.approved ? "Unapprove" : "Approve"}</button>
+            <button class="btn-small btn-small--danger js-del">Delete</button>
+          </td>
+        </tr>
+      `).join("");
+
+    tsTableBody.innerHTML = rows || `<tr><td colspan="8" class="muted">No entries.</td></tr>`;
   }
 
   tsForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const id = byId("ts_id").value || crypto.randomUUID();
-      const data = {
-        id,
-        employee_email: byId("ts_employee_email").value.trim(),
-        date: byId("ts_date").value,
-        start_time: byId("ts_start").value,
-        end_time: byId("ts_end").value,
-        notes: byId("ts_notes").value.trim(),
-        approved: false
-      };
       const list = await loadTimesheets();
-      const i = list.findIndex((x) => x.id === id);
-      if (i >= 0) { data.approved = !!list[i].approved; list[i] = data; } else list.push(data);
+      const id = byId("ts_id").value || uid();
+      const idx = list.findIndex((x) => x.id === id);
+
+      const next = {
+        ...(idx >= 0 ? list[idx] : {}),
+        id,
+        employee_email: (byId("ts_employee_email").value || "").trim().toLowerCase(),
+        date: byId("ts_date").value,
+        start: byId("ts_start").value,
+        end: byId("ts_end").value,
+        notes: (byId("ts_notes").value || "").trim(),
+        approved: (idx >= 0 ? !!list[idx].approved : false)
+      };
+
+      if (!next.employee_email) throw new Error("Employee email required.");
+      if (!next.date) throw new Error("Date required.");
+
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
+
       await saveTimesheets(list);
       tsStatus.textContent = "Saved.";
-      tsForm.reset(); byId("ts_id").value = "";
+      fillTSForm(null);
+      await renderTimesheets();
     } catch (err) {
-      showFatal("Data Error — Failed saving timesheets.", err);
+      tsStatus.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  byId("ts_reset")?.addEventListener("click", () => {
-    tsForm.reset(); byId("ts_id").value = ""; tsStatus.textContent = "";
+  tsReset?.addEventListener("click", () => {
+    fillTSForm(null);
+    tsStatus.textContent = "";
   });
 
   tsTableBody?.addEventListener("click", async (e) => {
-    const tr = e.target.closest("tr"); if (!tr) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
     const id = tr.dataset.id;
-
     try {
       const list = await loadTimesheets();
       const t = list.find((x) => x.id === id);
       if (!t) return;
 
-      if (e.target.classList.contains("btn-edit")) {
-        ["ts_id", "ts_employee_email", "ts_date", "ts_start", "ts_end", "ts_notes"].forEach((k) => {
-          const key = k === "ts_id" ? "id" : k.replace("ts_", "") + (k === "ts_notes" ? "" : "");
-          byId(k).value = (k === "ts_id" ? t.id : t[k.replace("ts_", "")]) || "";
-        });
-        window.scrollTo({ top: tsForm.offsetTop - 12, behavior: "smooth" });
-      }
+      if (e.target.classList.contains("js-edit")) fillTSForm(t);
 
-      if (e.target.classList.contains("btn-del")) {
-        if (confirm("Delete this timesheet?")) await saveTimesheets(list.filter((x) => x.id !== id));
-      }
-
-      if (e.target.classList.contains("btn-approve")) {
+      if (e.target.classList.contains("js-toggle")) {
         t.approved = !t.approved;
         await saveTimesheets(list);
+        await renderTimesheets();
+      }
+
+      if (e.target.classList.contains("js-del")) {
+        const next = list.filter((x) => x.id !== id);
+        await saveTimesheets(next);
+        await renderTimesheets();
       }
     } catch (err) {
-      showFatal("Data Error — Failed updating timesheets.", err);
+      showFatal(err);
     }
   });
 
-  async function renderTimesheets() {
-    const list = await loadTimesheets();
-    const f = tsFilterEmail?.value || "all";
-    const from = tsFilterFrom?.value ? new Date(tsFilterFrom.value) : null;
-    const to = tsFilterTo?.value ? new Date(tsFilterTo.value) : null;
+  [tsFilterEmail, tsFrom, tsTo].forEach((el) => el?.addEventListener("change", () => renderTimesheets().catch(showFatal)));
+  tsClear?.addEventListener("click", () => {
+    if (tsFilterEmail) tsFilterEmail.value = "all";
+    if (tsFrom) tsFrom.value = "";
+    if (tsTo) tsTo.value = "";
+    renderTimesheets().catch(showFatal);
+  });
 
-    tsTableBody.innerHTML =
-      list
-        .filter((t) => (f === "all" ? true : t.employee_email === f))
-        .filter((t) => {
-          const d = new Date(t.date);
-          if (from && d < from) return false;
-          if (to && d > to) return false;
-          return true;
-        })
-        .sort((a, b) => (a.date < b.date ? 1 : -1))
-        .map((t) => `<tr data-id="${t.id}">
-          <td>${t.date}</td><td>${t.employee_email}</td><td>${t.start_time}</td><td>${t.end_time}</td>
-          <td>${(parseH(t.end_time) - parseH(t.start_time)).toFixed(2)}</td><td>${t.notes || ""}</td>
-          <td><button class="btn-small btn-approve ${t.approved ? "btn-small--ok" : ""}">${t.approved ? "Approved" : "Approve"}</button></td>
-          <td><button class="btn-small btn-edit">Edit</button><button class="btn-small btn-small--danger btn-del">Delete</button></td>
-        </tr>`)
-        .join("") || '<tr><td colspan="8" class="muted">No entries.</td></tr>';
+  // Payroll section (minimal display)
+  const prRun = byId("pr_run");
+  const prLock = byId("pr_lock");
+  const prFrom = byId("pr_from");
+  const prTo = byId("pr_to");
+  const prStatus = byId("pr_status");
+  const prBody = $("#pr_table tbody");
+
+  async function loadPaystubs() { return (await apiGet(KEYS.paystubs, [])) || []; }
+  async function savePaystubs(list) { await apiSet(KEYS.paystubs, list); }
+
+  function inRange(d, from, to) {
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
   }
 
-  // =========================
-  // ===== SERVICES / REVIEWS / PTO (read-only renders like your original) =====
-  // =========================
+  async function runPayrollPreview() {
+    const from = prFrom?.value || "";
+    const to = prTo?.value || "";
+    const times = await loadTimesheets();
+    const list = times.filter((t) => inRange(String(t.date || ""), from, to));
+    const map = new Map();
+    for (const t of list) {
+      const em = String(t.employee_email || "").toLowerCase();
+      const hrs = hoursBetween(t.start, t.end);
+      map.set(em, (map.get(em) || 0) + hrs);
+    }
+
+    const rows = Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([email, hrs]) => `
+        <tr>
+          <td>${email}</td>
+          <td>${hrs.toFixed(2)}</td>
+          <td>${money(0)}</td>
+          <td>preview</td>
+          <td class="muted">—</td>
+        </tr>
+      `).join("");
+
+    prBody.innerHTML = rows || `<tr><td colspan="5" class="muted">No hours in range.</td></tr>`;
+  }
+
+  prRun?.addEventListener("click", () => {
+    runPayrollPreview().then(() => prStatus.textContent = "Preview generated.").catch(showFatal);
+  });
+
+  prLock?.addEventListener("click", async () => {
+    try {
+      // This “lock” simply marks timesheets approved in range and writes a simple paystub entry
+      const from = prFrom?.value || "";
+      const to = prTo?.value || "";
+      const times = await loadTimesheets();
+      const inR = times.filter((t) => inRange(String(t.date || ""), from, to));
+      inR.forEach((t) => (t.approved = true));
+      await saveTimesheets(times);
+
+      const map = new Map();
+      for (const t of inR) {
+        const em = String(t.employee_email || "").toLowerCase();
+        const hrs = hoursBetween(t.start, t.end);
+        map.set(em, (map.get(em) || 0) + hrs);
+      }
+
+      const stubs = await loadPaystubs();
+      const period = `${from || "?"}..${to || "?"}`;
+      for (const [email, hrs] of map.entries()) {
+        stubs.push({
+          id: uid(),
+          employee: email,
+          period,
+          hours: Number(hrs.toFixed(2)),
+          gross: 0,
+          status: "issued"
+        });
+      }
+      await savePaystubs(stubs);
+
+      await runPayrollPreview();
+      prStatus.textContent = "Approved & locked (timesheets approved, paystubs issued).";
+    } catch (err) {
+      showFatal(err);
+    }
+  });
+
+  // ----------------- Services Catalog (basic) -----------------
+  const svcForm = byId("svc-form");
+  const svcStatus = byId("svc_status");
+  const svcReset = byId("svc_reset");
+  const svcBody = $("#svc_table tbody");
+
+  async function loadServices() { return (await apiGet(KEYS.services, [])) || []; }
+  async function saveServices(list) { await apiSet(KEYS.services, list); }
+
+  function fillSvc(s) {
+    byId("svc_id").value = s?.id || "";
+    byId("svc_name").value = s?.name || "";
+    byId("svc_tier").value = s?.tier || "essential";
+    byId("svc_price").value = Number(s?.price || 35);
+    byId("svc_desc").value = s?.desc || "";
+  }
+
   async function renderServices() {
-    const tbody = $("#svc_table tbody"); if (!tbody) return;
-    const list = await apiGet(KEYS.services, []);
-    tbody.innerHTML =
-      list.map((s) =>
-        `<tr data-id="${s.id}">
-          <td>${s.tier}</td><td>${s.name}</td><td>${money(s.price_from)}</td><td>${s.desc || ""}</td><td></td>
-        </tr>`).join("") || '<tr><td colspan="5" class="muted">No services yet.</td></tr>';
+    const list = await loadServices();
+    svcBody.innerHTML = list
+      .sort((a, b) => String(a.tier || "").localeCompare(String(b.tier || "")) || String(a.name || "").localeCompare(String(b.name || "")))
+      .map((s) => `
+        <tr data-id="${s.id}">
+          <td>${s.tier || ""}</td>
+          <td>${s.name || ""}</td>
+          <td>${money(s.price || 0)}</td>
+          <td>${s.desc || ""}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-edit">Edit</button>
+            <button class="btn-small btn-small--danger js-del">Delete</button>
+          </td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" class="muted">No items.</td></tr>`;
   }
+
+  svcForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const list = await loadServices();
+      const id = byId("svc_id").value || uid();
+      const idx = list.findIndex((x) => x.id === id);
+
+      const next = {
+        ...(idx >= 0 ? list[idx] : {}),
+        id,
+        name: (byId("svc_name").value || "").trim(),
+        tier: byId("svc_tier").value,
+        price: Number(byId("svc_price").value || 0),
+        desc: (byId("svc_desc").value || "").trim()
+      };
+
+      if (!next.name) throw new Error("Service name required.");
+
+      if (idx >= 0) list[idx] = next;
+      else list.push(next);
+
+      await saveServices(list);
+      svcStatus.textContent = "Saved.";
+      fillSvc(null);
+      await renderServices();
+    } catch (err) {
+      svcStatus.textContent = String(err?.message || err);
+      throw err;
+    }
+  });
+
+  svcReset?.addEventListener("click", () => {
+    fillSvc(null);
+    svcStatus.textContent = "";
+  });
+
+  svcBody?.addEventListener("click", async (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    const id = tr.dataset.id;
+    try {
+      const list = await loadServices();
+      const s = list.find((x) => x.id === id);
+      if (!s) return;
+
+      if (e.target.classList.contains("js-edit")) fillSvc(s);
+
+      if (e.target.classList.contains("js-del")) {
+        const next = list.filter((x) => x.id !== id);
+        await saveServices(next);
+        await renderServices();
+      }
+    } catch (err) {
+      showFatal(err);
+    }
+  });
+
+  // ----------------- Reviews + PTO (render-only basics) -----------------
+  async function loadReviews() { return (await apiGet(KEYS.reviews, [])) || []; }
+  async function saveReviews(list) { await apiSet(KEYS.reviews, list); }
+  async function loadPTO() { return (await apiGet(KEYS.pto, [])) || []; }
+  async function savePTO(list) { await apiSet(KEYS.pto, list); }
+
+  const reviewBody = $("#review_table tbody");
+  const ptoBody = $("#pto_table tbody");
 
   async function renderReviews() {
-    const tbody = $("#review_table tbody"); if (!tbody) return;
-    const list = await apiGet(KEYS.reviews, []);
-    tbody.innerHTML =
-      list.map((r) =>
-        `<tr>
-          <td>${r.date || ""}</td><td>${r.customer || ""}</td><td>${r.title || ""}</td><td>${(r.photos || []).length}</td>
-          <td>${r.notes || ""}</td><td>${r.status || "pending"}</td>
-        </tr>`).join("") || '<tr><td colspan="6" class="muted">No completed jobs pending.</td></tr>';
+    const list = await loadReviews();
+    reviewBody.innerHTML = list
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+      .map((r) => `
+        <tr data-id="${r.id}">
+          <td>${r.date || ""}</td>
+          <td>${r.customer || ""}</td>
+          <td>${r.title || ""}</td>
+          <td>${(r.photos || []).join(", ")}</td>
+          <td>${r.notes || ""}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-approve">Approve</button>
+            <button class="btn-small btn-small--danger js-reject">Reject</button>
+          </td>
+        </tr>
+      `).join("") || `<tr><td colspan="6" class="muted">No pending reviews.</td></tr>`;
   }
+
+  reviewBody?.addEventListener("click", async (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    const id = tr.dataset.id;
+    try {
+      const list = await loadReviews();
+      const r = list.find((x) => x.id === id);
+      if (!r) return;
+
+      if (e.target.classList.contains("js-approve")) r.status = "approved";
+      if (e.target.classList.contains("js-reject")) r.status = "rejected";
+
+      await saveReviews(list);
+      await renderReviews();
+    } catch (err) {
+      showFatal(err);
+    }
+  });
 
   async function renderPTO() {
-    const tbody = $("#pto_table tbody"); if (!tbody) return;
-    const list = await apiGet(KEYS.pto, []);
-    tbody.innerHTML =
-      list.map((p) =>
-        `<tr>
-          <td>${p.employee || ""}</td><td>${p.from || ""}</td><td>${p.to || ""}</td><td>${p.reason || ""}</td><td>${p.status || "pending"}</td><td></td>
-        </tr>`).join("") || '<tr><td colspan="6" class="muted">No requests.</td></tr>';
+    const list = await loadPTO();
+    ptoBody.innerHTML = list
+      .sort((a, b) => String(b.from || "").localeCompare(String(a.from || "")))
+      .map((p) => `
+        <tr data-id="${p.id}">
+          <td>${p.employee || ""}</td>
+          <td>${p.from || ""}</td>
+          <td>${p.to || ""}</td>
+          <td>${p.reason || ""}</td>
+          <td>${p.status || "pending"}</td>
+          <td class="cell-actions">
+            <button class="btn-small js-ok">Approve</button>
+            <button class="btn-small btn-small--danger js-no">Deny</button>
+          </td>
+        </tr>
+      `).join("") || `<tr><td colspan="6" class="muted">No PTO requests.</td></tr>`;
   }
 
-  // promos/prices save (same functionality, strict writes)
+  ptoBody?.addEventListener("click", async (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    const id = tr.dataset.id;
+    try {
+      const list = await loadPTO();
+      const p = list.find((x) => x.id === id);
+      if (!p) return;
+
+      if (e.target.classList.contains("js-ok")) p.status = "approved";
+      if (e.target.classList.contains("js-no")) p.status = "denied";
+
+      await savePTO(list);
+      await renderPTO();
+    } catch (err) {
+      showFatal(err);
+    }
+  });
+
+  // ----------------- Promos & Prices (basic) -----------------
   const promoForm = byId("promo-form");
   const promoStatus = byId("promo_status");
+  const priceForm = byId("price-form");
+  const priceStatus = byId("price_status");
+
+  async function loadPromos() { return (await apiGet(KEYS.promos, [])) || []; }
+  async function savePromos(list) { await apiSet(KEYS.promos, list); }
+
   promoForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await apiSet(KEYS.promos, {
-        title: byId("promo_title").value.trim(),
-        subtitle: byId("promo_subtitle").value.trim(),
-        active: byId("promo_active").value === "true"
+      const list = await loadPromos();
+      list.push({
+        id: uid(),
+        title: (byId("promo_title").value || "").trim(),
+        subtitle: (byId("promo_subtitle").value || "").trim(),
+        active: String(byId("promo_active").value) === "true",
+        date: todayISO()
       });
-      promoStatus.textContent = "Promotion saved.";
+      await savePromos(list);
+      promoStatus.textContent = "Saved promotion.";
+      promoForm.reset();
     } catch (err) {
-      showFatal("Data Error — Failed saving promotion.", err);
+      promoStatus.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  const priceForm = byId("price-form");
-  const priceStatus = byId("price_status");
+  async function loadPrices() { return (await apiGet(KEYS.prices, null)) || null; }
+  async function savePrices(obj) { await apiSet(KEYS.prices, obj); }
+
+  async function renderPrices() {
+    const p = await loadPrices();
+    if (!p) return;
+    if (byId("p_essential")) byId("p_essential").value = Number(p.essential ?? 35);
+    if (byId("p_standard")) byId("p_standard").value = Number(p.standard ?? 55);
+    if (byId("p_premium")) byId("p_premium").value = Number(p.premium ?? 85);
+  }
+
   priceForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await apiSet(KEYS.prices, {
-        essential: Number(byId("p_essential").value || 35),
-        standard: Number(byId("p_standard").value || 55),
-        premium: Number(byId("p_premium").value || 85)
-      });
-      priceStatus.textContent = "Prices saved.";
+      const obj = {
+        essential: Number(byId("p_essential").value || 0),
+        standard: Number(byId("p_standard").value || 0),
+        premium: Number(byId("p_premium").value || 0),
+        updatedAt: new Date().toISOString()
+      };
+      await savePrices(obj);
+      priceStatus.textContent = "Saved pricing.";
     } catch (err) {
-      showFatal("Data Error — Failed saving prices.", err);
+      priceStatus.textContent = String(err?.message || err);
+      throw err;
     }
   });
 
-  // =========================
-  // ===== INIT =====
-  // =========================
+  // ----------------- Logout -----------------
+  byId("admin-logout")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.TNKIdentity?.logout?.();
+  });
+
+  // ----------------- INIT -----------------
   (async function init() {
     try {
-      // force token early so failures are immediate and obvious
-      await getTokenStrict();
+      // Force identity + token readiness up front (prevents PUT 401)
+      await waitForIdentityUser();
+      await tokenStrict();
 
-      await seedIfMissing();
-
+      // Accounts first (also populates datalists)
       await renderAccounts();
-      await refreshSelects();
-      await renderAdminCalendar();
 
-      resetInvoiceForm();
+      // Schedule
+      await renderCalendar();
+
+      // Invoices
+      fillInvoiceForm(null);
       await renderInvoices();
 
+      // Timesheets
       await renderTimesheets();
+
+      // Payroll preview (optional)
+      await runPayrollPreview().catch(() => {});
+
+      // Services
       await renderServices();
+
+      // Reviews + PTO
       await renderReviews();
       await renderPTO();
+
+      // Prices
+      await renderPrices();
     } catch (err) {
-      showFatal("Admin Portal Init Failed", err);
+      showFatal(err);
     }
   })();
 })();
