@@ -1,57 +1,65 @@
-// tnk-site/netlify/functions/stripe-webhook.js
+// tnk-site/netlify/functions/stripe_webhook.js
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-export default async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+function rawBody(event) {
+  const b = event.body || "";
+  if (event.isBase64Encoded) return Buffer.from(b, "base64");
+  return Buffer.from(b, "utf8");
+}
 
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-  const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
-    return new Response("Missing Stripe env vars", { status: 500 });
-  }
-
-  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
-
-  const sig = req.headers.get("stripe-signature");
-  if (!sig) return new Response("Missing stripe-signature", { status: 400 });
-
-  const rawBody = await req.text();
-
-  let event;
+export async function handler(event) {
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    return new Response(`Webhook signature verification failed: ${err.message}`, { status: 400 });
-  }
+    if (event.httpMethod !== "POST") {
+      return { statusCode: 405, body: "Method Not Allowed" };
+    }
 
-  // We mark invoice paid when checkout completes successfully
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const invoiceId = session?.metadata?.invoice_id;
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+    const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+      return { statusCode: 500, body: "Missing Stripe env vars" };
+    }
 
-    if (invoiceId) {
-      const store = getStore("tnk-data");
-      const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
-      const idx = invoices.findIndex((x) => x.id === invoiceId);
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+    const sig = event.headers["stripe-signature"] || event.headers["Stripe-Signature"];
+    if (!sig) return { statusCode: 400, body: "Missing stripe-signature" };
 
-      if (idx >= 0) {
-        invoices[idx] = {
-          ...invoices[idx],
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          stripe: {
-            session_id: session.id,
-            payment_intent: session.payment_intent || null,
-          },
-        };
-        await store.setJSON("tnk_invoices.json", invoices, {
-          metadata: { updatedAt: new Date().toISOString() }
-        });
+    let evt;
+    try {
+      evt = stripe.webhooks.constructEvent(rawBody(event), sig, STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error("[stripe_webhook] signature verify failed:", err?.message || err);
+      return { statusCode: 400, body: "Webhook signature verification failed" };
+    }
+
+    if (evt.type === "checkout.session.completed") {
+      const session = evt.data.object;
+
+      const invoiceId = session?.metadata?.invoice_id;
+      if (invoiceId) {
+        const store = getStore("tnk-data");
+        const key = "tnk_invoices.json";
+        const invoices = (await store.get(key, { type: "json" })) || [];
+
+        const idx = invoices.findIndex((x) => x?.id === invoiceId);
+        if (idx >= 0) {
+          invoices[idx] = {
+            ...invoices[idx],
+            status: "paid",
+            paid_at: new Date().toISOString(),
+            stripe_session_id: session.id,
+            stripe_payment_intent: session.payment_intent || "",
+          };
+          await store.set(key, JSON.stringify(invoices), {
+            metadata: { updatedAt: new Date().toISOString() },
+          });
+        }
       }
     }
-  }
 
-  return new Response("ok", { status: 200 });
-};
+    return { statusCode: 200, body: "ok" };
+  } catch (e) {
+    console.error("[stripe_webhook] error:", e);
+    return { statusCode: 500, body: "server error" };
+  }
+}
