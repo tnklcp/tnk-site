@@ -1,100 +1,105 @@
-// tnk-site/netlify/functions/stripe-create-checkout.js
+// tnk-site/netlify/functions/stripe_create_checkout.js
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-export default async (req, context) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
-  if (req.method !== "POST") return json({ ok: false, error: "Method Not Allowed" }, 405);
+function json(statusCode, bodyObj) {
+  return {
+    statusCode,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyObj),
+  };
+}
 
-  const user = context?.clientContext?.user || null;
-  if (!user?.email) return json({ ok: false, error: "Unauthorized" }, 401);
+function getSiteUrl(event) {
+  // Prefer explicit env, otherwise fall back to request origin.
+  // SITE_URL should be like https://theneighborhoodkidslawncare.com
+  const envUrl = process.env.SITE_URL;
+  if (envUrl && /^https?:\/\//i.test(envUrl)) return envUrl.replace(/\/+$/, "");
+  const origin = event.headers?.origin || event.headers?.Origin;
+  if (origin && /^https?:\/\//i.test(origin)) return origin.replace(/\/+$/, "");
+  // Netlify also sets URL / DEPLOY_PRIME_URL sometimes:
+  const netlifyUrl = process.env.URL || process.env.DEPLOY_PRIME_URL;
+  if (netlifyUrl && /^https?:\/\//i.test(netlifyUrl)) return netlifyUrl.replace(/\/+$/, "");
+  return null;
+}
 
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-  if (!STRIPE_SECRET_KEY) return json({ ok: false, error: "Missing STRIPE_SECRET_KEY" }, 500);
+export async function handler(event) {
+  try {
+    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method Not Allowed" });
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
+    const user = event.clientContext?.user;
+    if (!user?.email) return json(401, { ok: false, error: "Unauthorized" });
 
-  const body = await safeJson(req);
-  const invoiceId = body?.invoiceId;
-  if (!invoiceId) return json({ ok: false, error: "Missing invoiceId" }, 400);
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+    if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: "Missing STRIPE_SECRET_KEY" });
 
-  // Load invoices from Netlify Blobs (same store your portals use)
-  const store = getStore("tnk-data");
-  const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
+    const siteUrl = getSiteUrl(event);
+    if (!siteUrl) return json(500, { ok: false, error: "Missing SITE_URL (or could not infer origin)" });
 
-  const inv = invoices.find((x) => x.id === invoiceId);
-  if (!inv) return json({ ok: false, error: "Invoice not found" }, 404);
+    let body = {};
+    try {
+      body = JSON.parse(event.body || "{}");
+    } catch {
+      return json(400, { ok: false, error: "Invalid JSON body" });
+    }
 
-  const customerEmail = String(inv.customer_email || "").toLowerCase();
-  const authedEmail = String(user.email || "").toLowerCase();
+    const invoiceId = body.invoiceId || body.invoice_id;
+    if (!invoiceId) return json(400, { ok: false, error: "Missing invoiceId" });
 
-  // Customer can only pay their own invoice
-  if (customerEmail !== authedEmail) return json({ ok: false, error: "Forbidden" }, 403);
+    // Load invoices from the same Netlify Blobs store used by collections.js
+    const store = getStore("tnk-data");
+    const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
+    const inv = invoices.find((x) => x?.id === invoiceId);
 
-  if (inv.status === "paid") return json({ ok: false, error: "Invoice already paid" }, 400);
+    if (!inv) return json(404, { ok: false, error: "Invoice not found" });
 
-  const siteUrl =
-    process.env.URL || // Netlify provides URL at build/runtime
-    `${req.headers.get("x-forwarded-proto") || "https"}://${req.headers.get("host")}`;
+    const invoiceCustomer = String(inv.customer_email || "").toLowerCase();
+    const authedEmail = String(user.email || "").toLowerCase();
+    if (!invoiceCustomer || invoiceCustomer !== authedEmail) {
+      return json(403, { ok: false, error: "Forbidden: invoice does not belong to this user" });
+    }
 
-  // Convert invoice items to Stripe line_items
-  const items = Array.isArray(inv.items) ? inv.items : [];
-  const line_items = items.length
-    ? items.map((it) => ({
-        quantity: Math.max(1, Number(it.qty || 1)),
-        price_data: {
-          currency: "usd",
-          unit_amount: Math.max(0, Math.round(Number(it.unit || 0) * 100)),
-          product_data: {
-            name: String(it.desc || "Service"),
-          },
-        },
-      }))
-    : [
+    const status = String(inv.status || "").toLowerCase();
+    if (status === "paid") return json(400, { ok: false, error: "Invoice already paid" });
+
+    const total = Number(inv.total || 0);
+    if (!Number.isFinite(total) || total <= 0) {
+      return json(400, { ok: false, error: "Invoice total is invalid" });
+    }
+
+    // Stripe expects integer cents
+    const amountCents = Math.round(total * 100);
+
+    const stripe = new Stripe(STRIPE_SECRET_KEY);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: authedEmail,
+      line_items: [
         {
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: Math.max(0, Math.round(Number(inv.total || 0) * 100)),
-            product_data: { name: `Invoice ${inv.number || ""}`.trim() || "Invoice" },
+            unit_amount: amountCents,
+            product_data: {
+              name: `Invoice ${inv.number || ""}`.trim() || "TNK Invoice",
+              description: inv.notes || "Neighborhood Kids Lawncare Plus",
+            },
           },
         },
-      ];
+      ],
+      metadata: {
+        invoice_id: inv.id,
+        invoice_number: inv.number || "",
+        customer_email: authedEmail,
+      },
+      success_url: `${siteUrl}/customer.html?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/customer.html?stripe=cancel`,
+    });
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: authedEmail,
-    line_items,
-    success_url: `${siteUrl}/customer.html?paid=1&invoice=${encodeURIComponent(inv.id)}`,
-    cancel_url: `${siteUrl}/customer.html?canceled=1&invoice=${encodeURIComponent(inv.id)}`,
-    metadata: {
-      invoice_id: String(inv.id),
-      invoice_number: String(inv.number || ""),
-      customer_email: authedEmail,
-    },
-  });
-
-  return json({ ok: true, url: session.url }, 200);
-};
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-}
-function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
-  });
-}
-async function safeJson(req) {
-  try {
-    const t = await req.text();
-    return t ? JSON.parse(t) : {};
-  } catch {
-    return {};
+    return json(200, { ok: true, url: session.url, id: session.id });
+  } catch (e) {
+    console.error("[stripe_create_checkout] error:", e);
+    return json(500, { ok: false, error: "Server error", message: e?.message || String(e) });
   }
 }
