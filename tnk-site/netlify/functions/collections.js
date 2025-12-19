@@ -1,9 +1,13 @@
 // tnk-site/netlify/functions/collections.js
-// Generic collection get/set using Netlify Blobs (robust + CORS + loud errors)
+// Netlify Blobs-backed collection get/set with:
+// - CORS
+// - Loud, useful errors
+// - Manual fallback configuration (siteID + token) if Blobs env isn't auto-configured
+
 import { getStore } from "@netlify/blobs";
 
 export async function handler(event, context) {
-  // CORS + preflight
+  // CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -15,11 +19,16 @@ export async function handler(event, context) {
   try {
     const method = event.httpMethod;
 
-    // IMPORTANT: getStore expects an object in current @netlify/blobs versions
-    const store = getStore({ name: "tnk-data" });
+    // Try normal auto-configured store first.
+    // If Blobs env isn't configured, we fall back to manual config.
+    const store = getConfiguredStore();
 
-    // Netlify Identity user (present if Identity + JWT sent)
-    const user = context?.clientContext?.user || event?.clientContext?.user || null;
+    // Identity context (write requires auth)
+    const user =
+      context?.clientContext?.user ||
+      event?.clientContext?.user ||
+      null;
+
     const isAuthed = !!user;
 
     if (method === "GET") {
@@ -27,14 +36,12 @@ export async function handler(event, context) {
       if (!name) return json(400, { ok: false, error: "Missing ?name" });
 
       const key = `${name}.json`;
-
-      // If the key doesn't exist, store.get returns null
       const data = await store.get(key, { type: "json" });
+
       return json(200, { ok: true, data: data ?? null });
     }
 
     if (method === "PUT") {
-      // Write requires auth
       if (!isAuthed) return json(401, { ok: false, error: "Auth required" });
 
       let body = {};
@@ -49,7 +56,6 @@ export async function handler(event, context) {
 
       const key = `${name}.json`;
 
-      // Store JSON directly (no double-encoding). This avoids json-parse weirdness.
       await store.setJSON(key, data ?? null, {
         metadata: {
           updatedAt: new Date().toISOString(),
@@ -62,13 +68,61 @@ export async function handler(event, context) {
 
     return json(405, { ok: false, error: "Method Not Allowed" });
   } catch (err) {
-    // Fail loudly: surface the message so you can see it in the browser
     return json(500, {
       ok: false,
       error: "Collections function failed",
       message: err?.message || String(err),
-      // helpful in Netlify logs too
       stack: err?.stack || null,
+      hint:
+        "If you see MissingBlobsEnvironmentError, set NETLIFY_SITE_ID and NETLIFY_BLOBS_TOKEN env vars in Netlify.",
+    });
+  }
+}
+
+/**
+ * Attempt to create a store in auto mode.
+ * If the environment isn't configured for Blobs, fall back to manual mode using env vars.
+ */
+function getConfiguredStore() {
+  try {
+    // Auto-config mode (works when Netlify Blobs is properly enabled/configured)
+    return getStore({ name: "tnk-data" });
+  } catch (e) {
+    // Manual fallback mode:
+    // Netlify requires siteID + token if Blobs env isn't automatically configured.
+    const siteID =
+      process.env.NETLIFY_SITE_ID ||
+      process.env.SITE_ID ||
+      process.env.SITE_ID_PROD ||
+      "";
+
+    // You must set ONE of these yourself in Netlify env vars.
+    // Recommended name: NETLIFY_BLOBS_TOKEN (a Netlify personal access token)
+    const token =
+      process.env.NETLIFY_BLOBS_TOKEN ||
+      process.env.NETLIFY_AUTH_TOKEN ||
+      process.env.NETLIFY_API_TOKEN ||
+      "";
+
+    if (!siteID || !token) {
+      // Throw a helpful error that will show in the browser response
+      throw new Error(
+        [
+          "MissingBlobsEnvironmentError: Netlify Blobs is not configured for this site.",
+          "Manual configuration required:",
+          "Set environment variables in Netlify:",
+          "  NETLIFY_SITE_ID = <your site id>",
+          "  NETLIFY_BLOBS_TOKEN = <a Netlify personal access token>",
+          "",
+          "Then redeploy.",
+        ].join("\n")
+      );
+    }
+
+    return getStore({
+      name: "tnk-data",
+      siteID,
+      token,
     });
   }
 }
