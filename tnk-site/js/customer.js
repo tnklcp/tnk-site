@@ -112,10 +112,10 @@
     if (current) activate(current);
   })();
 
-  // ----- Stripe pay flow -----
-  async function startCheckout(invoiceId) {
+  // ----- Stripe checkout -----
+  async function startStripeCheckout(invoiceId) {
     const t = await token();
-    const res = await fetch("/.netlify/functions/stripe-create-checkout", {
+    const res = await fetch("/.netlify/functions/stripe_create_checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -125,8 +125,8 @@
     });
     if (!res.ok) throw new Error(`Stripe checkout failed: ${res.status} ${res.statusText}`);
     const j = await res.json();
-    if (!j?.url) throw new Error("Stripe checkout did not return a session URL.");
-    location.assign(j.url);
+    if (!j?.url) throw new Error(`Stripe checkout failed: missing session url`);
+    window.location.assign(j.url);
   }
 
   // ----- invoices -----
@@ -138,6 +138,7 @@
   async function renderInvoices() {
     const email = myEmail();
     if (!email) { invStatus.textContent = "Not signed in."; return; }
+
     const all = await loadInvoices();
     const mine = all.filter((i) => (i.customer_email || "").toLowerCase() === email);
 
@@ -145,16 +146,18 @@
       mine
         .sort((a, b) => (a.date < b.date ? 1 : -1))
         .map((i) => {
-          const isPaid = String(i.status || "").toLowerCase() === "paid";
-          const actionBtn = isPaid
-            ? `<button class="button js-view">View</button>`
-            : `<button class="button button--primary js-pay">Pay</button>
-               <button class="button js-view">View</button>`;
+          const paid = String(i.status || "").toLowerCase() === "paid";
           return `
             <tr data-id="${i.id}">
-              <td>${i.number || ""}</td><td>${i.date || ""}</td><td>${i.due || ""}</td>
-              <td>${money(i.total)}</td><td>${i.status || ""}</td>
-              <td style="display:flex;gap:.5rem;flex-wrap:wrap;">${actionBtn}</td>
+              <td>${i.number || ""}</td>
+              <td>${i.date || ""}</td>
+              <td>${i.due || ""}</td>
+              <td>${money(i.total)}</td>
+              <td>${i.status || ""}</td>
+              <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="button js-view" type="button">View</button>
+                ${paid ? "" : `<button class="button button--primary js-pay" type="button">Pay</button>`}
+              </td>
             </tr>`;
         })
         .join("") || `<tr><td colspan="6" class="muted">No invoices yet.</td></tr>`;
@@ -166,9 +169,13 @@
 
     if (e.target.classList.contains("js-pay")) {
       try {
-        await startCheckout(id);
+        e.target.disabled = true;
+        e.target.textContent = "Redirecting…";
+        await startStripeCheckout(id);
       } catch (err) {
-        alert(err?.message || String(err));
+        e.target.disabled = false;
+        e.target.textContent = "Pay";
+        showFatal(err);
       }
       return;
     }
@@ -353,6 +360,7 @@
 
   // ----- availability -----
   const slotsWrap = byId("cust_slots");
+
   async function renderAvailability() {
     const slots = (await apiGet(KEYS.availability)) || [];
     if (!slots.length) { slotsWrap.innerHTML = '<p class="muted">No open slots published yet.</p>'; return; }
@@ -365,6 +373,7 @@
           </div>`)
       .join("");
   }
+
   slotsWrap?.addEventListener("click", (e) => {
     const pick = e.target?.dataset?.pick;
     if (!pick) return;
@@ -383,6 +392,12 @@
     try {
       const email = myEmail();
       if (!email) throw new Error("No logged-in user email found in session/identity.");
+
+      // After returning from Stripe, refresh invoices so status can show paid (webhook updates).
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("stripe") === "success") {
+        invStatus.textContent = "Payment received. Updating invoices…";
+      }
 
       await renderInvoices();
       await renderBalance();
