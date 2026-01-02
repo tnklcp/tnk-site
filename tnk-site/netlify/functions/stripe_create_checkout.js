@@ -2,11 +2,23 @@
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-function json(statusCode, bodyObj) {
+function json(statusCode, bodyObj, extraHeaders = {}) {
   return {
     statusCode,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders(),
+      ...extraHeaders,
+    },
     body: JSON.stringify(bodyObj),
+  };
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
@@ -23,11 +35,63 @@ function getSiteUrl(event) {
   return null;
 }
 
-export async function handler(event) {
+/**
+ * Same “auto mode then fallback env vars” approach as collections.js,
+ * so checkout/webhook don't randomly fail if Blobs isn't auto-configured.
+ */
+function getConfiguredStore() {
   try {
+    return getStore({ name: "tnk-data" });
+  } catch (e) {
+    const siteID =
+      process.env.NETLIFY_SITE_ID ||
+      process.env.SITE_ID ||
+      process.env.SITE_ID_PROD ||
+      "";
+
+    const token =
+      process.env.NETLIFY_BLOBS_TOKEN ||
+      process.env.NETLIFY_AUTH_TOKEN ||
+      process.env.NETLIFY_API_TOKEN ||
+      "";
+
+    if (!siteID || !token) {
+      throw new Error(
+        [
+          "MissingBlobsEnvironmentError: Netlify Blobs is not configured for this site.",
+          "Manual configuration required:",
+          "Set environment variables in Netlify:",
+          "  NETLIFY_SITE_ID = <your site id>",
+          "  NETLIFY_BLOBS_TOKEN = <a Netlify personal access token>",
+          "",
+          "Then redeploy.",
+        ].join("\n")
+      );
+    }
+
+    return getStore({ name: "tnk-data", siteID, token });
+  }
+}
+
+export async function handler(event, context) {
+  try {
+    // CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return {
+        statusCode: 204,
+        headers: { ...corsHeaders() },
+        body: "",
+      };
+    }
+
     if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method Not Allowed" });
 
-    const user = event.clientContext?.user;
+    // IMPORTANT: read Identity from context (event.clientContext is often undefined)
+    const user =
+      context?.clientContext?.user ||
+      event?.clientContext?.user ||
+      null;
+
     if (!user?.email) return json(401, { ok: false, error: "Unauthorized" });
 
     const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -47,7 +111,7 @@ export async function handler(event) {
     if (!invoiceId) return json(400, { ok: false, error: "Missing invoiceId" });
 
     // Load invoices from the same Netlify Blobs store used by collections.js
-    const store = getStore("tnk-data");
+    const store = getConfiguredStore();
     const invoices = (await store.get("tnk_invoices.json", { type: "json" })) || [];
     const inv = invoices.find((x) => x?.id === invoiceId);
 
