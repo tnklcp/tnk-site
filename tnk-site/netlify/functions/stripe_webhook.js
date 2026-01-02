@@ -8,6 +8,44 @@ function rawBody(event) {
   return Buffer.from(b, "utf8");
 }
 
+/**
+ * Same “auto mode then fallback env vars” approach as collections.js,
+ * so checkout/webhook don't randomly fail if Blobs isn't auto-configured.
+ */
+function getConfiguredStore() {
+  try {
+    return getStore({ name: "tnk-data" });
+  } catch (e) {
+    const siteID =
+      process.env.NETLIFY_SITE_ID ||
+      process.env.SITE_ID ||
+      process.env.SITE_ID_PROD ||
+      "";
+
+    const token =
+      process.env.NETLIFY_BLOBS_TOKEN ||
+      process.env.NETLIFY_AUTH_TOKEN ||
+      process.env.NETLIFY_API_TOKEN ||
+      "";
+
+    if (!siteID || !token) {
+      throw new Error(
+        [
+          "MissingBlobsEnvironmentError: Netlify Blobs is not configured for this site.",
+          "Manual configuration required:",
+          "Set environment variables in Netlify:",
+          "  NETLIFY_SITE_ID = <your site id>",
+          "  NETLIFY_BLOBS_TOKEN = <a Netlify personal access token>",
+          "",
+          "Then redeploy.",
+        ].join("\n")
+      );
+    }
+
+    return getStore({ name: "tnk-data", siteID, token });
+  }
+}
+
 export async function handler(event) {
   try {
     if (event.httpMethod !== "POST") {
@@ -37,7 +75,7 @@ export async function handler(event) {
 
       const invoiceId = session?.metadata?.invoice_id;
       if (invoiceId) {
-        const store = getStore("tnk-data");
+        const store = getConfiguredStore();
         const key = "tnk_invoices.json";
         const invoices = (await store.get(key, { type: "json" })) || [];
 
@@ -50,7 +88,9 @@ export async function handler(event) {
             stripe_session_id: session.id,
             stripe_payment_intent: session.payment_intent || "",
           };
-          await store.set(key, JSON.stringify(invoices), {
+
+          // Store as JSON (consistent)
+          await store.setJSON(key, invoices, {
             metadata: { updatedAt: new Date().toISOString() },
           });
         }
