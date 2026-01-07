@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal — TNK Lawncare Plus</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" />
   <style>
     .admin-wrap { max-width: 1200px; margin: 2rem auto; }
     .muted { opacity:.85; font-size:.95rem; }
@@ -30,6 +31,11 @@
     .inline { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
     .items-head, .items-row { display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:.5rem; align-items:center; }
     @media (max-width: 900px){ .admin-grid { grid-template-columns: 1fr; } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    /* Calendar polish */
+    #admin-calendar { min-height: 720px; }
+    .fc { --fc-border-color: #e6e1d6; --fc-today-bg-color: rgba(250, 246, 236, 0.9); }
+    .fc .fc-toolbar-title { color: var(--clr-primary-600); font-weight: 800; }
   </style>
 </head>
 <body data-role-guard="admin">
@@ -157,6 +163,41 @@
                 <input id="job_end" type="time" />
               </div>
             </div>
+
+            <!-- Recurring controls (NEW) -->
+            <div class="admin-card" style="padding:.75rem;border:1px dashed #e6e1d6;background:#fffdf7;">
+              <div class="inline" style="justify-content:space-between;">
+                <label class="inline" style="gap:.4rem;">
+                  <input type="checkbox" id="job_is_recurring">
+                  <strong>Recurring Service</strong>
+                </label>
+                <span class="muted">Use for “every 2 weeks”, etc.</span>
+              </div>
+
+              <div class="grid-3" style="margin-top:.5rem;">
+                <div>
+                  <label for="job_interval_weeks">Every (weeks)</label>
+                  <input id="job_interval_weeks" type="number" min="1" step="1" value="2" />
+                </div>
+                <div>
+                  <label for="job_weekday">Day of week</label>
+                  <select id="job_weekday">
+                    <option value="0">Sunday</option>
+                    <option value="1">Monday</option>
+                    <option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option>
+                    <option value="4">Thursday</option>
+                    <option value="5">Friday</option>
+                    <option value="6">Saturday</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="job_until">Until (optional)</label>
+                  <input id="job_until" type="date" />
+                </div>
+              </div>
+            </div>
+
             <div class="grid-2">
               <div>
                 <label for="job_assignee">Assign Employee</label>
@@ -569,8 +610,52 @@
     </p>
   </div>
 
+  <!-- scope modal (NEW) -->
+  <div id="series-scope-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999;">
+    <div style="max-width:520px; margin:10vh auto; background:#fff; border-radius:16px; padding:1rem; box-shadow: 0 20px 60px rgba(0,0,0,.25);">
+      <h2 style="margin:.25rem 0 .5rem; color:var(--clr-primary-600);">Move recurring service</h2>
+      <p class="muted" style="margin-top:0;">Do you want to move only this occurrence, or shift the whole series going forward?</p>
+
+      <div class="admin-card" style="margin:.75rem 0; padding:.75rem;">
+        <div id="series-scope-preview" class="muted"></div>
+      </div>
+
+      <div class="inline" style="justify-content:flex-end; gap:.5rem;">
+        <button class="button" id="scope-cancel">Cancel</button>
+        <button class="button" id="scope-one">Only this</button>
+        <button class="button button--primary" id="scope-future">This & future</button>
+      </div>
+    </div>
+  </div>
+
   <script defer src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script defer src="js/tnk-identity.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   <script src="js/admin.js" defer></script>
+</body>
+</html>
+
+      <div id="admin-calendar"></div>
+    </div>
+  </section>
+</div>
+
+<!-- Recurrence scope modal -->
+<div id="series-scope-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999;">
+  <div style="max-width:520px; margin:10vh auto; background:#fff; border-radius:16px; padding:1rem;">
+    <h2>Move recurring service</h2>
+    <p class="muted" id="series-scope-preview"></p>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+      <button class="button" id="scope-cancel">Cancel</button>
+      <button class="button" id="scope-one">Only this</button>
+      <button class="button button--primary" id="scope-future">This & future</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script src="js/tnk-identity.js"></script>
+<script src="js/admin.js" defer></script>
 </body>
 </html>
