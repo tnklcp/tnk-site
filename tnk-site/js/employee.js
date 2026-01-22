@@ -99,12 +99,50 @@
     return jwt;
   }
 
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed to read file."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadPhoto(file, jobId) {
+    const t = await tokenStrict();
+    const dataUrl = await fileToDataUrl(file);
+    const res = await fetch("/.netlify/functions/photo_upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${t}`
+      },
+      body: JSON.stringify({
+        jobId,
+        name: file.name,
+        dataUrl
+      })
+    });
+    if (!res.ok) throw new Error(`Photo upload failed: ${res.status} ${res.statusText}`);
+    const j = await res.json();
+    if (!j?.key) throw new Error("Photo upload failed: missing key.");
+    return { name: file.name, key: j.key };
+  }
+
+  async function uploadPhotos(files, jobId) {
+    const uploaded = [];
+    for (const file of files) {
+      uploaded.push(await uploadPhoto(file, jobId));
+    }
+    return uploaded;
+  }
+
   async function apiGet(name) {
-    const t = await token();
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
       headers: {
         "Content-Type": "application/json",
-        ...(t ? { Authorization: `Bearer ${t}` } : {})
+        Authorization: `Bearer ${t}`
       }
     });
     if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
@@ -283,7 +321,8 @@
     const j = jobs.find((x) => x.id === id);
     if (!j) { cStatus.textContent = "Job not found."; return; }
 
-    const photos = Array.from(byId("c_photos").files || []).map((f) => f.name);
+    const files = Array.from(byId("c_photos").files || []);
+    const photos = files.length ? await uploadPhotos(files, j.id) : [];
     const list = await loadReviews();
 
     list.push({
@@ -510,6 +549,7 @@
   // ----- init -----
   (async function init() {
     try {
+      try { await window.TNKIdentity?.init?.({ guard: "employee-or-admin" }); } catch {}
       const email = myEmail();
       if (!email) throw new Error("No logged-in user email found in session/identity.");
 
