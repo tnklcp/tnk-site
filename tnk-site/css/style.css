@@ -51,6 +51,12 @@ body {
 img { max-width: 100%; height: auto; display: block; border: 0; } /* no yellow borders */
 a { color: inherit; text-underline-offset: 2px; }
 .container { width: min(100% - 2rem, var(--container)); margin-inline: auto; }
+.portal-wrap, .admin-wrap { width: min(100% - 2rem, var(--container)); margin-inline: auto; }
+.grid, .admin-grid { min-width: 0; }
+.card, .admin-card { min-width: 0; }
+.table-wrap { max-width: 100%; }
+.table-wrap table { table-layout: fixed; }
+.table-wrap th, .table-wrap td { word-break: break-word; overflow-wrap: anywhere; }
 
 /* ========= Skip link ========= */
 .visually-hidden-focusable { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }

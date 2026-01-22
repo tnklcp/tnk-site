@@ -43,6 +43,7 @@ const COLLECTION_RULES = {
     employeeFilter: (item, email) =>
       String(item?.employee || "").toLowerCase() === email,
   },
+  tnk_completed_jobs: { read: ["admin"], write: ["admin"], type: "array" },
   tnk_pto: {
     read: ["admin", "employee"],
     write: ["admin", "employee"],
