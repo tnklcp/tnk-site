@@ -138,7 +138,7 @@
           <h2>New / Edit Job</h2>
           <form id="job-form" class="stack">
             <input type="hidden" id="job_id" />
-            <div class="grid-2">
+            <div class="grid-3">
               <div>
                 <label for="job_customer">Customer</label>
                 <input id="job_customer" list="admin-customers" placeholder="type email/name…" required />
@@ -147,6 +147,10 @@
               <div>
                 <label for="job_title">Job Title</label>
                 <input id="job_title" placeholder="e.g., Standard Mow" required />
+              </div>
+              <div>
+                <label for="job_cost">Job Cost ($)</label>
+                <input id="job_cost" type="number" min="0" step="0.01" placeholder="0.00" />
               </div>
             </div>
             <div class="grid-3">
@@ -496,6 +500,7 @@
               <tbody><!-- rows --></tbody>
             </table>
           </div>
+          <p id="review_status" class="muted"></p>
         </div>
 
         <div class="admin-card">
@@ -506,6 +511,16 @@
               <tbody><!-- rows --></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div class="admin-card" style="margin-top:1.25rem;">
+        <h2>Completed Jobs (Approved)</h2>
+        <div class="table-wrap">
+          <table id="completed_table">
+            <thead><tr><th>Date</th><th>Customer</th><th>Title</th><th>Employee</th><th>Cost</th><th>Invoice</th><th>Status</th></tr></thead>
+            <tbody><!-- rows --></tbody>
+          </table>
         </div>
       </div>
     </section>

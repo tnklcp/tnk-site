@@ -9,6 +9,23 @@
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
   const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+  const normalizeEmail = (v) => String(v || "").trim().toLowerCase();
+
+  function parseISODate(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatISODate(d) {
+    return d ? d.toISOString().slice(0, 10) : "";
+  }
+
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
 
   function showFatal(err) {
     console.error(err);
@@ -149,6 +166,8 @@
     paystubs: "tnk_paystubs",
     services: "tnk_services",
     reviews: "tnk_reviews",
+    completed_jobs: "tnk_completed_jobs",
+    history: "tnk_cust_history",
     pto: "tnk_pto",
     promos: "tnk_promos",
     prices: "tnk_prices",
@@ -342,10 +361,31 @@
   async function loadJobs() { return (await apiGet(KEYS.jobs, [])) || []; }
   async function saveJobs(list) { await apiSet(KEYS.jobs, list); }
 
+  function isRecurring(job) {
+    return !!job?.is_recurring;
+  }
+
+  function nextRecurringDate(job) {
+    const base = parseISODate(job?.date);
+    if (!base) return "";
+    const interval = Number(job?.interval_weeks || 0);
+    if (!Number.isFinite(interval) || interval <= 0) return "";
+    const targetWeekday = Number.isFinite(Number(job?.weekday)) ? Number(job.weekday) : base.getDay();
+
+    const next = addDays(base, interval * 7);
+    const delta = (targetWeekday - next.getDay() + 7) % 7;
+    const adjusted = addDays(next, delta);
+
+    const until = parseISODate(job?.until);
+    if (until && adjusted > until) return "";
+    return formatISODate(adjusted);
+  }
+
   function fillJobForm(j) {
     byId("job_id").value = j?.id || "";
     byId("job_customer").value = j?.customer || "";
     byId("job_title").value = j?.title || "";
+    byId("job_cost").value = Number(j?.cost || 0) || "";
     byId("job_date").value = j?.date || "";
     byId("job_start").value = j?.start || "";
     byId("job_end").value = j?.end || "";
@@ -357,6 +397,10 @@
     byId("job_risk_gust").value = Number(j?.risk_gust ?? 35);
     byId("job_status").value = j?.status || "scheduled";
     byId("job_notes").value = j?.notes || "";
+    if (byId("job_is_recurring")) byId("job_is_recurring").checked = !!j?.is_recurring;
+    if (byId("job_interval_weeks")) byId("job_interval_weeks").value = Number(j?.interval_weeks || 2);
+    if (byId("job_weekday")) byId("job_weekday").value = String(j?.weekday ?? "0");
+    if (byId("job_until")) byId("job_until").value = j?.until || "";
   }
 
   async function renderCalendar() {
@@ -414,6 +458,7 @@
         id,
         customer: (byId("job_customer").value || "").trim(),
         title: (byId("job_title").value || "").trim(),
+        cost: Number(byId("job_cost").value || 0),
         date: byId("job_date").value,
         start: byId("job_start").value,
         end: byId("job_end").value,
@@ -424,12 +469,32 @@
         risk_rain: Number(byId("job_risk_rain").value || 0),
         risk_gust: Number(byId("job_risk_gust").value || 0),
         status: byId("job_status").value,
-        notes: (byId("job_notes").value || "").trim()
+        notes: (byId("job_notes").value || "").trim(),
+        is_recurring: !!byId("job_is_recurring")?.checked,
+        interval_weeks: Number(byId("job_interval_weeks")?.value || 0),
+        weekday: byId("job_weekday")?.value === "" ? null : Number(byId("job_weekday").value),
+        until: byId("job_until")?.value || "",
+        series_id: (idx >= 0 ? list[idx]?.series_id : "") || ""
       };
 
       if (!next.customer) throw new Error("Customer is required.");
       if (!next.title) throw new Error("Job title is required.");
       if (!next.date) throw new Error("Date is required.");
+
+      if (next.is_recurring) {
+        next.interval_weeks = Number(next.interval_weeks || 2);
+        if (!Number.isFinite(next.interval_weeks) || next.interval_weeks <= 0) next.interval_weeks = 2;
+        if (next.weekday == null || Number.isNaN(next.weekday)) {
+          const d = parseISODate(next.date);
+          next.weekday = d ? d.getDay() : 1;
+        }
+        if (!next.series_id) next.series_id = uid();
+      } else {
+        next.interval_weeks = 0;
+        next.weekday = null;
+        next.until = "";
+        next.series_id = "";
+      }
 
       if (idx >= 0) list[idx] = next;
       else list.push(next);
@@ -986,6 +1051,11 @@
 
   const reviewBody = $("#review_table tbody");
   const ptoBody = $("#pto_table tbody");
+  const reviewStatus = byId("review_status");
+  const completedBody = $("#completed_table tbody");
+
+  async function loadCompletedJobs() { return (await apiGet(KEYS.completed_jobs, [])) || []; }
+  async function saveCompletedJobs(list) { await apiSet(KEYS.completed_jobs, list); }
 
   function normalizePhotos(list) {
     const raw = Array.isArray(list) ? list : [];
@@ -1049,7 +1119,8 @@
 
   async function renderReviews() {
     const list = await loadReviews();
-    reviewBody.innerHTML = list
+    const pending = list.filter((r) => String(r?.status || "pending").toLowerCase() === "pending");
+    reviewBody.innerHTML = pending
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
       .map((r) => {
         const photos = normalizePhotos(r.photos);
@@ -1071,6 +1142,83 @@
         </tr>
       `;
       }).join("") || `<tr><td colspan="6" class="muted">No pending reviews.</td></tr>`;
+    if (reviewStatus) reviewStatus.textContent = pending.length ? `${pending.length} pending review(s).` : "No pending reviews.";
+  }
+
+  async function renderCompletedJobs() {
+    if (!completedBody) return;
+    const [list, invoices] = await Promise.all([loadCompletedJobs(), loadInvoices()]);
+    completedBody.innerHTML = list
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+      .map((c) => {
+        const inv =
+          invoices.find((i) => i.id === c.invoice_id) ||
+          invoices.find((i) => i.number && i.number === c.invoice_number) ||
+          null;
+        const status = inv?.status || c.status || "approved";
+        return `
+        <tr data-id="${c.id}">
+          <td>${c.date || ""}</td>
+          <td>${c.customer || ""}</td>
+          <td>${c.title || ""}</td>
+          <td>${c.employee || ""}</td>
+          <td>${money(c.cost || 0)}</td>
+          <td>${c.invoice_number || c.invoice || ""}</td>
+          <td>${status}</td>
+        </tr>
+      `;
+      }).join("") || `<tr><td colspan="7" class="muted">No completed jobs yet.</td></tr>`;
+  }
+
+  async function loadHistoryMap() { return (await apiGet(KEYS.history, {})) || {}; }
+  async function saveHistoryMap(map) { await apiSet(KEYS.history, map); }
+
+  function resolveCustomerAccount(accounts, customerField) {
+    const raw = String(customerField || "").trim();
+    const email = normalizeEmail(raw);
+    if (email.includes("@")) return accounts.find((a) => normalizeEmail(a.email) === email) || null;
+    const byName = accounts.find((a) => String(a.name || "").trim().toLowerCase() === raw.toLowerCase());
+    return byName || null;
+  }
+
+  function buildInvoiceFromJob(job, account) {
+    const total = Number(job?.cost || 0);
+    const number = `INV-${String(Date.now()).slice(-6)}`;
+    const serviceDate = job?.date || "";
+    return {
+      id: uid(),
+      customer_email: normalizeEmail(account?.email || job?.customer || ""),
+      customer_name: account?.name || "",
+      customer_address: account?.address || "",
+      number,
+      status: "unpaid",
+      date: todayISO(),
+      due: serviceDate || todayISO(),
+      tax: 0,
+      items: [
+        { desc: `${job?.title || "Service"}${serviceDate ? ` (${serviceDate})` : ""}`, qty: 1, unit: total }
+      ],
+      total,
+      notes: job?.notes || "",
+      service_date: serviceDate,
+      job_id: job?.id || "",
+      job_title: job?.title || "",
+      recurring: !!job?.is_recurring
+    };
+  }
+
+  async function sendInvoiceEmail(invoiceId) {
+    const t = await tokenStrict();
+    const res = await fetch("/.netlify/functions/invoice_send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ invoiceId })
+    });
+    if (!res.ok) {
+      const detail = await readErrorDetail(res);
+      throw new Error(`Invoice email failed: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`);
+    }
+    return await res.json().catch(() => ({}));
   }
 
   reviewBody?.addEventListener("click", async (e) => {
@@ -1087,11 +1235,139 @@
         return;
       }
 
-      if (e.target.classList.contains("js-approve")) r.status = "approved";
-      if (e.target.classList.contains("js-reject")) r.status = "rejected";
+      const isApprove = e.target.classList.contains("js-approve");
+      const isReject = e.target.classList.contains("js-reject");
+      if (!isApprove && !isReject) return;
 
+      const nowIso = new Date().toISOString();
+      r.status = isApprove ? "approved" : "rejected";
+      r.reviewed_at = nowIso;
+
+      const jobs = await loadJobs();
+      const job = jobs.find((x) => x.id === r.job_id);
+
+      if (job) {
+        job.status = isApprove ? "approved" : "review_rejected";
+        job.completed_at = nowIso;
+      }
+
+      let invoicesChanged = false;
+      let completedChanged = false;
+      let historyChanged = false;
+      let newInvoiceId = "";
+
+      if (isApprove) {
+        const [accounts, invoices, completed, history] = await Promise.all([
+          loadAccounts(),
+          loadInvoices(),
+          loadCompletedJobs(),
+          loadHistoryMap()
+        ]);
+
+        const account = resolveCustomerAccount(accounts, job?.customer || r.customer || "");
+        const custEmail = normalizeEmail(account?.email || job?.customer || r.customer || "");
+
+        if (job && isRecurring(job)) {
+          const total = Number(job.cost || 0);
+          if (!custEmail || !custEmail.includes("@")) {
+            if (reviewStatus) reviewStatus.textContent = "Approved. Add a customer email to auto-generate the recurring invoice.";
+          } else if (total > 0) {
+            const existingInvoice = job.invoice_id
+              ? invoices.find((inv) => inv.id === job.invoice_id)
+              : invoices.find((inv) => inv.number && inv.number === job.invoice);
+            if (!existingInvoice) {
+              const inv = buildInvoiceFromJob(job, account);
+              invoices.push(inv);
+              invoicesChanged = true;
+              job.invoice = inv.number;
+              job.invoice_id = inv.id;
+              newInvoiceId = inv.id;
+            }
+          } else if (reviewStatus) {
+            reviewStatus.textContent = "Approved. Add a job cost to auto-generate the recurring invoice.";
+          }
+
+          const nextDate = nextRecurringDate(job);
+          if (nextDate) {
+            const nextJob = {
+              ...job,
+              id: uid(),
+              date: nextDate,
+              status: "scheduled",
+              invoice: "",
+              invoice_id: "",
+              completed_at: "",
+              parent_job_id: job.id,
+              recurrence_index: Number(job.recurrence_index || 0) + 1
+            };
+            jobs.push(nextJob);
+          }
+        }
+
+        const completedId = r.id || uid();
+        const completedEntry = {
+          id: completedId,
+          review_id: r.id || "",
+          job_id: job?.id || "",
+          date: job?.date || r.date || "",
+          customer: job?.customer || r.customer || "",
+          title: job?.title || r.title || "",
+          employee: r.employee || job?.assignee || "",
+          notes: r.notes || job?.notes || "",
+          photos: r.photos || [],
+          cost: Number(job?.cost || 0),
+          invoice_id: job?.invoice_id || "",
+          invoice: job?.invoice || "",
+          invoice_number: job?.invoice || "",
+          status: "approved",
+          approved_at: nowIso,
+          recurring: !!job?.is_recurring
+        };
+
+        const existingCompletedIdx = completed.findIndex((c) => c.id === completedId);
+        if (existingCompletedIdx >= 0) completed[existingCompletedIdx] = completedEntry;
+        else completed.push(completedEntry);
+        completedChanged = true;
+
+        if (custEmail) {
+          const custHist = Array.isArray(history[custEmail]) ? history[custEmail] : [];
+          custHist.push({
+            id: completedId,
+            date: completedEntry.date,
+            type: completedEntry.title,
+            notes: completedEntry.notes || "",
+            tech: completedEntry.employee || ""
+          });
+          history[custEmail] = custHist;
+          historyChanged = true;
+        }
+
+        if (job) {
+          const idx = jobs.findIndex((x) => x.id === job.id);
+          if (idx >= 0) jobs[idx] = job;
+        }
+
+        if (invoicesChanged) await saveInvoices(invoices);
+        if (completedChanged) await saveCompletedJobs(completed);
+        if (historyChanged) await saveHistoryMap(history);
+      }
+
+      await saveJobs(jobs);
       await saveReviews(list);
+
+      if (newInvoiceId) {
+        try {
+          await sendInvoiceEmail(newInvoiceId);
+          if (reviewStatus) reviewStatus.textContent = "Approved and invoice email sent.";
+        } catch (err) {
+          if (reviewStatus) reviewStatus.textContent = String(err?.message || err);
+        }
+      }
+
       await renderReviews();
+      await renderCompletedJobs();
+      await renderCalendar();
+      await renderInvoices();
     } catch (err) {
       showFatal(err);
     }
@@ -1214,6 +1490,7 @@
       // Invoices
       fillInvoiceForm(null);
       await renderInvoices();
+      setInterval(() => renderInvoices().catch(() => {}), 60000);
 
       // Timesheets
       await renderTimesheets();
@@ -1226,6 +1503,7 @@
 
       // Reviews + PTO
       await renderReviews();
+      await renderCompletedJobs();
       await renderPTO();
 
       // Prices
