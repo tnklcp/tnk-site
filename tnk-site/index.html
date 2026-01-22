@@ -340,6 +340,21 @@
     </div>
   </section>
 
+  <!-- Careers CTA -->
+  <section id="careers" class="section reveal">
+    <div class="container">
+      <h2>Work With Us</h2>
+      <p style="text-align:center;max-width:50rem;margin:0 auto var(--space-6);">
+        Looking for a hands-on job with a small, hardworking team? We hire seasonal and year-round crew members.
+      </p>
+      <div style="text-align:center;">
+        <button class="button button--primary button--xl" data-modal-open="job-modal">
+          Apply for a Job
+        </button>
+      </div>
+    </div>
+  </section>
+
   <!-- Area Request Modal -->
   <div class="modal" id="area-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="area-modal-title">
     <div class="modal__backdrop" data-modal-close></div>
@@ -369,6 +384,61 @@
           <button class="button button--primary button--xl" type="submit">
             <span class="btn-icon" aria-hidden="true">📍</span>
             <span>Send</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Job Application Modal -->
+  <div class="modal" id="job-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="job-modal-title">
+    <div class="modal__backdrop" data-modal-close></div>
+    <div class="modal__dialog" role="document">
+      <button class="modal__close" type="button" aria-label="Close" data-modal-close>&times;</button>
+      <h3 id="job-modal-title">Job Application</h3>
+      <p class="lead">Tell us about yourself and the role you're interested in.</p>
+
+      <form name="job-application" netlify data-netlify="true" netlify-honeypot="company" action="/thank-you" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="form-name" value="job-application" />
+        <p style="display:none"><label>Company <input name="company" /></label></p>
+
+        <label for="job_name">Full Name</label>
+        <input id="job_name" name="name" type="text" autocomplete="name" required />
+
+        <label for="job_email">Email</label>
+        <input id="job_email" name="email" type="email" autocomplete="email" required />
+
+        <label for="job_phone">Phone Number</label>
+        <input id="job_phone" name="phone" type="tel" autocomplete="tel" required pattern="^[0-9\-\+\(\)\s]{7,}$" />
+
+        <label for="job_city">City</label>
+        <input id="job_city" name="city" type="text" autocomplete="address-level2" required />
+
+        <label for="job_role">Role Interest</label>
+        <select id="job_role" name="role" required>
+          <option value="" disabled selected>Select a role</option>
+          <option>Field Crew</option>
+          <option>Team Lead</option>
+          <option>Equipment/Maintenance</option>
+          <option>Office/Customer Support</option>
+          <option>Other</option>
+        </select>
+
+        <label for="job_experience">Relevant Experience</label>
+        <textarea id="job_experience" name="experience" rows="4" placeholder="Share previous lawncare, landscaping, or hands-on work."></textarea>
+
+        <label for="job_availability">Availability</label>
+        <input id="job_availability" name="availability" type="text" placeholder="e.g., Weekdays after 8am, weekends" required />
+
+        <label for="job_resume">Resume (Optional)</label>
+        <input id="job_resume" type="file" name="resume" accept=".pdf,.doc,.docx" />
+        <small class="help-text">PDF or Word document preferred.</small>
+
+        <div class="form-actions">
+          <p role="status" aria-live="polite"></p>
+          <button class="button button--primary button--xl" type="submit">
+            <span class="btn-icon" aria-hidden="true">🧑‍🌾</span>
+            <span>Submit Application</span>
           </button>
         </div>
       </form>
