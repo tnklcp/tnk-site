@@ -6,47 +6,37 @@
 
 import { getStore } from "@netlify/blobs";
 
-export async function handler(event, context) {
+export default async (request, context) => {
   // CORS preflight
-  if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 204,
-      headers: corsHeaders(),
-      body: "",
-    };
+  if (request.method === "OPTIONS") {
+    return new Response("", { status: 204, headers: corsHeaders() });
   }
 
   try {
-    const method = event.httpMethod;
+    const method = request.method;
 
     // Try normal auto-configured store first.
     // If Blobs env isn't configured, we fall back to manual config.
     const store = getConfiguredStore();
 
-    // Identity context (write requires auth)
-    const user =
-      context?.clientContext?.user ||
-      event?.clientContext?.user ||
-      null;
-
-    const isAuthed = !!user;
-
     if (method === "GET") {
-      const name = event.queryStringParameters?.name;
+      const url = new URL(request.url);
+      const name = url.searchParams.get("name");
       if (!name) return json(400, { ok: false, error: "Missing ?name" });
 
       const key = `${name}.json`;
-      const data = await store.get(key, { type: "json" });
+      const data = await safeGetJSON(store, key);
 
       return json(200, { ok: true, data: data ?? null });
     }
 
     if (method === "PUT") {
-      if (!isAuthed) return json(401, { ok: false, error: "Auth required" });
+      const user = await resolveUser(request, context);
+      if (!user) return json(401, { ok: false, error: "Auth required" });
 
       let body = {};
       try {
-        body = JSON.parse(event.body || "{}");
+        body = await request.json();
       } catch {
         return json(400, { ok: false, error: "Invalid JSON body" });
       }
@@ -77,7 +67,7 @@ export async function handler(event, context) {
         "If you see MissingBlobsEnvironmentError, set NETLIFY_SITE_ID and NETLIFY_BLOBS_TOKEN env vars in Netlify.",
     });
   }
-}
+};
 
 /**
  * Attempt to create a store in auto mode.
@@ -90,18 +80,19 @@ function getConfiguredStore() {
   } catch (e) {
     // Manual fallback mode:
     // Netlify requires siteID + token if Blobs env isn't automatically configured.
+    const env = globalThis.Netlify?.env || {};
     const siteID =
-      process.env.NETLIFY_SITE_ID ||
-      process.env.SITE_ID ||
-      process.env.SITE_ID_PROD ||
+      env.NETLIFY_SITE_ID ||
+      env.SITE_ID ||
+      env.SITE_ID_PROD ||
       "";
 
     // You must set ONE of these yourself in Netlify env vars.
     // Recommended name: NETLIFY_BLOBS_TOKEN (a Netlify personal access token)
     const token =
-      process.env.NETLIFY_BLOBS_TOKEN ||
-      process.env.NETLIFY_AUTH_TOKEN ||
-      process.env.NETLIFY_API_TOKEN ||
+      env.NETLIFY_BLOBS_TOKEN ||
+      env.NETLIFY_AUTH_TOKEN ||
+      env.NETLIFY_API_TOKEN ||
       "";
 
     if (!siteID || !token) {
@@ -137,9 +128,41 @@ function corsHeaders() {
 }
 
 function json(statusCode, obj) {
-  return {
-    statusCode,
+  return new Response(JSON.stringify(obj), {
+    status: statusCode,
     headers: corsHeaders(),
-    body: JSON.stringify(obj),
-  };
+  });
+}
+
+async function resolveUser(request, context) {
+  const ctxUser = context?.clientContext?.user || null;
+  if (ctxUser) return ctxUser;
+
+  const auth = request.headers.get("authorization");
+  if (!auth) return null;
+
+  try {
+    const origin = new URL(request.url).origin;
+    const res = await fetch(`${origin}/.netlify/identity/user`, {
+      headers: { Authorization: auth },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function safeGetJSON(store, key) {
+  try {
+    return await store.get(key, { type: "json" });
+  } catch (err) {
+    const text = await store.get(key, { type: "text" });
+    if (text == null) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw err;
+    }
+  }
 }

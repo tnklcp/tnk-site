@@ -5,6 +5,12 @@
   const byId = (id) => document.getElementById(id);
   const money = (n) => `$${(Number(n || 0)).toFixed(2)}`;
   const todayISO = () => new Date().toISOString().slice(0, 10);
+  const nowHHMM = () => {
+    const d = new Date();
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  };
 
   // ----- Auth: employee or admin -----
   function assertAllowed() {
@@ -27,6 +33,49 @@
       "").toLowerCase();
 
   // ----- Strict Collections API (NO local fallback) -----
+  async function waitForIdentityUser({ timeoutMs = 12000 } = {}) {
+    if (window.TNKIdentity?.init) {
+      try {
+        await window.TNKIdentity.init({ guard: "employee-or-admin" });
+      } catch {}
+    }
+
+    const start = Date.now();
+    const immediate = window.netlifyIdentity?.currentUser?.();
+    if (immediate) return immediate;
+
+    return await new Promise((resolve, reject) => {
+      const id = window.netlifyIdentity;
+      if (!id || !id.on) return reject(new Error("Netlify Identity widget is not available on this page."));
+
+      const timer = setInterval(() => {
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error("Timed out waiting for Netlify Identity. Are you logged in?"));
+        }
+      }, 200);
+
+      const poll = setInterval(() => {
+        const u = id.currentUser?.();
+        if (u) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(u);
+        }
+      }, 150);
+
+      id.on("init", (user) => {
+        if (user) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(user);
+        }
+      });
+
+      try { id.init(); } catch {}
+    });
+  }
+
   async function token() {
     try {
       const t = await window.TNKIdentity?.token?.();
@@ -39,6 +88,15 @@
     } catch {
       return null;
     }
+  }
+
+  async function tokenStrict() {
+    const t = await token();
+    if (t) return t;
+    const u = await waitForIdentityUser();
+    const jwt = await u.jwt(true);
+    if (!jwt) throw new Error("No JWT available from Netlify Identity user.");
+    return jwt;
   }
 
   async function apiGet(name) {
@@ -55,7 +113,7 @@
   }
 
   async function apiSet(name, data) {
-    const t = await token();
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections`, {
       method: "PUT",
       headers: {
@@ -121,6 +179,33 @@
   async function saveTimesheets(v) { await apiSet(KEYS.timesheets, v); }
   async function savePTO(v) { await apiSet(KEYS.pto, v); }
   async function saveEmpComments(v) { await apiSet(KEYS.emp_comments, v); }
+
+  function parseHHMM(t) {
+    if (!t) return null;
+    const [h, m] = String(t).split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function hoursBetween(start, end) {
+    const s = parseHHMM(start);
+    const e = parseHHMM(end);
+    if (s == null || e == null) return 0;
+    const diff = e - s;
+    return diff > 0 ? diff / 60 : 0;
+  }
+
+  function entryHours(t) {
+    const explicit = Number(t?.hours);
+    if (!Number.isNaN(explicit) && explicit > 0) return explicit;
+    return hoursBetween(t?.start, t?.end);
+  }
+
+  function openShiftFor(list, email) {
+    return list.find(
+      (t) => (t.employee_email || "").toLowerCase() === email && !t.end
+    );
+  }
 
   // ----- jobs: Today -----
   const todayBody = $("#emp_today_jobs tbody");
@@ -227,33 +312,114 @@
   // ----- hours -----
   const hForm = byId("emp-hours-form");
   const hStatus = byId("eh_status");
+  const clockInBtn = byId("eh_clock_in");
+  const clockOutBtn = byId("eh_clock_out");
+  const clockStatus = byId("eh_clock_status");
+  const clockDetails = byId("eh_clock_details");
+  const clockMsg = byId("eh_clock_msg");
 
   async function renderHours() {
     const me = myEmail();
     const rows = (await loadTimesheets())
       .filter((t) => (t.employee_email || "").toLowerCase() === me)
       .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .map((t) => `<tr><td>${t.date}</td><td>${t.hours || 0}</td><td>${t.approved ? "approved" : "pending"}</td><td>${t.notes || ""}</td></tr>`)
-      .join("") || '<tr><td colspan="4" class="muted">No hours yet.</td></tr>';
+      .map((t) => {
+        const total = entryHours(t);
+        const status = t.end ? (t.approved ? "approved" : "pending") : "in progress";
+        return `<tr><td>${t.date || ""}</td><td>${t.start || "—"}</td><td>${t.end || "—"}</td><td>${total.toFixed(2)}</td><td>${status}</td><td>${t.notes || ""}</td></tr>`;
+      })
+      .join("") || '<tr><td colspan="6" class="muted">No hours yet.</td></tr>';
     $("#emp_hours_table tbody").innerHTML = rows;
   }
+
+  async function renderClockStatus() {
+    const me = myEmail();
+    const list = await loadTimesheets();
+    const open = openShiftFor(list, me);
+    if (open) {
+      clockStatus.textContent = "Clocked in";
+      clockDetails.textContent = `Started ${open.date || todayISO()} at ${open.start || "—"}.`;
+      clockInBtn.disabled = true;
+      clockOutBtn.disabled = false;
+    } else {
+      clockStatus.textContent = "Not clocked in";
+      clockDetails.textContent = "No active shift.";
+      clockInBtn.disabled = false;
+      clockOutBtn.disabled = true;
+    }
+  }
+
+  clockInBtn?.addEventListener("click", async () => {
+    try {
+      const me = myEmail();
+      const list = await loadTimesheets();
+      if (openShiftFor(list, me)) {
+        clockMsg.textContent = "Already clocked in.";
+        return;
+      }
+      list.push({
+        id: crypto.randomUUID(),
+        employee_email: me,
+        date: todayISO(),
+        start: nowHHMM(),
+        end: "",
+        hours: 0,
+        notes: "Clocked in",
+        approved: false,
+        source: "clock"
+      });
+      await saveTimesheets(list);
+      clockMsg.textContent = "Clocked in.";
+      await renderClockStatus();
+      await renderHours();
+    } catch (err) {
+      clockMsg.textContent = String(err?.message || err);
+      throw err;
+    }
+  });
+
+  clockOutBtn?.addEventListener("click", async () => {
+    try {
+      const me = myEmail();
+      const list = await loadTimesheets();
+      const open = openShiftFor(list, me);
+      if (!open) {
+        clockMsg.textContent = "No active shift to clock out.";
+        return;
+      }
+      open.end = nowHHMM();
+      open.hours = Number(entryHours(open).toFixed(2));
+      open.notes = open.notes || "Clocked out";
+      await saveTimesheets(list);
+      clockMsg.textContent = "Clocked out.";
+      await renderClockStatus();
+      await renderHours();
+    } catch (err) {
+      clockMsg.textContent = String(err?.message || err);
+      throw err;
+    }
+  });
 
   hForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const list = await loadTimesheets();
+    const start = byId("eh_start").value;
+    const end = byId("eh_end").value;
+    const hours = Number(hoursBetween(start, end).toFixed(2));
     list.push({
       id: crypto.randomUUID(),
       employee_email: myEmail(),
       date: byId("eh_date").value,
-      hours: Number(byId("eh_hours").value || 0),
-      start_time: "",
-      end_time: "",
+      start,
+      end,
+      hours,
       notes: byId("eh_notes").value.trim(),
       approved: false
     });
     await saveTimesheets(list);
     hStatus.textContent = "Saved.";
     hForm.reset();
+    await renderClockStatus();
     await renderHours();
   });
 
@@ -352,6 +518,7 @@
       await refreshCompleteSelect();
       await renderCompletions();
       await renderHours();
+      await renderClockStatus();
       await renderPaystubs();
       await renderPTO();
       await refreshCompletedJobsForComments();
