@@ -1,32 +1,17 @@
-// tnk-site/netlify/functions/stripe_webhook.js
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
 
-function rawBody(event) {
-  const b = event.body || "";
-  if (event.isBase64Encoded) return Buffer.from(b, "base64");
-  return Buffer.from(b, "utf8");
+function getEnv() {
+  return globalThis.Netlify?.env || {};
 }
 
-/**
- * Same “auto mode then fallback env vars” approach as collections.js,
- * so checkout/webhook don't randomly fail if Blobs isn't auto-configured.
- */
 function getConfiguredStore() {
   try {
     return getStore({ name: "tnk-data" });
-  } catch (e) {
-    const siteID =
-      process.env.NETLIFY_SITE_ID ||
-      process.env.SITE_ID ||
-      process.env.SITE_ID_PROD ||
-      "";
-
-    const token =
-      process.env.NETLIFY_BLOBS_TOKEN ||
-      process.env.NETLIFY_AUTH_TOKEN ||
-      process.env.NETLIFY_API_TOKEN ||
-      "";
+  } catch {
+    const env = getEnv();
+    const siteID = env.NETLIFY_SITE_ID || env.SITE_ID || env.SITE_ID_PROD || "";
+    const token = env.NETLIFY_BLOBS_TOKEN || env.NETLIFY_AUTH_TOKEN || env.NETLIFY_API_TOKEN || "";
 
     if (!siteID || !token) {
       throw new Error(
@@ -46,28 +31,30 @@ function getConfiguredStore() {
   }
 }
 
-export async function handler(event) {
+export default async (request) => {
   try {
-    if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
+    if (request.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405 });
     }
 
-    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-    const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+    const env = getEnv();
+    const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
+    const STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET;
     if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
-      return { statusCode: 500, body: "Missing Stripe env vars" };
+      return new Response("Missing Stripe env vars", { status: 500 });
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY);
-    const sig = event.headers["stripe-signature"] || event.headers["Stripe-Signature"];
-    if (!sig) return { statusCode: 400, body: "Missing stripe-signature" };
+    const sig = request.headers.get("stripe-signature");
+    if (!sig) return new Response("Missing stripe-signature", { status: 400 });
 
     let evt;
     try {
-      evt = stripe.webhooks.constructEvent(rawBody(event), sig, STRIPE_WEBHOOK_SECRET);
+      const raw = await request.arrayBuffer();
+      evt = stripe.webhooks.constructEvent(Buffer.from(raw), sig, STRIPE_WEBHOOK_SECRET);
     } catch (err) {
       console.error("[stripe_webhook] signature verify failed:", err?.message || err);
-      return { statusCode: 400, body: "Webhook signature verification failed" };
+      return new Response("Webhook signature verification failed", { status: 400 });
     }
 
     if (evt.type === "checkout.session.completed") {
@@ -89,7 +76,6 @@ export async function handler(event) {
             stripe_payment_intent: session.payment_intent || "",
           };
 
-          // Store as JSON (consistent)
           await store.setJSON(key, invoices, {
             metadata: { updatedAt: new Date().toISOString() },
           });
@@ -97,9 +83,9 @@ export async function handler(event) {
       }
     }
 
-    return { statusCode: 200, body: "ok" };
+    return new Response("ok", { status: 200 });
   } catch (e) {
     console.error("[stripe_webhook] error:", e);
-    return { statusCode: 500, body: "server error" };
+    return new Response("server error", { status: 500 });
   }
-}
+};

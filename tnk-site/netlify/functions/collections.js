@@ -6,6 +6,69 @@
 
 import { getStore } from "@netlify/blobs";
 
+const COLLECTION_RULES = {
+  tnk_accounts: { read: ["admin"], write: ["admin"], type: "array" },
+  tnk_jobs: {
+    read: ["admin", "employee"],
+    write: ["admin", "employee"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      !item?.assignee || String(item.assignee || "").toLowerCase() === email,
+  },
+  tnk_invoices: {
+    read: ["admin", "customer"],
+    write: ["admin"],
+    type: "array",
+    customerFilter: (item, email) =>
+      String(item?.customer_email || "").toLowerCase() === email,
+  },
+  tnk_timesheets: {
+    read: ["admin", "employee"],
+    write: ["admin", "employee"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      String(item?.employee_email || "").toLowerCase() === email,
+  },
+  tnk_paystubs: {
+    read: ["admin", "employee"],
+    write: ["admin"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      String(item?.employee || "").toLowerCase() === email,
+  },
+  tnk_reviews: {
+    read: ["admin", "employee"],
+    write: ["admin", "employee"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      String(item?.employee || "").toLowerCase() === email,
+  },
+  tnk_pto: {
+    read: ["admin", "employee"],
+    write: ["admin", "employee"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      String(item?.employee || "").toLowerCase() === email,
+  },
+  tnk_emp_comments: {
+    read: ["admin", "employee"],
+    write: ["admin", "employee"],
+    type: "array",
+    employeeFilter: (item, email) =>
+      String(item?.employee || "").toLowerCase() === email,
+  },
+  tnk_services: { read: ["admin"], write: ["admin"], type: "array" },
+  tnk_promos: { read: ["admin"], write: ["admin"], type: "array" },
+  tnk_prices: { read: ["admin"], write: ["admin"], type: "array" },
+  tnk_availability: { read: ["admin", "customer"], write: ["admin"], type: "array" },
+  tnk_cust_prefs: { read: ["admin", "customer"], write: ["admin", "customer"], type: "map" },
+  tnk_cust_extras: { read: ["admin", "customer"], write: ["admin", "customer"], type: "map" },
+  tnk_cust_specials: { read: ["admin", "customer"], write: ["admin", "customer"], type: "map" },
+  tnk_cust_comments: { read: ["admin", "customer"], write: ["admin", "customer"], type: "map" },
+  tnk_cust_history: { read: ["admin", "customer"], write: ["admin"], type: "map" },
+  tnk_cust_balances: { read: ["admin", "customer"], write: ["admin"], type: "map" },
+};
+
 export default async (request, context) => {
   // CORS preflight
   if (request.method === "OPTIONS") {
@@ -24,10 +87,19 @@ export default async (request, context) => {
       const name = url.searchParams.get("name");
       if (!name) return json(400, { ok: false, error: "Missing ?name" });
 
+      const rule = COLLECTION_RULES[name];
+      if (!rule) return json(400, { ok: false, error: "Unknown collection" });
+
+      const user = await resolveUser(request, context);
+      const role = getRole(user);
+      if (!user || !role) return json(401, { ok: false, error: "Auth required" });
+      if (!rule.read.includes(role)) return json(403, { ok: false, error: "Forbidden" });
+
       const key = `${name}.json`;
       const data = await safeGetJSON(store, key);
+      const scoped = scopeRead(rule, data, role, user?.email);
 
-      return json(200, { ok: true, data: data ?? null });
+      return json(200, { ok: true, data: scoped ?? null });
     }
 
     if (method === "PUT") {
@@ -44,9 +116,18 @@ export default async (request, context) => {
       const { name, data } = body || {};
       if (!name) return json(400, { ok: false, error: "Missing name" });
 
-      const key = `${name}.json`;
+      const rule = COLLECTION_RULES[name];
+      if (!rule) return json(400, { ok: false, error: "Unknown collection" });
 
-      await store.setJSON(key, data ?? null, {
+      const role = getRole(user);
+      if (!role) return json(401, { ok: false, error: "Auth required" });
+      if (!rule.write.includes(role)) return json(403, { ok: false, error: "Forbidden" });
+
+      const key = `${name}.json`;
+      const existing = await safeGetJSON(store, key);
+      const next = await scopeWrite(rule, existing, data, role, user?.email);
+
+      await store.setJSON(key, next ?? null, {
         metadata: {
           updatedAt: new Date().toISOString(),
           updatedBy: user?.email || "unknown",
@@ -134,6 +215,20 @@ function json(statusCode, obj) {
   });
 }
 
+function getRole(user) {
+  if (!user) return null;
+  const appRoles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
+  const appRole = typeof user?.app_metadata?.role === "string" ? [user.app_metadata.role] : [];
+  const metaRoles = Array.isArray(user?.user_metadata?.roles) ? user.user_metadata.roles : [];
+  const metaRole = typeof user?.user_metadata?.role === "string" ? [user.user_metadata.role] : [];
+  const roles = [...appRoles, ...appRole, ...metaRoles, ...metaRole]
+    .map((r) => String(r || "").toLowerCase())
+    .filter(Boolean);
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("employee")) return "employee";
+  return "customer";
+}
+
 async function resolveUser(request, context) {
   const ctxUser = context?.clientContext?.user || null;
   if (ctxUser) return ctxUser;
@@ -165,4 +260,73 @@ async function safeGetJSON(store, key) {
       throw err;
     }
   }
+}
+
+function scopeRead(rule, data, role, email) {
+  if (role === "admin") return data;
+
+  if (rule.type === "map") {
+    const map = data && typeof data === "object" ? data : {};
+    const key = String(email || "").toLowerCase();
+    return key ? { [key]: map[key] ?? null } : {};
+  }
+
+  if (!Array.isArray(data)) return [];
+
+  if (role === "employee" && typeof rule.employeeFilter === "function") {
+    return data.filter((item) => rule.employeeFilter(item, String(email || "").toLowerCase()));
+  }
+
+  if (role === "customer" && typeof rule.customerFilter === "function") {
+    return data.filter((item) => rule.customerFilter(item, String(email || "").toLowerCase()));
+  }
+
+  return data;
+}
+
+async function scopeWrite(rule, existing, incoming, role, email) {
+  if (role === "admin") return incoming ?? null;
+
+  if (rule.type === "map") {
+    const current = existing && typeof existing === "object" ? existing : {};
+    const key = String(email || "").toLowerCase();
+    if (!key) return current;
+    let value = null;
+    if (incoming && typeof incoming === "object" && key in incoming) {
+      value = incoming[key];
+    } else {
+      value = incoming;
+    }
+    return { ...current, [key]: value };
+  }
+
+  const current = Array.isArray(existing) ? existing : [];
+  const next = Array.isArray(incoming) ? incoming : [];
+  const actor = String(email || "").toLowerCase();
+
+  if (role === "employee" && typeof rule.employeeFilter === "function") {
+    return mergeAllowed(current, next, (item) => rule.employeeFilter(item, actor));
+  }
+
+  if (role === "customer" && typeof rule.customerFilter === "function") {
+    return mergeAllowed(current, next, (item) => rule.customerFilter(item, actor));
+  }
+
+  return current;
+}
+
+function mergeAllowed(existing, incoming, allowFn) {
+  const byId = new Map(
+    (Array.isArray(existing) ? existing : [])
+      .filter((item) => item && item.id)
+      .map((item) => [item.id, item])
+  );
+
+  for (const item of Array.isArray(incoming) ? incoming : []) {
+    if (!item || !item.id) continue;
+    if (!allowFn(item)) continue;
+    byId.set(item.id, item);
+  }
+
+  return Array.from(byId.values());
 }

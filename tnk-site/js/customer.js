@@ -1,5 +1,5 @@
 /* TNK Customer Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
-(function () {
+(async function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const byId = (id) => document.getElementById(id);
@@ -8,13 +8,16 @@
 
   // ----- Auth: customer only -----
   function assertCustomer() {
-    const role = sessionStorage.getItem("tnk_role");
+    const role = sessionStorage.getItem("tnk_role") || window.TNKIdentity?.role?.();
     if (role === "customer") return true;
     if (role === "admin") { location.replace("admin.html"); return false; }
     if (role === "employee") { location.replace("employee.html"); return false; }
     location.replace("login-customer.html");
     return false;
   }
+  try {
+    await window.TNKIdentity?.init?.({ guard: "customer" });
+  } catch {}
   if (!assertCustomer()) return;
 
   byId("cust-logout")?.addEventListener("click", (e) => {
@@ -43,12 +46,18 @@
     }
   }
 
-  async function apiGet(name) {
+  async function tokenStrict() {
     const t = await token();
+    if (t) return t;
+    throw new Error("No JWT available from Netlify Identity user.");
+  }
+
+  async function apiGet(name) {
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
       headers: {
         "Content-Type": "application/json",
-        ...(t ? { Authorization: `Bearer ${t}` } : {})
+        Authorization: `Bearer ${t}`
       }
     });
     if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
@@ -57,12 +66,12 @@
   }
 
   async function apiSet(name, data) {
-    const t = await token();
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(t ? { Authorization: `Bearer ${t}` } : {})
+        Authorization: `Bearer ${t}`
       },
       body: JSON.stringify({ name, data })
     });

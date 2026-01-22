@@ -89,12 +89,39 @@
     return jwt;
   }
 
+  async function readErrorDetail(res) {
+    try {
+      const text = await res.text();
+      if (!text) return "";
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        try {
+          const json = JSON.parse(text);
+          const msg = json?.message || json?.error || json?.detail;
+          return msg ? String(msg) : text.trim();
+        } catch {
+          return text.trim();
+        }
+      }
+      return text.trim();
+    } catch {
+      return "";
+    }
+  }
+
   // ----------------- Collections API -----------------
   async function apiGet(name, fallback) {
+    const t = await tokenStrict();
     const res = await fetch(`/.netlify/functions/collections?name=${encodeURIComponent(name)}`, {
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        ...(t ? { Authorization: `Bearer ${t}` } : {})
+      }
     });
-    if (!res.ok) throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const detail = await readErrorDetail(res);
+      throw new Error(`GET ${name} failed: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`);
+    }
     const j = await res.json();
     return (j && j.data) ?? fallback;
   }
@@ -107,7 +134,10 @@
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
       body: JSON.stringify({ name, data })
     });
-    if (!res.ok) throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const detail = await readErrorDetail(res);
+      throw new Error(`PUT ${name} failed: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`);
+    }
   }
 
   // ----------------- Keys -----------------
@@ -957,23 +987,90 @@
   const reviewBody = $("#review_table tbody");
   const ptoBody = $("#pto_table tbody");
 
+  function normalizePhotos(list) {
+    const raw = Array.isArray(list) ? list : [];
+    return raw
+      .map((p) => {
+        if (!p) return null;
+        if (typeof p === "string") return { name: p, key: "" };
+        return { name: p.name || "photo", key: p.key || "" };
+      })
+      .filter(Boolean);
+  }
+
+  async function fetchPhotoObjectUrl(key) {
+    const t = await tokenStrict();
+    const res = await fetch(`/.netlify/functions/photo_get?key=${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${t}` }
+    });
+    if (!res.ok) throw new Error(`Photo fetch failed: ${res.status} ${res.statusText}`);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  async function openPhotoViewer(review) {
+    const photos = normalizePhotos(review?.photos);
+    const keys = photos.filter((p) => p.key);
+    if (!keys.length) return;
+
+    const win = window.open("", "_blank");
+    if (!win) throw new Error("Popup blocked while opening photo viewer.");
+
+    win.document.open();
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+      <title>Job Photos</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;color:#1e2f1e}
+        h1{margin:0 0 12px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+        img{width:100%;height:auto;border-radius:12px;border:1px solid #e6e1d6;box-shadow:0 8px 20px rgba(0,0,0,.08)}
+        .cap{font-size:.9rem;color:#556; margin-top:6px}
+      </style></head><body>
+      <h1>${review?.title || "Job Photos"}</h1>
+      <div class="grid" id="photo-grid"></div>
+      </body></html>`);
+    win.document.close();
+
+    const grid = win.document.getElementById("photo-grid");
+    for (const p of keys) {
+      const url = await fetchPhotoObjectUrl(p.key);
+      const figure = win.document.createElement("div");
+      const img = win.document.createElement("img");
+      img.src = url;
+      img.alt = p.name || "Job photo";
+      const cap = win.document.createElement("div");
+      cap.className = "cap";
+      cap.textContent = p.name || "photo";
+      figure.appendChild(img);
+      figure.appendChild(cap);
+      grid.appendChild(figure);
+    }
+  }
+
   async function renderReviews() {
     const list = await loadReviews();
     reviewBody.innerHTML = list
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
-      .map((r) => `
+      .map((r) => {
+        const photos = normalizePhotos(r.photos);
+        const viewable = photos.filter((p) => p.key).length;
+        const photoCell = viewable
+          ? `<button class="btn-small js-view-photos">View (${viewable})</button>`
+          : (photos.length ? photos.map((p) => p.name).join(", ") : "—");
+        return `
         <tr data-id="${r.id}">
           <td>${r.date || ""}</td>
           <td>${r.customer || ""}</td>
           <td>${r.title || ""}</td>
-          <td>${(r.photos || []).join(", ")}</td>
+          <td>${photoCell}</td>
           <td>${r.notes || ""}</td>
           <td class="cell-actions">
             <button class="btn-small js-approve">Approve</button>
             <button class="btn-small btn-small--danger js-reject">Reject</button>
           </td>
         </tr>
-      `).join("") || `<tr><td colspan="6" class="muted">No pending reviews.</td></tr>`;
+      `;
+      }).join("") || `<tr><td colspan="6" class="muted">No pending reviews.</td></tr>`;
   }
 
   reviewBody?.addEventListener("click", async (e) => {
@@ -984,6 +1081,11 @@
       const list = await loadReviews();
       const r = list.find((x) => x.id === id);
       if (!r) return;
+
+      if (e.target.classList.contains("js-view-photos")) {
+        await openPhotoViewer(r);
+        return;
+      }
 
       if (e.target.classList.contains("js-approve")) r.status = "approved";
       if (e.target.classList.contains("js-reject")) r.status = "rejected";

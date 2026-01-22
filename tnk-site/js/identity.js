@@ -18,7 +18,13 @@
 
   function normalizeRole(user) {
     if (!user) return null;
-    const roles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
+    const appRoles = Array.isArray(user?.app_metadata?.roles) ? user.app_metadata.roles : [];
+    const appRole = typeof user?.app_metadata?.role === "string" ? [user.app_metadata.role] : [];
+    const metaRoles = Array.isArray(user?.user_metadata?.roles) ? user.user_metadata.roles : [];
+    const metaRole = typeof user?.user_metadata?.role === "string" ? [user.user_metadata.role] : [];
+    const roles = [...appRoles, ...appRole, ...metaRoles, ...metaRole]
+      .map((r) => String(r || "").toLowerCase())
+      .filter(Boolean);
     if (roles.includes("admin")) return "admin";
     if (roles.includes("employee")) return "employee";
     return "customer";
