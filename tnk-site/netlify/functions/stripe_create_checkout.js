@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
+import { getStripeSecretKey, stripeSecretKeyError } from "./stripe-utils.js";
 
 function json(statusCode, bodyObj, extraHeaders = {}) {
   return new Response(JSON.stringify(bodyObj), {
@@ -96,8 +97,8 @@ export default async (request, context) => {
     if (!user?.email) return json(401, { ok: false, error: "Unauthorized" });
 
     const env = getEnv();
-    const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
-    if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: "Missing STRIPE_SECRET_KEY" });
+    const STRIPE_SECRET_KEY = getStripeSecretKey(env);
+    if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: stripeSecretKeyError() });
 
     const siteUrl = getSiteUrl(request);
     if (!siteUrl) return json(500, { ok: false, error: "Missing SITE_URL (or could not infer origin)" });

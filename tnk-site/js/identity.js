@@ -5,6 +5,8 @@
    ========================================================= */
 (function (w, d) {
   const WIDGET_SRC = "https://identity.netlify.com/v1/netlify-identity-widget.js";
+  const SETTINGS_URL = "/.netlify/identity/settings";
+  let identityCheckPromise = null;
 
   function ensureWidgetLoaded() {
     return new Promise((resolve) => {
@@ -14,6 +16,43 @@
       s.onload = () => resolve();
       d.head.appendChild(s);
     });
+  }
+
+  async function isIdentityAvailable() {
+    if (identityCheckPromise) return identityCheckPromise;
+    identityCheckPromise = (async () => {
+      try {
+        const res = await fetch(SETTINGS_URL, { method: "GET", cache: "no-store" });
+        if (!res.ok) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    return identityCheckPromise;
+  }
+
+  function showIdentityUnavailable(message) {
+    const existing = d.getElementById("tnk-identity-error");
+    if (existing) return;
+    const wrap = d.createElement("div");
+    wrap.id = "tnk-identity-error";
+    wrap.setAttribute("role", "alert");
+    wrap.style.cssText = [
+      "background:#fff3f3",
+      "border:1px solid #e6b6b6",
+      "color:#7b1f1f",
+      "padding:12px 16px",
+      "margin:12px auto",
+      "max-width:860px",
+      "border-radius:10px",
+      "font-family:inherit",
+    ].join(";");
+    wrap.innerHTML = `
+      <strong>Identity Unavailable</strong>
+      <div style="margin-top:6px">${message}</div>
+    `;
+    d.body.prepend(wrap);
   }
 
   function normalizeRole(user) {
@@ -113,6 +152,16 @@
     async init(opts = {}) {
       this.configure(opts);
 
+      const available = await isIdentityAvailable();
+      if (!available) {
+        const msg =
+          "Netlify Identity is not enabled or reachable for this site. Enable Identity in the Netlify dashboard, then redeploy.";
+        console.error(msg);
+        showIdentityUnavailable(msg);
+        if (opts.onError) opts.onError(new Error(msg));
+        return;
+      }
+
       await ensureWidgetLoaded();
       const id = w.netlifyIdentity;
       if (!id) return;
@@ -162,7 +211,32 @@
         if (opts.onLogout) opts.onLogout();
       });
 
-      id.init();
+      id.on("error", (err) => {
+        const msg =
+          "Netlify Identity reported an error. Check that Identity is enabled and the site is reachable.";
+        console.error(msg, err);
+        showIdentityUnavailable(msg);
+        if (opts.onError) opts.onError(err);
+      });
+
+      try {
+        const initResult = id.init();
+        if (initResult && typeof initResult.then === "function") {
+          initResult.catch((err) => {
+            const msg =
+              "Netlify Identity failed to initialize. Check that Identity is enabled and the site is reachable.";
+            console.error(msg, err);
+            showIdentityUnavailable(msg);
+            if (opts.onError) opts.onError(err);
+          });
+        }
+      } catch (err) {
+        const msg =
+          "Netlify Identity failed to initialize. Check that Identity is enabled and the site is reachable.";
+        console.error(msg, err);
+        showIdentityUnavailable(msg);
+        if (opts.onError) opts.onError(err);
+      }
     }
   };
 

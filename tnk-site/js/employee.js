@@ -72,7 +72,12 @@
         }
       });
 
-      try { id.init(); } catch {}
+      try {
+        const initResult = id.init();
+        if (initResult && typeof initResult.then === "function") {
+          initResult.catch(() => {});
+        }
+      } catch {}
     });
   }
 
