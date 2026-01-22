@@ -110,7 +110,21 @@
     <section class="panel" id="panel-hours">
       <div class="grid">
         <div class="card">
-          <h2>Add Hours</h2>
+          <h2>Clock In / Out</h2>
+          <div class="stack">
+            <div>
+              <strong>Status:</strong> <span id="eh_clock_status">Not clocked in</span>
+            </div>
+            <div class="muted" id="eh_clock_details">No active shift.</div>
+            <div class="inline">
+              <button class="button button--primary" id="eh_clock_in" type="button">Clock In</button>
+              <button class="button" id="eh_clock_out" type="button" disabled>Clock Out</button>
+            </div>
+            <p id="eh_clock_msg" class="muted"></p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Add Hours Manually</h2>
           <form id="emp-hours-form" class="stack">
             <div class="grid-2">
               <div>
@@ -118,12 +132,20 @@
                 <input id="eh_date" type="date" required />
               </div>
               <div>
-                <label for="eh_hours">Hours</label>
-                <input id="eh_hours" type="number" min="0" max="24" step="0.25" required />
+                <label for="eh_start">Start</label>
+                <input id="eh_start" type="time" required />
               </div>
             </div>
-            <label for="eh_notes">Notes</label>
-            <input id="eh_notes" placeholder="Optional" />
+            <div class="grid-2">
+              <div>
+                <label for="eh_end">End</label>
+                <input id="eh_end" type="time" required />
+              </div>
+              <div>
+                <label for="eh_notes">Notes</label>
+                <input id="eh_notes" placeholder="Optional" />
+              </div>
+            </div>
             <button class="button button--primary" type="submit">Save</button>
             <p id="eh_status" class="muted"></p>
           </form>
@@ -132,7 +154,7 @@
           <h2>Your Hours</h2>
           <div class="table-wrap">
             <table id="emp_hours_table">
-              <thead><tr><th>Date</th><th>Hours</th><th>Status</th><th>Notes</th></tr></thead>
+              <thead><tr><th>Date</th><th>Start</th><th>End</th><th>Total</th><th>Status</th><th>Notes</th></tr></thead>
               <tbody><!-- rows --></tbody>
             </table>
           </div>

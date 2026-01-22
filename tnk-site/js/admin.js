@@ -647,6 +647,12 @@
     return diff > 0 ? diff / 60 : 0;
   }
 
+  function entryHours(t) {
+    const explicit = Number(t?.hours);
+    if (!Number.isNaN(explicit) && explicit > 0) return explicit;
+    return hoursBetween(t?.start, t?.end);
+  }
+
   function tsMatches(t) {
     const em = tsFilterEmail?.value || "all";
     const from = tsFrom?.value || "";
@@ -675,8 +681,8 @@
           <td>${t.date || ""}</td>
           <td>${t.employee_email || ""}</td>
           <td>${t.start || ""}</td>
-          <td>${t.end || ""}</td>
-          <td>${hoursBetween(t.start, t.end).toFixed(2)}</td>
+          <td>${t.end || (t.start ? "in progress" : "")}</td>
+          <td>${entryHours(t).toFixed(2)}</td>
           <td>${t.notes || ""}</td>
           <td>${t.approved ? "yes" : "no"}</td>
           <td class="cell-actions">
@@ -789,7 +795,7 @@
     const map = new Map();
     for (const t of list) {
       const em = String(t.employee_email || "").toLowerCase();
-      const hrs = hoursBetween(t.start, t.end);
+      const hrs = entryHours(t);
       map.set(em, (map.get(em) || 0) + hrs);
     }
 
@@ -825,7 +831,7 @@
       const map = new Map();
       for (const t of inR) {
         const em = String(t.employee_email || "").toLowerCase();
-        const hrs = hoursBetween(t.start, t.end);
+        const hrs = entryHours(t);
         map.set(em, (map.get(em) || 0) + hrs);
       }
 
