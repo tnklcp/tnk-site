@@ -29,10 +29,9 @@
     .muted { opacity:.85; font-size:.95rem; }
     .stack { display:grid; gap:.75rem; }
   </style>
+  
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
-  <script src="js/identity.js" defer></script>
-</head>
+  <script src="js/identity.js" defer></script></head>
 <body>
   <div class="auth-wrap">
     <div class="auth-card">
@@ -59,6 +58,19 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
+      const loginBtn = document.getElementById("open-login");
+      const signupBtn = document.getElementById("open-signup");
+      const disableAuth = (message) => {
+        if (loginBtn) {
+          loginBtn.disabled = true;
+          loginBtn.textContent = message;
+        }
+        if (signupBtn) {
+          signupBtn.disabled = true;
+          signupBtn.textContent = message;
+        }
+      };
+
       TNKIdentity.init({
         autoRoute: false, // IMPORTANT: prevents redirect race
 
@@ -72,13 +84,17 @@
 
         onLogout() {
           location.replace("login-customer.html");
+        },
+
+        onError() {
+          disableAuth("Identity unavailable");
         }
       });
 
-      document.getElementById("open-login").addEventListener("click", () => {
+      loginBtn?.addEventListener("click", () => {
         if (window.netlifyIdentity) netlifyIdentity.open("login");
       });
-      document.getElementById("open-signup").addEventListener("click", () => {
+      signupBtn?.addEventListener("click", () => {
         if (window.netlifyIdentity) netlifyIdentity.open("signup");
       });
     });

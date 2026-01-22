@@ -10,8 +10,7 @@
     .card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 1.25rem; }
     .muted { opacity: .85; }
     .log { background: #00000008; border: 1px solid #e6e1d6; padding: .75rem; border-radius: 8px; min-height: 120px; white-space: pre-wrap; }
-  </style>
-</head>
+  </style></head>
 <body>
   <header class="hero">
     <h1>Welcome</h1>
@@ -31,13 +30,15 @@
   </main>
 
   <!-- Identity widget + helpers -->
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  
   <script src="js/identity.js"></script>
   <script>
     const logEl = document.getElementById('log');
     const statusEl = document.getElementById('status');
     const actions = document.getElementById('actions');
+    let identityAvailable = true;
     const log = (m) => { logEl.textContent += (m + '\n'); };
+    const getIdentity = () => window.netlifyIdentity || null;
 
     function routeByRole(user) {
       const roles = user?.app_metadata?.roles || [];
@@ -56,13 +57,34 @@
     }
 
     document.getElementById('open-login').addEventListener('click', () => {
-      netlifyIdentity.open('login');
+      if (!identityAvailable) return;
+      const id = getIdentity();
+      if (!id) return;
+      try { id.open('login'); } catch {}
     });
 
     // Core: accept invites / confirmations and route
     (async function init() {
       statusEl.textContent = 'Initializing…';
-      await TNK.identityReady;
+      await TNKIdentity.init({
+        autoRoute: false,
+        onError() {
+          identityAvailable = false;
+          statusEl.textContent = 'Identity unavailable. Please try again later.';
+          const btn = document.getElementById('open-login');
+          if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Identity unavailable';
+          }
+        }
+      });
+
+      const identity = getIdentity();
+      if (!identity) {
+        identityAvailable = false;
+        statusEl.textContent = 'Identity unavailable. Please try again later.';
+        return;
+      }
 
       const invite = getToken('invite_token');
       const confirm = getToken('confirmation_token') || getToken('token');
@@ -71,14 +93,14 @@
         log('Invite token found. Accepting…');
         statusEl.textContent = 'Accepting your invite…';
         try {
-          const user = await netlifyIdentity.acceptInvite(invite, true);
+          const user = await identity.acceptInvite(invite, true);
           log('Invite accepted. Signed in as ' + (user && user.email));
           statusEl.textContent = 'Invite accepted. Redirecting…';
           return routeByRole(user);
         } catch (e) {
           log('Invite error: ' + (e && e.message || e));
           statusEl.textContent = 'Invite acceptance failed. Please click “Open Login”.';
-          netlifyIdentity.open('login');
+          try { identity.open('login'); } catch {}
           return;
         }
       }
@@ -88,12 +110,12 @@
         // but we open the login to finalize the session.
         log('Confirmation token detected.');
         statusEl.textContent = 'Email confirmed. Finalizing…';
-        netlifyIdentity.open('login');
+        try { identity.open('login'); } catch {}
         return;
       }
 
       // No tokens: if already logged-in, route now; else show login button
-      const current = TNK.getUser();
+      const current = TNKIdentity.user();
       if (current) {
         log('Already signed in as ' + current.email);
         statusEl.textContent = 'Signed in. Redirecting…';
@@ -104,11 +126,13 @@
       }
     })();
 
-    netlifyIdentity.on('login', (user) => {
-      statusEl.textContent = 'Signed in. Redirecting…';
-      routeByRole(user);
-    });
-    netlifyIdentity.on('error', (e) => log('Identity error: ' + (e && e.message || e)));
+    if (getIdentity()) {
+      getIdentity().on('login', (user) => {
+        statusEl.textContent = 'Signed in. Redirecting…';
+        routeByRole(user);
+      });
+      getIdentity().on('error', (e) => log('Identity error: ' + (e && e.message || e)));
+    }
   </script>
 </body>
 </html>

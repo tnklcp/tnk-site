@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
+import { getStripeSecretKey, stripeSecretKeyError } from "./stripe-utils.js";
 
 function getEnv() {
   return globalThis.Netlify?.env || {};
@@ -38,10 +39,11 @@ export default async (request) => {
     }
 
     const env = getEnv();
-    const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
+    const STRIPE_SECRET_KEY = getStripeSecretKey(env);
     const STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET;
     if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
-      return new Response("Missing Stripe env vars", { status: 500 });
+      const detail = !STRIPE_SECRET_KEY ? stripeSecretKeyError() : "Missing STRIPE_WEBHOOK_SECRET in Netlify env vars.";
+      return new Response(`Missing Stripe env vars: ${detail}`, { status: 500 });
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY);

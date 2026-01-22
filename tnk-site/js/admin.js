@@ -88,8 +88,13 @@
         }
       });
 
-      // Kick identity init if needed
-      try { id.init(); } catch {}
+      // Kick identity init if needed (avoid unhandled promise rejection)
+      try {
+        const initResult = id.init();
+        if (initResult && typeof initResult.then === "function") {
+          initResult.catch(() => {});
+        }
+      } catch {}
     });
   }
 
@@ -124,6 +129,38 @@
     } catch {
       return "";
     }
+  }
+
+  async function fetchBillingStatus() {
+    try {
+      const res = await fetch("/.netlify/functions/billing_status");
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  function formatBillingConfigError(status) {
+    if (!status?.ok) return "";
+    const missing = [];
+
+    if (status?.stripe && status.stripe.configured === false) {
+      const list = Array.isArray(status.stripe.missing) && status.stripe.missing.length
+        ? status.stripe.missing.join(", ")
+        : "STRIPE_SECRET_KEY";
+      missing.push(`Stripe secret key (${list})`);
+    }
+
+    if (status?.email && status.email.configured === false) {
+      const list = Array.isArray(status.email.missing) && status.email.missing.length
+        ? status.email.missing.join(", ")
+        : "RESEND_API_KEY, RESEND_FROM";
+      missing.push(`Email sender (${list})`);
+    }
+
+    if (!missing.length) return "";
+    return `Billing configuration missing. Set ${missing.join(" | ")} in Netlify: Project configuration > Environment variables.`;
   }
 
   // ----------------- Collections API -----------------
@@ -1208,6 +1245,10 @@
   }
 
   async function sendInvoiceEmail(invoiceId) {
+    const status = await fetchBillingStatus();
+    const configError = formatBillingConfigError(status);
+    if (configError) throw new Error(configError);
+
     const t = await tokenStrict();
     const res = await fetch("/.netlify/functions/invoice_send", {
       method: "POST",
@@ -1267,26 +1308,37 @@
         const account = resolveCustomerAccount(accounts, job?.customer || r.customer || "");
         const custEmail = normalizeEmail(account?.email || job?.customer || r.customer || "");
 
-        if (job && isRecurring(job)) {
+        if (job) {
           const total = Number(job.cost || 0);
-          if (!custEmail || !custEmail.includes("@")) {
-            if (reviewStatus) reviewStatus.textContent = "Approved. Add a customer email to auto-generate the recurring invoice.";
-          } else if (total > 0) {
+          const hasEmail = !!(custEmail && custEmail.includes("@"));
+          if (!hasEmail) {
+            if (reviewStatus) reviewStatus.textContent = "Approved. Add a customer email to auto-generate the invoice.";
+          } else if (!(total > 0)) {
+            if (reviewStatus) reviewStatus.textContent = "Approved. Add a job cost to auto-generate the invoice.";
+          } else {
             const existingInvoice = job.invoice_id
               ? invoices.find((inv) => inv.id === job.invoice_id)
               : invoices.find((inv) => inv.number && inv.number === job.invoice);
-            if (!existingInvoice) {
+            let targetInvoice = existingInvoice || null;
+            if (!targetInvoice) {
               const inv = buildInvoiceFromJob(job, account);
               invoices.push(inv);
               invoicesChanged = true;
               job.invoice = inv.number;
               job.invoice_id = inv.id;
-              newInvoiceId = inv.id;
+              targetInvoice = inv;
+            } else {
+              if (!job.invoice_id) job.invoice_id = targetInvoice.id || "";
+              if (!job.invoice && targetInvoice.number) job.invoice = targetInvoice.number;
             }
-          } else if (reviewStatus) {
-            reviewStatus.textContent = "Approved. Add a job cost to auto-generate the recurring invoice.";
-          }
 
+            if (targetInvoice && (!targetInvoice.emailed_at || !targetInvoice.stripe_checkout_url)) {
+              newInvoiceId = targetInvoice.id;
+            }
+          }
+        }
+
+        if (job && isRecurring(job)) {
           const nextDate = nextRecurringDate(job);
           if (nextDate) {
             const nextJob = {

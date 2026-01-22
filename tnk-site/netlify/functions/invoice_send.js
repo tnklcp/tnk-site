@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { getStore } from "@netlify/blobs";
+import { getStripeSecretKey, stripeSecretKeyError } from "./stripe-utils.js";
 
 export default async (request, context) => {
   const json = (status, body) =>
@@ -13,8 +14,8 @@ export default async (request, context) => {
   }
 
   const env = globalThis.Netlify?.env || {};
-  const STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY;
-  if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: "Missing STRIPE_SECRET_KEY" });
+  const STRIPE_SECRET_KEY = getStripeSecretKey(env);
+  if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: stripeSecretKeyError() });
 
   let body = {};
   try {
@@ -136,31 +137,43 @@ export default async (request, context) => {
     return json(500, { ok: false, error: "Missing RESEND_API_KEY or RESEND_FROM" });
   }
 
-  const serviceDate = inv.service_date || "";
-  const customerLine = [inv.customer_name || "", inv.customer_address || ""].filter(Boolean).join(" — ");
   const paymentUrl = session.url || "";
+  const customerName = inv.customer_name || (inv.customer_email || "").split("@")[0] || "Customer";
+  const totalFormatted = total.toFixed(2);
 
-  const subject = `Invoice ${inv.number || ""} from TNK Lawncare Plus`;
+  const subject = `Invoice ${inv.number || ""} from The Neighborhood Kids Lawncare Plus`;
   const text = [
-    `Hello ${inv.customer_name || ""}`.trim(),
-    customerLine ? `Customer: ${customerLine}` : "",
-    serviceDate ? `Service date: ${serviceDate}` : "",
-    `Invoice ${inv.number || ""} total: $${total.toFixed(2)}`,
-    `It was a pleasure servicing your property. Attached is invoice ${inv.number || ""} for $${total.toFixed(2)} and a payment link to get that taken care of.`,
-    "We appreciate your business and look forward to servicing your property again.",
-    paymentUrl ? `Payment link: ${paymentUrl}` : "",
+    `Hello ${customerName},`,
+    "",
+    "Thank you for your business.",
+    "",
+    `Please find attached Invoice #${inv.number || ""} for services rendered.`,
+    `Total Amount Due: $${totalFormatted}`,
+    "",
+    "For your convenience, you may pay securely online using the Stripe payment link below.",
+    paymentUrl ? paymentUrl : "",
+    "",
+    "If you have any questions regarding this invoice or need additional information, please don't hesitate to reach out.",
+    "",
+    "We appreciate your prompt payment and look forward to continuing to serve you.",
+    "",
+    "Best regards,",
+    "The Neighborhood Kids Lawncare Plus",
+    "Phone: 541-921-4416",
+    "Email: tnklcp@gmail.com",
   ]
     .filter(Boolean)
     .join("\n");
 
   const html = `
-    <p>Hello ${inv.customer_name || ""}</p>
-    ${customerLine ? `<p><strong>Customer:</strong> ${customerLine}</p>` : ""}
-    ${serviceDate ? `<p><strong>Service date:</strong> ${serviceDate}</p>` : ""}
-    <p><strong>Invoice ${inv.number || ""} total:</strong> $${total.toFixed(2)}</p>
-    <p>It was a pleasure servicing your property. Attached is invoice ${inv.number || ""} for $${total.toFixed(2)} and a payment link to get that taken care of.</p>
-    <p>We appreciate your business and look forward to servicing your property again.</p>
-    ${paymentUrl ? `<p><a href="${paymentUrl}">Pay this invoice</a></p>` : ""}
+    <p>Hello ${customerName},</p>
+    <p>Thank you for your business.</p>
+    <p>Please find attached <strong>Invoice #${inv.number || ""}</strong> for services rendered.<br><strong>Total Amount Due:</strong> $${totalFormatted}</p>
+    <p>For your convenience, you may pay securely online using the Stripe payment link below.</p>
+    ${paymentUrl ? `<p><a href="${paymentUrl}">Pay via Stripe</a></p>` : ""}
+    <p>If you have any questions regarding this invoice or need additional information, please don't hesitate to reach out.</p>
+    <p>We appreciate your prompt payment and look forward to continuing to serve you.</p>
+    <p>Best regards,<br><strong>The Neighborhood Kids Lawncare Plus</strong><br>Phone: 541-921-4416<br>Email: tnklcp@gmail.com</p>
   `;
 
   const emailRes = await fetch("https://api.resend.com/emails", {
