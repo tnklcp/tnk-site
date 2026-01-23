@@ -1,5 +1,5 @@
 /* TNK Employee Portal — Identity guard + tabs + Netlify-backed data (NO localStorage, fail loudly) */
-(function () {
+(async function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const byId = (id) => document.getElementById(id);
@@ -14,11 +14,19 @@
 
   // ----- Auth: employee or admin -----
   function assertAllowed() {
-    const role = sessionStorage.getItem("tnk_role");
+    const user = window.TNKIdentity?.user?.() || window.netlifyIdentity?.currentUser?.();
+    if (!user) {
+      location.replace("login.html");
+      return false;
+    }
+    const role = sessionStorage.getItem("tnk_role") || window.TNKIdentity?.role?.();
     if (role === "employee" || role === "admin") return true;
     location.replace("login.html");
     return false;
   }
+  try {
+    await window.TNKIdentity?.init?.({ guard: "employee-or-admin" });
+  } catch {}
   if (!assertAllowed()) return;
 
   byId("emp-logout")?.addEventListener("click", (e) => {
