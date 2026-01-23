@@ -8,6 +8,11 @@
 
   // ----- Auth: customer only -----
   function assertCustomer() {
+    const user = window.TNKIdentity?.user?.() || window.netlifyIdentity?.currentUser?.();
+    if (!user) {
+      location.replace("login-customer.html");
+      return false;
+    }
     const role = sessionStorage.getItem("tnk_role") || window.TNKIdentity?.role?.();
     if (role === "customer") return true;
     if (role === "admin") { location.replace("admin.html"); return false; }
@@ -49,7 +54,11 @@
   async function tokenStrict() {
     const t = await token();
     if (t) return t;
-    throw new Error("No JWT available from Netlify Identity user.");
+    const err = new Error("Session expired. Please log in again.");
+    err.code = "AUTH_REDIRECT";
+    try { window.TNKIdentity?.logout?.(); } catch {}
+    location.replace("login-customer.html");
+    throw err;
   }
 
   async function apiGet(name) {
@@ -79,6 +88,7 @@
   }
 
   function showFatal(err) {
+    if (err && err.code === "AUTH_REDIRECT") return;
     console.error(err);
     const root = byId("cust-root") || document.body;
     const div = document.createElement("div");
@@ -123,12 +133,12 @@
 
   // ----- Stripe checkout -----
   async function startStripeCheckout(invoiceId) {
-    const t = await token();
+    const t = await tokenStrict();
     const res = await fetch("/.netlify/functions/stripe_create_checkout", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(t ? { Authorization: `Bearer ${t}` } : {})
+        Authorization: `Bearer ${t}`
       },
       body: JSON.stringify({ invoiceId })
     });

@@ -222,13 +222,7 @@
       try {
         const initResult = id.init();
         if (initResult && typeof initResult.then === "function") {
-          initResult.catch((err) => {
-            const msg =
-              "Netlify Identity failed to initialize. Check that Identity is enabled and the site is reachable.";
-            console.error(msg, err);
-            showIdentityUnavailable(msg);
-            if (opts.onError) opts.onError(err);
-          });
+          await initResult;
         }
       } catch (err) {
         const msg =
