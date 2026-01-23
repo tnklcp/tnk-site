@@ -164,6 +164,14 @@ export default async (request, context) => {
     return json(200, { ok: true, url: session.url, id: session.id });
   } catch (e) {
     console.error("[stripe_create_checkout] error:", e);
+    const stripeStatus = Number(e?.statusCode);
+    if (Number.isInteger(stripeStatus) && stripeStatus >= 400 && stripeStatus < 600) {
+      const payload = { ok: false, error: e?.message || "Stripe error" };
+      if (e?.type) payload.type = e.type;
+      if (e?.code) payload.code = e.code;
+      return json(stripeStatus, payload);
+    }
+
     return json(500, { ok: false, error: "Server error", message: e?.message || String(e) });
   }
 };
