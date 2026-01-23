@@ -71,15 +71,32 @@
         }
       };
 
+      const assignCustomerRole = async (user) => {
+        if (!user) return;
+        try {
+          const token = await user.jwt(true);
+          if (!token) return;
+          await fetch("/.netlify/functions/identity_assign_role", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            }
+          });
+        } catch (err) {
+          console.warn("Customer role assignment failed.", err);
+        }
+      };
+
       TNKIdentity.init({
         autoRoute: false, // IMPORTANT: prevents redirect race
 
         onInit(user) {
-          if (user) TNKIdentity.routeAfterLogin(user);
+          if (user) assignCustomerRole(user).finally(() => TNKIdentity.routeAfterLogin(user));
         },
 
         onLogin(user) {
-          TNKIdentity.routeAfterLogin(user);
+          assignCustomerRole(user).finally(() => TNKIdentity.routeAfterLogin(user));
         },
 
         onLogout() {
