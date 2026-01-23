@@ -162,7 +162,7 @@ function getConfiguredStore() {
   } catch (e) {
     // Manual fallback mode:
     // Netlify requires siteID + token if Blobs env isn't automatically configured.
-    const env = globalThis.Netlify?.env || {};
+    const env = globalThis.Netlify?.env || process.env || {};
     const siteID =
       env.NETLIFY_SITE_ID ||
       env.SITE_ID ||

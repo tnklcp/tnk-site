@@ -22,7 +22,7 @@ function corsHeaders() {
 }
 
 function getEnv() {
-  return globalThis.Netlify?.env || {};
+  return globalThis.Netlify?.env || process.env || {};
 }
 
 function getSiteUrl(request) {

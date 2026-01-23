@@ -44,7 +44,7 @@ function getConfiguredStore() {
   try {
     return getStore({ name: "tnk-data" });
   } catch {
-    const env = globalThis.Netlify?.env || {};
+    const env = globalThis.Netlify?.env || process.env || {};
     const siteID = env.NETLIFY_SITE_ID || env.SITE_ID || env.SITE_ID_PROD || "";
     const token = env.NETLIFY_BLOBS_TOKEN || env.NETLIFY_AUTH_TOKEN || env.NETLIFY_API_TOKEN || "";
 
