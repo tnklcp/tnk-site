@@ -132,10 +132,22 @@
       },
       body: JSON.stringify({ invoiceId })
     });
-    if (!res.ok) throw new Error(`Stripe checkout failed: ${res.status} ${res.statusText}`);
-    const j = await res.json();
-    if (!j?.url) throw new Error(`Stripe checkout failed: missing session url`);
-    window.location.assign(j.url);
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const detail = payload?.error || payload?.message || payload?.detail;
+      throw new Error(
+        `Stripe checkout failed: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ""}`
+      );
+    }
+
+    if (!payload?.url) throw new Error("Stripe checkout failed: missing session url");
+    window.location.assign(payload.url);
   }
 
   // ----- invoices -----
