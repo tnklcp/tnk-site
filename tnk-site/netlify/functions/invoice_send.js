@@ -13,7 +13,7 @@ export default async (request, context) => {
     return json(405, { ok: false, error: "Method Not Allowed" });
   }
 
-  const env = globalThis.Netlify?.env || {};
+  const env = globalThis.Netlify?.env || process.env || {};
   const STRIPE_SECRET_KEY = getStripeSecretKey(env);
   if (!STRIPE_SECRET_KEY) return json(500, { ok: false, error: stripeSecretKeyError() });
 

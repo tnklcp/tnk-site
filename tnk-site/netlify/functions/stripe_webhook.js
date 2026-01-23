@@ -3,7 +3,7 @@ import { getStore } from "@netlify/blobs";
 import { getStripeSecretKey, stripeSecretKeyError } from "./stripe-utils.js";
 
 function getEnv() {
-  return globalThis.Netlify?.env || {};
+  return globalThis.Netlify?.env || process.env || {};
 }
 
 function getConfiguredStore() {
