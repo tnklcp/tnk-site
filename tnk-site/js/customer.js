@@ -25,6 +25,55 @@
   } catch {}
   if (!assertCustomer()) return;
 
+  // ----- Identity readiness (prevents immediate logout after login) -----
+  async function waitForIdentityUser({ timeoutMs = 12000 } = {}) {
+    if (window.TNKIdentity?.init) {
+      try {
+        await window.TNKIdentity.init({ guard: "customer" });
+      } catch {}
+    }
+
+    const start = Date.now();
+    const immediate = window.netlifyIdentity?.currentUser?.();
+    if (immediate) return immediate;
+
+    return await new Promise((resolve, reject) => {
+      const id = window.netlifyIdentity;
+      if (!id || !id.on) return reject(new Error("Netlify Identity widget is not available on this page."));
+
+      const timer = setInterval(() => {
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(timer);
+          reject(new Error("Timed out waiting for Netlify Identity. Are you logged in?"));
+        }
+      }, 200);
+
+      const poll = setInterval(() => {
+        const u = id.currentUser?.();
+        if (u) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(u);
+        }
+      }, 150);
+
+      id.on("init", (user) => {
+        if (user) {
+          clearInterval(poll);
+          clearInterval(timer);
+          resolve(user);
+        }
+      });
+
+      try {
+        const initResult = id.init();
+        if (initResult && typeof initResult.then === "function") {
+          initResult.catch(() => {});
+        }
+      } catch {}
+    });
+  }
+
   byId("cust-logout")?.addEventListener("click", (e) => {
     e.preventDefault();
     window.TNKIdentity?.logout?.();
@@ -54,6 +103,11 @@
   async function tokenStrict() {
     const t = await token();
     if (t) return t;
+    try {
+      const u = await waitForIdentityUser();
+      const jwt = await u.jwt(true);
+      if (jwt) return jwt;
+    } catch {}
     const err = new Error("Session expired. Please log in again.");
     err.code = "AUTH_REDIRECT";
     try { window.TNKIdentity?.logout?.(); } catch {}
