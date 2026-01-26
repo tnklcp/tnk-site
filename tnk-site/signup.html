@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Up | TNK Lawncare Plus</title>
+  <meta name="description" content="Create a secure Auth0 account for The Neighborhood Kids Lawncare Plus portals." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/signup.js" defer></script>
+</head>
+<body class="login-shell">
+  <a href="#signup" class="visually-hidden-focusable">Skip to Sign Up</a>
+
+  <header class="hero" style="padding-bottom: 3rem;">
+    <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus Logo" width="260" height="260" decoding="async" />
+    <h1>Create a Portal Account</h1>
+    <p>Sign up through Auth0 to access the Admin or Employee portal.</p>
+  </header>
+
+  <main class="login-main" id="signup">
+    <section class="section" style="padding-top: 2rem;">
+      <div class="container">
+        <div class="login-panel">
+          <div class="login-actions">
+            <p id="signup-status" role="status" aria-live="polite"></p>
+            <button id="signup-button" class="button button--primary button--xl" type="button">Create Account with Auth0</button>
+          </div>
+          <div class="login-note" aria-live="polite">
+            <strong>Before signing up</strong>
+            <p>Use a company-approved email address so access can be assigned to the right portal.</p>
+          </div>
+          <div class="login-links">
+            <a href="login.html">Already have an account? Sign in.</a>
+          </div>
+          <p class="login-footer">Need help? Call <a href="tel:+15419214416">541-921-4416</a> or return to the <a href="index.html">main site</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
