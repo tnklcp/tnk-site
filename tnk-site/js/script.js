@@ -56,63 +56,91 @@ document.addEventListener("keydown", (e) => {
 // ===== Estimate Tier Auto-Select + Scroll =====
 (function initTierButtons() {
   const btns = document.querySelectorAll('[data-plan]');
-  if (!btns.length) return;
+  const serviceCards = document.querySelectorAll('.service-card[data-tier]');
+  if (!btns.length && !serviceCards.length) return;
+
   const form = document.querySelector('#estimate form');
+  const selectedPlan = document.getElementById('selected_plan');
+  const essential = document.querySelector('details[data-tier="essential"]');
+  const standard  = document.querySelector('details[data-tier="standard"]');
+  const premium   = document.querySelector('details[data-tier="premium"]');
+  const storm     = document.querySelector('details[data-tier="storm"]');
+
+  const E = [
+    'Lawn Mowing (Alternating Patterns)',
+    'String Trimming (Edges, Beds)',
+    'Blowing Off Hard Surfaces',
+    'Turf Inspection'
+  ];
+  const S = [
+    'Shrub & Plant Pruning',
+    'Collect & Bag Debris',
+    'Plant Health Inspection',
+    'Hand-Pull Weeds (Walkways)'
+  ];
+  const P = [
+    'Hand-Weeding Garden Beds',
+    'Hand-Pull Weeds (Lawn)',
+    'Insulate Hose Spigots',
+    'Remove Cobwebs',
+    'Seasonal Fertilization',
+    'Inspect Mulch Condition'
+  ];
+
   const setChecked = (container, labels) => {
+    if (!container) return;
     labels.forEach(v => {
       const input = container.querySelector(`input[type="checkbox"][value="${v}"]`);
       if (input) input.checked = true;
     });
   };
 
+  const clearAll = () => {
+    form.querySelectorAll('input[type="checkbox"][name="services"]').forEach(i => (i.checked = false));
+    form.querySelectorAll('input[type="checkbox"][name^="storm_"]').forEach(i => (i.checked = false));
+  };
+
+  const openDetails = (details) => {
+    details.forEach(d => d && d.setAttribute('open', ''));
+  };
+
+  const selectTier = (plan) => {
+    if (selectedPlan) selectedPlan.value = plan;
+    clearAll();
+    openDetails([essential, standard, premium, storm]);
+
+    if (plan === 'essential') {
+      setChecked(essential, E);
+    } else if (plan === 'standard') {
+      setChecked(essential, E);
+      setChecked(standard, S);
+    } else if (plan === 'premium') {
+      setChecked(essential, E);
+      setChecked(standard, S);
+      setChecked(premium, P);
+    } else if (plan === 'storm') {
+      form.querySelectorAll('input[type="checkbox"][name^="storm_"]').forEach(i => (i.checked = true));
+    }
+
+    document.getElementById('estimate').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
       const plan = btn.dataset.plan; // 'essential' | 'standard' | 'premium'
-      document.getElementById('selected_plan').value = plan;
+      selectTier(plan);
+    });
+  });
 
-      // Clear previous checks
-      form.querySelectorAll('input[type="checkbox"][name="services"]').forEach(i => (i.checked = false));
-
-      const essential = document.querySelector('details[data-tier="essential"]');
-      const standard  = document.querySelector('details[data-tier="standard"]');
-      const premium   = document.querySelector('details[data-tier="premium"]');
-
-      const E = [
-        'Lawn Mowing (Alternating Patterns)',
-        'String Trimming (Edges, Beds)',
-        'Blowing Off Hard Surfaces',
-        'Turf Inspection'
-      ];
-      const S = [
-        'Shrub & Plant Pruning',
-        'Collect & Bag Debris',
-        'Plant Health Inspection',
-        'Hand-Pull Weeds (Walkways)'
-      ];
-      const P = [
-        'Hand-Weeding Garden Beds',
-        'Hand-Pull Weeds (Lawn)',
-        'Insulate Hose Spigots',
-        'Remove Cobwebs',
-        'Seasonal Fertilization',
-        'Inspect Mulch Condition'
-      ];
-
-      // open accordions for visibility
-      [essential, standard, premium].forEach(d => d && d.setAttribute('open',''));
-
-      if (plan === 'essential') {
-        setChecked(essential, E);
-      } else if (plan === 'standard') {
-        setChecked(essential, E);
-        setChecked(standard,  S);
-      } else if (plan === 'premium') {
-        setChecked(essential, E);
-        setChecked(standard,  S);
-        setChecked(premium,   P);
+  serviceCards.forEach(card => {
+    const plan = card.dataset.tier;
+    const handleActivate = () => selectTier(plan);
+    card.addEventListener('click', handleActivate);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleActivate();
       }
-
-      document.getElementById('estimate').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
 })();
