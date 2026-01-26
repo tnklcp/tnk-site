@@ -28,8 +28,8 @@
   <!-- Specials Bar -->
   <div class="promo-bar" role="region" aria-label="Specials">
     <div class="container promo-inner">
-      <span>🍂 Fall Special:</span>
-      <strong>Storm-Season Check From $35</strong>
+      <span>🌷 Spring Special:</span>
+      <strong>Spring Cleanups Starting at $65</strong>
       <a href="#estimate" class="promo-link">Book Now</a>
     </div>
   </div>
@@ -159,7 +159,7 @@
     <div class="container">
       <h2>Our Services</h2>
       <div class="services-grid">
-        <div class="service-card reveal" style="--reveal-delay:0ms">
+        <div class="service-card reveal" data-tier="essential" style="--reveal-delay:0ms" role="button" tabindex="0" aria-label="Select Essential Care and scroll to the estimate form">
           <h3>Essential Care</h3>
           <ul>
             <li><strong>Lawn Mowing:</strong> Regular mowing to maintain a neat, healthy lawn and proper grass height.</li>
@@ -168,7 +168,7 @@
             <li><strong>Proactive Property Inspection:</strong> Identify potential lawn or landscape issues early.</li>
           </ul>
         </div>
-        <div class="service-card reveal" style="--reveal-delay:120ms">
+        <div class="service-card reveal" data-tier="standard" style="--reveal-delay:120ms" role="button" tabindex="0" aria-label="Select Standard Care and scroll to the estimate form">
           <h3>Standard Care</h3>
           <ul>
             <li>Includes Essential Care, Plus:</li>
@@ -176,7 +176,7 @@
             <li><strong>Debris Clean-Up:</strong> Removal of fallen leaves, branches, and debris.</li>
           </ul>
         </div>
-        <div class="service-card reveal" style="--reveal-delay:240ms">
+        <div class="service-card reveal" data-tier="premium" style="--reveal-delay:240ms" role="button" tabindex="0" aria-label="Select Premium Care and scroll to the estimate form">
           <h3>Premium Care</h3>
           <ul>
             <li>Includes Standard Care, Plus:</li>
@@ -186,7 +186,7 @@
             <li><strong>Seasonal Fertilization:</strong> Promote healthy growth all year.</li>
           </ul>
         </div>
-        <div class="service-card reveal" style="--reveal-delay:360ms">
+        <div class="service-card reveal" data-tier="storm" style="--reveal-delay:360ms" role="button" tabindex="0" aria-label="Select Storm Damage Protection Inspection and scroll to the estimate form">
           <h3>Storm Damage Protection Inspection</h3>
           <p>
             <strong>Comprehensive Property Assessment:</strong> We inspect trees, fences, gutters, and outdoor structures and recommend proactive measures to reduce storm damage year-round.
@@ -269,7 +269,7 @@
         </details>
 
         <!-- Storm Prevention -->
-        <details class="details-card">
+        <details class="details-card" data-tier="storm">
           <summary>Storm Damage Prevention Service</summary>
           <div class="sublegend">Scheduling Options</div>
           <div class="option-grid option-grid--2">
