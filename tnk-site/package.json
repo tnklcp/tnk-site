@@ -2,5 +2,9 @@
   "name": "tnk-site",
   "private": true,
   "type": "module",
-  "dependencies": {}
+  "dependencies": {
+    "@netlify/blobs": "^9.0.0",
+    "@netlify/functions": "^3.0.0",
+    "jose": "^5.2.0"
+  }
 }

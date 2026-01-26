@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Employee Portal | TNK Lawncare Plus</title>
+  <meta name="description" content="Employee portal for assigned jobs, time tracking, and time-off requests." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/employee-portal.js" defer></script>
+</head>
+<body>
+  <header class="hero" style="padding-bottom: 3rem;">
+    <h1>Employee Portal</h1>
+    <p>Track assigned jobs, log time, and request time off.</p>
+    <div class="cta-row">
+      <a class="button button--primary" href="index.html">Return to Site</a>
+      <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding-top: 1.5rem;">
+      <div class="container">
+        <p class="login-footer" id="employee-user">Loading employee profile...</p>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container">
+        <h2>Today’s Work</h2>
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">AJ</div>
+            <h3 class="portal-title">Assigned Jobs</h3>
+            <p class="portal-text">View job details and update status as you work.</p>
+            <a class="button button--primary" href="#">View Jobs</a>
+          </article>
+          <article class="portal-card">
+            <div class="portal-icon">TT</div>
+            <h3 class="portal-title">Time Tracking</h3>
+            <p class="portal-text">Clock in/out and review your time logs.</p>
+            <a class="button button--primary" href="#">Open Time Log</a>
+          </article>
+          <article class="portal-card">
+            <div class="portal-icon">TO</div>
+            <h3 class="portal-title">Time-Off Requests</h3>
+            <p class="portal-text">Submit new requests and check approval status.</p>
+            <a class="button button--primary" href="#">Request Time Off</a>
+          </article>
+          <article class="portal-card">
+            <div class="portal-icon">CW</div>
+            <h3 class="portal-title">Completed Work</h3>
+            <p class="portal-text">Submit completed jobs for admin review.</p>
+            <a class="button button--primary" href="#">Submit Job</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Work Actions</h2>
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">AJ</div>
+            <h3 class="portal-title">Assigned Jobs</h3>
+            <p class="portal-text">Update job status as work progresses.</p>
+            <ul id="employee-job-list"></ul>
+          </article>
+
+          <article class="portal-card">
+            <div class="portal-icon">TT</div>
+            <h3 class="portal-title">Clock In / Out</h3>
+            <form id="employee-time-form" class="form-grid">
+              <div class="field">
+                <label for="time-job-id">Job ID</label>
+                <input id="time-job-id" name="jobId" type="text" />
+              </div>
+              <div class="field">
+                <label for="time-notes">Notes</label>
+                <input id="time-notes" name="notes" type="text" />
+              </div>
+              <div class="form-actions">
+                <button class="button button--primary" type="submit" data-action="clock_in">Clock In</button>
+                <button class="button button--accent" type="submit" data-action="clock_out">Clock Out</button>
+              </div>
+            </form>
+            <ul id="employee-time-list"></ul>
+          </article>
+
+          <article class="portal-card">
+            <div class="portal-icon">TO</div>
+            <h3 class="portal-title">Request Time Off</h3>
+            <form id="employee-timeoff-form" class="form-grid">
+              <div class="field">
+                <label for="timeoff-start">Start Date</label>
+                <input id="timeoff-start" name="startDate" type="date" required />
+              </div>
+              <div class="field">
+                <label for="timeoff-end">End Date</label>
+                <input id="timeoff-end" name="endDate" type="date" required />
+              </div>
+              <div class="field">
+                <label for="timeoff-notes">Notes</label>
+                <input id="timeoff-notes" name="notes" type="text" />
+              </div>
+              <div class="form-actions">
+                <button class="button button--primary" type="submit">Submit Request</button>
+              </div>
+            </form>
+            <ul id="employee-timeoff-list"></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
