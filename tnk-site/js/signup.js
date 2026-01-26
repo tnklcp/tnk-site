@@ -21,14 +21,27 @@
     window.location.href = "employee.html";
   };
 
+  const attachIdentityHandlers = async () => {
+    const identity = await window.tnkAuth.getIdentity();
+    const handleAccess = async () => {
+      updateStatus("Account ready. Redirecting...");
+      const profile = await window.tnkAuth.getUserProfile();
+      if (typeof identity.close === "function") {
+        identity.close();
+      }
+      redirectByRole(profile.roles);
+    };
+    identity.on("signup", handleAccess);
+    identity.on("login", handleAccess);
+  };
+
   const boot = async () => {
     try {
       updateStatus("Loading secure signup...");
       await window.tnkAuth.init();
-      await window.tnkAuth.handleRedirectIfPresent();
-      const { client } = await window.tnkAuth.init();
-      const isAuthenticated = await client.isAuthenticated();
-      if (isAuthenticated) {
+      await attachIdentityHandlers();
+      const user = await window.tnkAuth.getCurrentUser();
+      if (user) {
         const profile = await window.tnkAuth.getUserProfile();
         redirectByRole(profile.roles);
         return;
@@ -41,7 +54,7 @@
 
   button.addEventListener("click", (event) => {
     event.preventDefault();
-    updateStatus("Opening Auth0 signup...");
+    updateStatus("Opening account setup...");
     window.tnkAuth.signup();
   });
 
