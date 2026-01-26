@@ -7,27 +7,3 @@
 [functions]
   node_bundler = "esbuild"
 
-[[redirects]]
-  from = "/admin"
-  to = "/admin.html"
-  status = 301
-
-[[redirects]]
-  from = "/employee"
-  to = "/employee.html"
-  status = 301
-
-[[redirects]]
-  from = "/customer"
-  to = "/customer.html"
-  status = 301
-
-[[redirects]]
-  from = "/login"
-  to = "/login.html"
-  status = 301
-
-[[redirects]]
-  from = "/login-customer"
-  to = "/login-customer.html"
-  status = 301
