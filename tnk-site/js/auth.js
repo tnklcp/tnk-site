@@ -1,6 +1,6 @@
 (() => {
   const state = {
-    client: null,
+    identity: null,
     config: null,
     ready: null
   };
@@ -19,116 +19,112 @@
     return response.json();
   };
 
+  const getIdentity = () => {
+    if (state.identity) return state.identity;
+    if (!window.netlifyIdentity) {
+      throw new Error("Netlify Identity widget failed to load.");
+    }
+    state.identity = window.netlifyIdentity;
+    return state.identity;
+  };
+
   const init = async () => {
     if (state.ready) return state.ready;
 
     state.ready = (async () => {
       const config = await loadConfig();
-      if (!window.createAuth0Client) {
-        throw new Error("Auth0 SDK failed to load.");
-      }
-      const client = await window.createAuth0Client({
-        domain: config.domain,
-        clientId: config.clientId,
-        authorizationParams: {
-          audience: config.audience || undefined,
-          redirect_uri: config.redirectUri || `${window.location.origin}/login.html`
-        },
-        cacheLocation: "localstorage",
-        useRefreshTokens: true
-      });
-      state.client = client;
+      const identity = getIdentity();
+      identity.init();
       state.config = config;
-      return { client, config };
+      return { identity, config };
     })();
 
     return state.ready;
   };
 
-  const handleRedirectIfPresent = async () => {
-    const query = window.location.search;
-    if (!query.includes("code=") || !query.includes("state=")) {
-      return false;
-    }
-    const { client } = await init();
-    await client.handleRedirectCallback();
-    window.history.replaceState({}, document.title, window.location.pathname);
-    return true;
-  };
+  const handleRedirectIfPresent = async () => false;
 
-  const getRolesFromClaims = (claims, config) => {
-    if (!claims) return [];
-    const configured = config?.rolesClaim && claims[config.rolesClaim];
-    const fallback = claims["https://tnk/roles"] || claims.roles;
-    const roles = configured || fallback;
-    if (Array.isArray(roles)) return roles.map((role) => String(role));
-    if (typeof roles === "string") return [roles];
+  const normalizeRoles = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map((role) => String(role));
+    if (typeof value === "string") return [value];
     return [];
   };
 
+  const getRolesFromUser = (user, config) => {
+    if (!user) return [];
+    const rolesClaim = config?.rolesClaim;
+    const appMetadata = user.app_metadata || {};
+    const userMetadata = user.user_metadata || {};
+    const configuredRoles = rolesClaim
+      ? appMetadata[rolesClaim] ?? userMetadata[rolesClaim] ?? user[rolesClaim]
+      : undefined;
+    const fallback = configuredRoles ?? appMetadata.roles ?? userMetadata.roles ?? user.roles;
+    return normalizeRoles(fallback);
+  };
+
   const getUserProfile = async () => {
-    const { client, config } = await init();
-    const [user, claims] = await Promise.all([client.getUser(), client.getIdTokenClaims()]);
+    const { identity, config } = await init();
+    const user = identity.currentUser();
     return {
       user,
-      roles: getRolesFromClaims(claims || {}, config),
-      claims
+      roles: getRolesFromUser(user, config),
+      claims: user?.app_metadata || {}
     };
   };
 
+  const getCurrentUser = async () => {
+    const { identity } = await init();
+    return identity.currentUser();
+  };
+
   const login = async () => {
-    const { client, config } = await init();
-    await client.loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: config.redirectUri || `${window.location.origin}/login.html`
-      }
-    });
+    const { identity } = await init();
+    identity.open("login");
   };
 
   const signup = async () => {
-    const { client, config } = await init();
-    await client.loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: config.redirectUri || `${window.location.origin}/login.html`,
-        screen_hint: "signup"
-      }
-    });
+    const { identity } = await init();
+    identity.open("signup");
   };
 
   const logout = async (returnTo) => {
-    const { client } = await init();
-    client.logout({
-      logoutParams: {
-        returnTo: returnTo || `${window.location.origin}/login.html`
-      }
-    });
+    const { identity } = await init();
+    identity.logout();
+    if (returnTo) {
+      window.location.href = returnTo;
+    }
   };
 
   const getAccessToken = async () => {
-    const { client, config } = await init();
-    return client.getTokenSilently({
-      authorizationParams: {
-        audience: config.audience || undefined
-      }
-    });
+    const { identity } = await init();
+    const user = identity.currentUser();
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (typeof user.jwt === "function") {
+      return user.jwt();
+    }
+    const token = user.token?.access_token;
+    if (!token) {
+      throw new Error("Missing access token");
+    }
+    return token;
   };
 
   const requireAuth = async (redirectTo) => {
-    const { client, config } = await init();
-    await handleRedirectIfPresent();
-    const isAuthenticated = await client.isAuthenticated();
-    if (!isAuthenticated) {
-      await client.loginWithRedirect({
-        authorizationParams: {
-          redirect_uri:
-            redirectTo ||
-            config.redirectUri ||
-            `${window.location.origin}${window.location.pathname}`
-        }
-      });
+    const { identity } = await init();
+    const user = identity.currentUser();
+    if (!user) {
+      window.location.href = redirectTo || "login.html";
       return null;
     }
-    return client;
+    return user;
+  };
+
+  const onEvent = async (event, handler) => {
+    const { identity } = await init();
+    identity.on(event, handler);
   };
 
   window.tnkAuth = {
@@ -141,6 +137,9 @@
     logout,
     requireAuth,
     setStatus,
-    getConfig: () => state.config
+    getConfig: () => state.config,
+    getCurrentUser,
+    getIdentity: async () => (await init()).identity,
+    onEvent
   };
 })();

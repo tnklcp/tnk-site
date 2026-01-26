@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login | TNK Lawncare Plus</title>
-  <meta name="description" content="Secure login for The Neighborhood Kids Lawncare Plus internal portals." />
+  <meta name="description" content="Secure login for The Neighborhood Kids Lawncare Plus internal portals via Netlify Identity." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
   <script src="js/auth.js" defer></script>
   <script src="js/login.js" defer></script>
 </head>
@@ -26,11 +26,11 @@
         <div class="login-panel">
           <div class="login-actions">
             <p id="login-status" role="status" aria-live="polite"></p>
-            <button id="login-button" class="button button--primary button--xl" type="button">Sign In with Auth0</button>
+            <button id="login-button" class="button button--primary button--xl" type="button">Sign In with Netlify Identity</button>
           </div>
           <div class="login-note" aria-live="polite">
             <strong>Secure access</strong>
-            <p>Use your Auth0 credentials to reach the Admin or Employee portal.</p>
+            <p>Use your Netlify Identity credentials to reach the Admin or Employee portal.</p>
           </div>
           <div class="login-links">
             <a href="signup.html">Need an account? Sign up here.</a>

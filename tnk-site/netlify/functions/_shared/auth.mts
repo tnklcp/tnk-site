@@ -1,8 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 type AuthConfig = {
-  domain: string;
-  audience?: string;
   rolesClaim?: string;
   adminRole: string;
   employeeRole: string;
@@ -15,19 +13,30 @@ type AuthResult = {
   roles: string[];
 };
 
-const getAuthConfig = (): AuthConfig => {
-  const domain = Netlify.env.AUTH0_DOMAIN;
-  if (!domain) {
-    throw new Error("AUTH0_DOMAIN is not configured");
+const getEnv = (key: string): string | undefined => {
+  if (typeof Netlify === "undefined" || !Netlify.env) {
+    return undefined;
   }
+  if (typeof Netlify.env.get === "function") {
+    return Netlify.env.get(key);
+  }
+  return (Netlify.env as Record<string, string | undefined>)[key];
+};
 
-  return {
-    domain,
-    audience: Netlify.env.AUTH0_AUDIENCE || undefined,
-    rolesClaim: Netlify.env.AUTH0_ROLES_CLAIM || undefined,
-    adminRole: Netlify.env.AUTH0_ADMIN_ROLE || "admin",
-    employeeRole: Netlify.env.AUTH0_EMPLOYEE_ROLE || "employee"
-  };
+const getAuthConfig = (): AuthConfig => ({
+  rolesClaim: getEnv("IDENTITY_ROLES_CLAIM") || undefined,
+  adminRole: getEnv("IDENTITY_ADMIN_ROLE") || "admin",
+  employeeRole: getEnv("IDENTITY_EMPLOYEE_ROLE") || "employee"
+});
+
+const getIdentityIssuer = (req: Request): string | null => {
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost || req.headers.get("host");
+  if (!host) {
+    return null;
+  }
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  return `${proto}://${host}/.netlify/identity`;
 };
 
 const normalizeRoles = (value: unknown): string[] => {
@@ -38,10 +47,19 @@ const normalizeRoles = (value: unknown): string[] => {
 };
 
 const getRoles = (payload: Record<string, unknown>, config: AuthConfig): string[] => {
-  if (config.rolesClaim && payload[config.rolesClaim]) {
-    return normalizeRoles(payload[config.rolesClaim]);
-  }
-  const fallbackClaim = payload["https://tnk/roles"] ?? payload.roles;
+  const appMetadata =
+    payload.app_metadata && typeof payload.app_metadata === "object"
+      ? (payload.app_metadata as Record<string, unknown>)
+      : undefined;
+  const configuredClaim = config.rolesClaim
+    ? payload[config.rolesClaim] ?? appMetadata?.[config.rolesClaim]
+    : undefined;
+  const fallbackClaim =
+    configuredClaim ??
+    payload["https://tnk/roles"] ??
+    payload.roles ??
+    appMetadata?.roles ??
+    payload.app_metadata;
   return normalizeRoles(fallbackClaim);
 };
 
@@ -54,13 +72,12 @@ export const verifyAuth = async (req: Request): Promise<AuthResult> => {
   }
 
   const config = getAuthConfig();
-  const issuer = `https://${config.domain}/`;
-  const jwks = createRemoteJWKSet(new URL(`${issuer}.well-known/jwks.json`));
-
-  const { payload } = await jwtVerify(token, jwks, {
-    issuer,
-    audience: config.audience
-  });
+  const issuer = getIdentityIssuer(req);
+  if (!issuer) {
+    throw new Error("Identity issuer unavailable");
+  }
+  const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
+  const { payload } = await jwtVerify(token, jwks, { issuer });
 
   return {
     subject: String(payload.sub || ""),

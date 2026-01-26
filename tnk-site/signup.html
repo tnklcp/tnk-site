@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sign Up | TNK Lawncare Plus</title>
-  <meta name="description" content="Create a secure Auth0 account for The Neighborhood Kids Lawncare Plus portals." />
+  <meta name="description" content="Create a secure Netlify Identity account for The Neighborhood Kids Lawncare Plus portals." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
   <script src="js/auth.js" defer></script>
   <script src="js/signup.js" defer></script>
 </head>
@@ -17,7 +17,7 @@
   <header class="hero" style="padding-bottom: 3rem;">
     <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus Logo" width="260" height="260" decoding="async" />
     <h1>Create a Portal Account</h1>
-    <p>Sign up through Auth0 to access the Admin or Employee portal.</p>
+    <p>Sign up through Netlify Identity to access the Admin or Employee portal.</p>
   </header>
 
   <main class="login-main" id="signup">
@@ -26,7 +26,7 @@
         <div class="login-panel">
           <div class="login-actions">
             <p id="signup-status" role="status" aria-live="polite"></p>
-            <button id="signup-button" class="button button--primary button--xl" type="button">Create Account with Auth0</button>
+            <button id="signup-button" class="button button--primary button--xl" type="button">Create Account with Netlify Identity</button>
           </div>
           <div class="login-note" aria-live="polite">
             <strong>Before signing up</strong>
