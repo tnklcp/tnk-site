@@ -42,11 +42,11 @@
         </div>
 
         <div class="dashboard-grid dashboard-grid--mosaic">
-          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-cut">
+          <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--shape-cut">
             <div class="panel-header">
               <div>
                 <h3>Assigned Jobs</h3>
-                <p class="panel-note">Start work or submit completed jobs from the list.</p>
+                <p class="panel-note">Start work or complete assigned jobs from the list.</p>
               </div>
               <div class="panel-icon">AJ</div>
             </div>
@@ -56,20 +56,40 @@
             </div>
           </article>
 
-          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
+          <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--shape-pill">
+            <div class="panel-header">
+              <div>
+                <h3>Pay Period Hours</h3>
+                <p class="panel-note">Current and last pay period totals.</p>
+              </div>
+              <div class="panel-icon">PP</div>
+            </div>
+            <div class="panel-body">
+              <p class="pay-period-range" id="employee-pay-period-range"></p>
+              <div class="pay-period-metrics">
+                <div class="metric">
+                  <span>Current pay period</span>
+                  <strong id="employee-pay-period-current">00:00</strong>
+                </div>
+                <div class="metric">
+                  <span>Last pay period</span>
+                  <strong id="employee-pay-period-last">00:00</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--shape-soft">
             <div class="panel-header">
               <div>
                 <h3>Clock In / Out</h3>
-                <p class="panel-note">Log time against a job and review recent entries.</p>
+                <p class="panel-note">Log overall hours and review recent entries.</p>
+                <span class="status-pill" id="employee-clock-status">Clocked out</span>
               </div>
               <div class="panel-icon">TT</div>
             </div>
             <div class="panel-body">
               <form id="employee-time-form" class="form-grid">
-                <div class="field">
-                  <label for="time-job-id">Job ID</label>
-                  <input id="time-job-id" name="jobId" type="text" />
-                </div>
                 <div class="field">
                   <label for="time-notes">Notes</label>
                   <input id="time-notes" name="notes" type="text" />
@@ -82,11 +102,11 @@
             </div>
           </article>
 
-          <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--shape-arch">
+          <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--shape-arch">
             <div class="panel-header">
               <div>
                 <h3>Recent Time Entries</h3>
-                <p class="panel-note">Recent clock activity for assigned jobs.</p>
+                <p class="panel-note">Recent clock activity for overall hours.</p>
               </div>
               <div class="panel-icon">TL</div>
             </div>
@@ -96,7 +116,7 @@
             </div>
           </article>
 
-          <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--shape-soft">
+          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
             <div class="panel-header">
               <div>
                 <h3>Request Time Off</h3>
@@ -125,7 +145,7 @@
             </div>
           </article>
 
-          <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--shape-pill">
+          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-pill">
             <div class="panel-header">
               <div>
                 <h3>Time-Off Requests</h3>

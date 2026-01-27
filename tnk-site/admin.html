@@ -37,6 +37,7 @@
               <a class="dashboard-link" href="admin-jobs.html">Jobs</a>
               <a class="dashboard-link" href="admin-approvals.html">Approvals</a>
               <a class="dashboard-link" href="admin-time.html">Time Logs</a>
+              <a class="dashboard-link" href="admin-pay-periods.html">Pay Periods</a>
             </div>
           </div>
         </div>
@@ -112,6 +113,30 @@
                   <input id="job-assigned" name="assignedTo" type="text" />
                 </div>
                 <div class="field">
+                  <label for="job-service-date">Service Date</label>
+                  <input id="job-service-date" name="serviceDate" type="date" />
+                </div>
+                <div class="field">
+                  <label for="job-recurrence-type">Job Type</label>
+                  <select id="job-recurrence-type" name="recurrenceType">
+                    <option value="one_time">One-time</option>
+                    <option value="recurring">Recurring</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="job-recurrence-interval">Recurrence Interval</label>
+                  <input id="job-recurrence-interval" name="recurrenceInterval" type="number" min="1" value="1" />
+                  <span class="help-text">Only used for recurring jobs.</span>
+                </div>
+                <div class="field">
+                  <label for="job-recurrence-unit">Recurrence Unit</label>
+                  <select id="job-recurrence-unit" name="recurrenceUnit">
+                    <option value="week">Week(s)</option>
+                    <option value="day">Day(s)</option>
+                    <option value="month">Month(s)</option>
+                  </select>
+                </div>
+                <div class="field">
                   <label for="job-notes">Notes</label>
                   <input id="job-notes" name="notes" type="text" />
                 </div>
@@ -161,6 +186,34 @@
             <div class="panel-list">
               <h4>Pending Requests</h4>
               <ul id="admin-timeoff-list" class="portal-list"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
+            <div class="panel-header">
+              <div>
+                <h3>Current Pay Period</h3>
+                <p class="panel-note">Running totals for the active pay period.</p>
+              </div>
+              <div class="panel-icon">PP</div>
+            </div>
+            <div class="panel-body">
+              <p class="pay-period-range" id="admin-pay-period-range"></p>
+              <ul id="admin-pay-period-current-list" class="portal-list"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-arch">
+            <div class="panel-header">
+              <div>
+                <h3>Pay Period History</h3>
+                <p class="panel-note">Open the employee tabs to review every pay period.</p>
+              </div>
+              <div class="panel-icon">PH</div>
+            </div>
+            <div class="panel-body">
+              <p class="panel-note" style="margin-bottom: 1rem;">View each employee individually to see their hours only.</p>
+              <a class="button button--primary" href="admin-pay-periods.html">Open Pay Period History</a>
             </div>
           </article>
         </div>

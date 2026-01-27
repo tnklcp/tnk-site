@@ -8,6 +8,18 @@
   const jobList = document.getElementById("admin-job-list");
   const timeList = document.getElementById("admin-time-list");
   const timeoffList = document.getElementById("admin-timeoff-list");
+  const recurrenceTypeSelect = document.getElementById("job-recurrence-type");
+  const recurrenceIntervalInput = document.getElementById("job-recurrence-interval");
+  const recurrenceUnitSelect = document.getElementById("job-recurrence-unit");
+  const payPeriodRangeEl = document.getElementById("admin-pay-period-range");
+  const payPeriodCurrentList = document.getElementById("admin-pay-period-current-list");
+  const payPeriodEmployeeList = document.getElementById("admin-pay-period-employee-list");
+  const payPeriodHistoryTitle = document.getElementById("admin-pay-period-history-title");
+  const payPeriodHistoryList = document.getElementById("admin-pay-period-history-list");
+  const payPeriodTabs = document.getElementById("admin-pay-period-tabs");
+  const payPeriodTabPanel = document.getElementById("admin-pay-period-panel");
+  const payPeriodTabTitle = document.getElementById("admin-pay-period-tab-title");
+  const payPeriodTabList = document.getElementById("admin-pay-period-tab-list");
 
   if (!userEl || !logoutBtn) return;
 
@@ -76,6 +88,113 @@
 
   const toArray = (value) => (Array.isArray(value) ? value : []);
 
+  const formatDateTime = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(date);
+  };
+
+  const formatServiceDate = (value) => {
+    if (!value) return "";
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric"
+    }).format(date);
+  };
+
+  const formatDuration = (clockIn, clockOut) => {
+    if (!clockIn || !clockOut) return "";
+    const start = new Date(clockIn);
+    const end = new Date(clockOut);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "";
+    const diffMs = Math.max(0, end.getTime() - start.getTime());
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const hoursLabel = String(hours).padStart(2, "0");
+    const minutesLabel = String(minutes).padStart(2, "0");
+    return `${hoursLabel}:${minutesLabel}`;
+  };
+
+  const PAY_PERIOD_ANCHOR = new Date("2026-01-25T00:00:00");
+  const PAY_PERIOD_DAYS = 14;
+  const MS_PER_DAY = 86400000;
+
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const addDays = (date, days) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  };
+
+  const formatDate = (date) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric"
+    }).format(date);
+
+  const formatMinutes = (minutes) => {
+    const totalMinutes = Math.max(0, Math.round(minutes));
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  };
+
+  const getPayPeriodForDate = (date) => {
+    const base = startOfDay(PAY_PERIOD_ANCHOR);
+    const target = startOfDay(date);
+    const diffDays = Math.floor((target.getTime() - base.getTime()) / MS_PER_DAY);
+    const index = Math.floor(diffDays / PAY_PERIOD_DAYS);
+    const start = addDays(base, index * PAY_PERIOD_DAYS);
+    const end = addDays(start, PAY_PERIOD_DAYS - 1);
+    return { index, start, end };
+  };
+
+  const getEntryInterval = (entry, now) => {
+    if (!entry?.clockIn) return null;
+    const start = new Date(entry.clockIn);
+    if (Number.isNaN(start.getTime())) return null;
+    const end = entry.clockOut ? new Date(entry.clockOut) : now;
+    if (Number.isNaN(end.getTime())) return null;
+    return { start, end, open: !entry.clockOut };
+  };
+
+  const getOverlapMinutes = (start, end, periodStart, periodEndExclusive) => {
+    const rangeStart = Math.max(start.getTime(), periodStart.getTime());
+    const rangeEnd = Math.min(end.getTime(), periodEndExclusive.getTime());
+    if (rangeEnd <= rangeStart) return 0;
+    return (rangeEnd - rangeStart) / 60000;
+  };
+
+  const sumMinutesForPeriod = (entries, periodStart, periodEnd, now, includeOpen) => {
+    if (!entries?.length) return 0;
+    const periodEndExclusive = addDays(periodEnd, 1);
+    return entries.reduce((total, entry) => {
+      const interval = getEntryInterval(entry, now);
+      if (!interval) return total;
+      if (interval.open && !includeOpen) return total;
+      return total + getOverlapMinutes(interval.start, interval.end, periodStart, periodEndExclusive);
+    }, 0);
+  };
+
+  const applyRecurrenceState = (typeSelect, intervalInput, unitSelect) => {
+    if (!typeSelect || !intervalInput || !unitSelect) return;
+    const isRecurring = typeSelect.value === "recurring";
+    intervalInput.disabled = !isRecurring;
+    unitSelect.disabled = !isRecurring;
+  };
+
   const formatErrorSummary = (error) => {
     if (!error) return "Unknown error.";
     if (typeof error === "string") return error;
@@ -114,7 +233,22 @@
     const data = await apiRequest("/api/customers");
     const items = toArray(data?.customers).map((customer) => {
       const li = document.createElement("li");
-      li.textContent = `${customer.name} (${customer.status})`;
+      const label = document.createElement("div");
+      label.textContent = `${customer.name} (${customer.status})`;
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "button button--accent";
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", async () => {
+        if (!window.confirm(`Delete customer ${customer.name}? This cannot be undone.`)) return;
+        await apiRequest("/api/customers", {
+          method: "DELETE",
+          body: JSON.stringify({ id: customer.id })
+        });
+        loadCustomers();
+      });
+      li.appendChild(label);
+      li.appendChild(deleteBtn);
       return li;
     });
     renderList(customerList, items, "No customers yet.");
@@ -125,7 +259,115 @@
     const items = toArray(data?.jobs).map((job) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
-      label.textContent = `${job.title} — ${job.status}`;
+      const statusLabel = String(job.status || "").replace("_", " ");
+      const customerLabel = job.customerName ? ` — ${job.customerName}` : "";
+      label.textContent = `${job.title}${customerLabel} (${statusLabel})`;
+
+      const meta = document.createElement("div");
+      meta.className = "job-meta";
+      const serviceDateLabel = job.serviceDate ? formatServiceDate(job.serviceDate) : "Not scheduled";
+      const recurrenceLabel = job.isRecurring
+        ? `Recurring every ${job.recurrenceInterval || 1} ${job.recurrenceUnit || "week"}(s)`
+        : "One-time job";
+      const nextServiceLabel = job.isRecurring && job.nextServiceDate
+        ? formatServiceDate(job.nextServiceDate)
+        : "Not set";
+      meta.textContent = `Service date: ${serviceDateLabel} · ${recurrenceLabel} · Next: ${nextServiceLabel}`;
+
+      const timing = document.createElement("div");
+      timing.className = "job-meta";
+      const startedLabel = formatDateTime(job.startedAt);
+      const completedLabel = formatDateTime(job.completedAt);
+      const durationLabel = formatDuration(job.startedAt, job.completedAt);
+      const timingParts = [];
+      if (startedLabel) timingParts.push(`Started: ${startedLabel}`);
+      if (completedLabel) timingParts.push(`Completed: ${completedLabel}`);
+      if (durationLabel) timingParts.push(`Total: ${durationLabel}`);
+      timing.textContent = timingParts.join(" · ");
+
+      const editWrap = document.createElement("div");
+      editWrap.className = "job-inline";
+
+      const customerField = document.createElement("label");
+      customerField.textContent = "Customer";
+      const customerInput = document.createElement("input");
+      customerInput.type = "text";
+      customerInput.value = job.customerName || "";
+      customerField.appendChild(customerInput);
+      const customerWrap = document.createElement("div");
+      customerWrap.className = "field";
+      customerWrap.appendChild(customerField);
+
+      const assignedField = document.createElement("label");
+      assignedField.textContent = "Assigned To";
+      const assignedInput = document.createElement("input");
+      assignedInput.type = "text";
+      assignedInput.value = Array.isArray(job.assignedTo) ? job.assignedTo.join(", ") : "";
+      assignedField.appendChild(assignedInput);
+      const assignedWrap = document.createElement("div");
+      assignedWrap.className = "field";
+      assignedWrap.appendChild(assignedField);
+
+      const serviceField = document.createElement("label");
+      serviceField.textContent = "Service Date";
+      const serviceInput = document.createElement("input");
+      serviceInput.type = "date";
+      serviceInput.value = job.serviceDate || "";
+      serviceField.appendChild(serviceInput);
+      const serviceWrap = document.createElement("div");
+      serviceWrap.className = "field";
+      serviceWrap.appendChild(serviceField);
+
+      const typeField = document.createElement("label");
+      typeField.textContent = "Job Type";
+      const typeSelect = document.createElement("select");
+      [
+        { value: "one_time", label: "One-time" },
+        { value: "recurring", label: "Recurring" }
+      ].forEach((optionData) => {
+        const option = document.createElement("option");
+        option.value = optionData.value;
+        option.textContent = optionData.label;
+        typeSelect.appendChild(option);
+      });
+      typeSelect.value = job.isRecurring ? "recurring" : "one_time";
+      typeField.appendChild(typeSelect);
+      const typeWrap = document.createElement("div");
+      typeWrap.className = "field";
+      typeWrap.appendChild(typeField);
+
+      const intervalField = document.createElement("label");
+      intervalField.textContent = "Interval";
+      const intervalInput = document.createElement("input");
+      intervalInput.type = "number";
+      intervalInput.min = "1";
+      intervalInput.value = String(job.recurrenceInterval || 1);
+      intervalField.appendChild(intervalInput);
+      const intervalWrap = document.createElement("div");
+      intervalWrap.className = "field";
+      intervalWrap.appendChild(intervalField);
+
+      const unitField = document.createElement("label");
+      unitField.textContent = "Unit";
+      const unitSelect = document.createElement("select");
+      [
+        { value: "week", label: "Week(s)" },
+        { value: "day", label: "Day(s)" },
+        { value: "month", label: "Month(s)" }
+      ].forEach((optionData) => {
+        const option = document.createElement("option");
+        option.value = optionData.value;
+        option.textContent = optionData.label;
+        unitSelect.appendChild(option);
+      });
+      unitSelect.value = job.recurrenceUnit || "week";
+      unitField.appendChild(unitSelect);
+      const unitWrap = document.createElement("div");
+      unitWrap.className = "field";
+      unitWrap.appendChild(unitField);
+
+      const statusField = document.createElement("label");
+      statusField.textContent = "Status";
       const select = document.createElement("select");
       ["not_started", "in_progress", "submitted", "approved", "rejected"].forEach((status) => {
         const option = document.createElement("option");
@@ -134,20 +376,69 @@
         if (status === job.status) option.selected = true;
         select.appendChild(option);
       });
+      statusField.appendChild(select);
+      const statusWrap = document.createElement("div");
+      statusWrap.className = "field";
+      statusWrap.appendChild(statusField);
+
+      const actionWrap = document.createElement("div");
+      actionWrap.className = "portal-actions";
+
       const button = document.createElement("button");
       button.className = "button button--primary";
       button.type = "button";
-      button.textContent = "Update";
+      button.textContent = "Update Job";
       button.addEventListener("click", async () => {
         await apiRequest("/api/jobs", {
           method: "PATCH",
-          body: JSON.stringify({ id: job.id, status: select.value })
+          body: JSON.stringify({
+            id: job.id,
+            status: select.value,
+            customerName: customerInput.value,
+            assignedTo: assignedInput.value,
+            serviceDate: serviceInput.value,
+            recurrenceType: typeSelect.value,
+            recurrenceInterval: intervalInput.value,
+            recurrenceUnit: unitSelect.value
+          })
         });
         loadJobs();
       });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "button button--accent";
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "Delete Job";
+      deleteBtn.addEventListener("click", async () => {
+        if (!window.confirm(`Delete job ${job.title}? This cannot be undone.`)) return;
+        await apiRequest("/api/jobs", {
+          method: "DELETE",
+          body: JSON.stringify({ id: job.id })
+        });
+        loadJobs();
+      });
+
+      actionWrap.appendChild(button);
+      actionWrap.appendChild(deleteBtn);
+
+      editWrap.appendChild(customerWrap);
+      editWrap.appendChild(assignedWrap);
+      editWrap.appendChild(serviceWrap);
+      editWrap.appendChild(typeWrap);
+      editWrap.appendChild(intervalWrap);
+      editWrap.appendChild(unitWrap);
+      editWrap.appendChild(statusWrap);
+
+      typeSelect.addEventListener("change", () =>
+        applyRecurrenceState(typeSelect, intervalInput, unitSelect)
+      );
+      applyRecurrenceState(typeSelect, intervalInput, unitSelect);
+
       li.appendChild(label);
-      li.appendChild(select);
-      li.appendChild(button);
+      li.appendChild(meta);
+      if (timingParts.length) li.appendChild(timing);
+      li.appendChild(editWrap);
+      li.appendChild(actionWrap);
       return li;
     });
     renderList(jobList, items, "No jobs created yet.");
@@ -157,7 +448,10 @@
     const data = await apiRequest("/api/time-entries");
     const items = toArray(data?.entries).map((entry) => {
       const li = document.createElement("li");
-      li.textContent = `${entry.userEmail || entry.userId} — ${entry.status} (${entry.clockIn})`;
+      const clockInLabel = formatDateTime(entry.clockIn);
+      const clockOutLabel = formatDateTime(entry.clockOut);
+      const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";
+      li.textContent = `${entry.userEmail || entry.userId} — ${statusLabel} (${clockInLabel || entry.clockIn}${clockOutLabel ? ` → ${clockOutLabel}` : ""})`;
       return li;
     });
     renderList(timeList, items, "No time entries recorded yet.");
@@ -191,6 +485,169 @@
     renderList(timeoffList, items, "No time-off requests yet.");
   };
 
+  const loadPayPeriods = async () => {
+    const [employeeData, timeData] = await Promise.all([
+      apiRequest("/api/employees"),
+      apiRequest("/api/time-entries")
+    ]);
+    const employees = toArray(employeeData?.employees);
+    const entries = toArray(timeData?.entries);
+    const now = new Date();
+    const currentPeriod = getPayPeriodForDate(now);
+
+    if (payPeriodRangeEl) {
+      payPeriodRangeEl.textContent = `Pay period: ${formatDate(currentPeriod.start)} – ${formatDate(currentPeriod.end)}`;
+    }
+
+    const employeeMap = new Map();
+    employees.forEach((employee) => {
+      employeeMap.set(employee.id, {
+        ...employee,
+        label: employee.name || employee.email || employee.id,
+        entries: []
+      });
+    });
+
+    entries.forEach((entry) => {
+      const id = entry.userId;
+      if (!employeeMap.has(id)) {
+        employeeMap.set(id, {
+          id,
+          email: entry.userEmail,
+          name: entry.userEmail,
+          createdAt: entry.clockIn || now.toISOString(),
+          updatedAt: entry.clockOut || entry.clockIn || now.toISOString(),
+          label: entry.userEmail || id,
+          entries: []
+        });
+      }
+      employeeMap.get(id).entries.push(entry);
+    });
+
+    const employeeList = Array.from(employeeMap.values()).sort((a, b) =>
+      String(a.label || "").localeCompare(String(b.label || ""))
+    );
+
+    const currentItems = employeeList.map((employee) => {
+      const minutes = sumMinutesForPeriod(
+        employee.entries,
+        currentPeriod.start,
+        currentPeriod.end,
+        now,
+        true
+      );
+      const li = document.createElement("li");
+      const label = document.createElement("div");
+      label.textContent = employee.label;
+      const total = document.createElement("span");
+      total.textContent = formatMinutes(minutes);
+      li.appendChild(label);
+      li.appendChild(total);
+      return li;
+    });
+    renderList(payPeriodCurrentList, currentItems, "No employee hours yet.");
+
+    const getEmployeePeriods = (employee, timestamp) => {
+      let createdAt = employee.createdAt ? new Date(employee.createdAt) : timestamp;
+      if (Number.isNaN(createdAt.getTime())) {
+        createdAt = timestamp;
+      }
+      const startPeriod = getPayPeriodForDate(createdAt);
+      const current = getPayPeriodForDate(timestamp);
+      const periods = [];
+      for (let index = startPeriod.index; index <= current.index; index += 1) {
+        const start = addDays(startOfDay(PAY_PERIOD_ANCHOR), index * PAY_PERIOD_DAYS);
+        const end = addDays(start, PAY_PERIOD_DAYS - 1);
+        const minutes = sumMinutesForPeriod(
+          employee.entries,
+          start,
+          end,
+          timestamp,
+          index === current.index
+        );
+        periods.push({ start, end, minutes });
+      }
+      return periods;
+    };
+
+    const renderEmployeeHistory = (employee, timestamp, titleEl, listEl) => {
+      const periods = getEmployeePeriods(employee, timestamp);
+      if (titleEl) {
+        titleEl.textContent = `${employee.label} pay periods`;
+      }
+      const listItems = periods.map((period) => {
+        const li = document.createElement("li");
+        const label = document.createElement("div");
+        label.textContent = `${formatDate(period.start)} – ${formatDate(period.end)}`;
+        const total = document.createElement("span");
+        total.textContent = formatMinutes(period.minutes);
+        li.appendChild(label);
+        li.appendChild(total);
+        return li;
+      });
+      renderList(listEl, listItems, "No pay periods recorded yet.");
+    };
+
+    if (payPeriodEmployeeList || payPeriodHistoryList) {
+      const historyItems = employeeList.map((employee) => {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "link-button";
+        button.textContent = employee.label;
+        button.addEventListener("click", () =>
+          renderEmployeeHistory(employee, now, payPeriodHistoryTitle, payPeriodHistoryList)
+        );
+        li.appendChild(button);
+        return li;
+      });
+      renderList(payPeriodEmployeeList, historyItems, "No employees found.");
+
+      if (employeeList.length) {
+        renderEmployeeHistory(employeeList[0], now, payPeriodHistoryTitle, payPeriodHistoryList);
+      } else {
+        renderList(payPeriodHistoryList, [], "No pay periods recorded yet.");
+      }
+    }
+
+    if (payPeriodTabs && payPeriodTabList) {
+      payPeriodTabs.innerHTML = "";
+      if (!employeeList.length) {
+        if (payPeriodTabTitle) payPeriodTabTitle.textContent = "Pay periods";
+        renderList(payPeriodTabList, [], "No employees found.");
+        return;
+      }
+
+      const tabEntries = employeeList.map((employee, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tab-button";
+        button.textContent = employee.label;
+        button.id = `pay-period-tab-${index}`;
+        button.setAttribute("role", "tab");
+        button.setAttribute("aria-selected", "false");
+        button.addEventListener("click", () => selectTab(index));
+        payPeriodTabs.appendChild(button);
+        return { employee, button };
+      });
+
+      const selectTab = (index) => {
+        tabEntries.forEach((entry, idx) => {
+          const isActive = idx === index;
+          entry.button.classList.toggle("is-active", isActive);
+          entry.button.setAttribute("aria-selected", String(isActive));
+        });
+        const active = tabEntries[index];
+        if (payPeriodTabPanel) {
+          payPeriodTabPanel.setAttribute("aria-labelledby", active.button.id);
+        }
+        renderEmployeeHistory(active.employee, now, payPeriodTabTitle, payPeriodTabList);
+      };
+
+      selectTab(0);
+    }
+  };
+
   const loadAll = async () => {
     const tasks = [];
     if (customerForm || customerList) {
@@ -204,6 +661,15 @@
     }
     if (timeoffList) {
       tasks.push(safeLoad(loadTimeOff, timeoffList, "Unable to load time-off requests."));
+    }
+    if (
+      payPeriodCurrentList ||
+      payPeriodEmployeeList ||
+      payPeriodHistoryList ||
+      payPeriodTabs ||
+      payPeriodTabList
+    ) {
+      tasks.push(safeLoad(loadPayPeriods, payPeriodCurrentList, "Unable to load pay periods."));
     }
     const results = await Promise.all(tasks);
     if (results.some((ok) => !ok)) {
@@ -259,11 +725,18 @@
         body: JSON.stringify(Object.fromEntries(formData.entries()))
       });
       jobForm.reset();
+      if (recurrenceTypeSelect) recurrenceTypeSelect.value = "one_time";
+      applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect);
       loadJobs();
     } catch (error) {
       setStatus(error.message);
     }
   });
+
+  recurrenceTypeSelect?.addEventListener("change", () =>
+    applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect)
+  );
+  applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect);
 
   boot();
 })();
