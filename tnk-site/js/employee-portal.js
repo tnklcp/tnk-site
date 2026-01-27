@@ -1,5 +1,6 @@
 (() => {
   const userEl = document.getElementById("employee-user");
+  const statusEl = document.getElementById("employee-status");
   const logoutBtn = document.getElementById("employee-logout");
   const jobList = document.getElementById("employee-job-list");
   const timeForm = document.getElementById("employee-time-form");
@@ -9,19 +10,76 @@
 
   if (!userEl || !logoutBtn) return;
 
+  const setStatus = (message = "") => {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+  };
+
   const apiRequest = async (path, options = {}) => {
-    const token = await window.tnkAuth.getAccessToken();
-    const headers = new Headers(options.headers || {});
-    headers.set("authorization", `Bearer ${token}`);
-    if (options.body && !headers.has("content-type")) {
-      headers.set("content-type", "application/json");
+    const parseErrorDetail = async (response) => {
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return response.json().catch(() => null);
+      }
+      return response.text().catch(() => "");
+    };
+
+    const stringifyDetail = (detail) => {
+      if (!detail) return "";
+      if (typeof detail === "string") return detail.trim();
+      if (typeof detail === "object") {
+        if (detail.error) return String(detail.error);
+        try {
+          return JSON.stringify(detail);
+        } catch {
+          return String(detail);
+        }
+      }
+      return String(detail);
+    };
+
+    const truncate = (value, max = 300) => {
+      if (!value) return "";
+      return value.length > max ? `${value.slice(0, max)}…` : value;
+    };
+
+    const send = async (forceRefresh = false) => {
+      const token = await window.tnkAuth.getAccessToken(forceRefresh);
+      const headers = new Headers(options.headers || {});
+      headers.set("authorization", `Bearer ${token}`);
+      if (options.body && !headers.has("content-type")) {
+        headers.set("content-type", "application/json");
+      }
+      return fetch(path, { ...options, headers });
+    };
+
+    let response = await send(false);
+    if (!response.ok && response.status === 401) {
+      response = await send(true);
     }
-    const response = await fetch(path, { ...options, headers });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || "Request failed.");
+      const detail = await parseErrorDetail(response);
+      const detailText = truncate(stringifyDetail(detail));
+      const statusLabel = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
+      const parts = [`Request failed (${statusLabel})`, `Endpoint: ${path}`];
+      if (detailText) parts.push(`Detail: ${detailText}`);
+      const err = new Error(parts.join(" | "));
+      err.status = response.status;
+      err.statusText = response.statusText;
+      err.endpoint = path;
+      err.detail = detail;
+      throw err;
     }
     return response.json();
+  };
+
+  const toArray = (value) => (Array.isArray(value) ? value : []);
+
+  const formatErrorSummary = (error) => {
+    if (!error) return "Unknown error.";
+    if (typeof error === "string") return error;
+    if (error.message) return error.message;
+    return String(error);
   };
 
   const renderList = (el, items, emptyMessage) => {
@@ -36,9 +94,24 @@
     items.forEach((item) => el.appendChild(item));
   };
 
+  const safeLoad = async (loader, listEl, errorMessage) => {
+    try {
+      await loader();
+      return true;
+    } catch (error) {
+      const detail = formatErrorSummary(error);
+      if (listEl) {
+        renderList(listEl, [], `${errorMessage || "Unable to load data."} ${detail}`);
+      }
+      setStatus(`${errorMessage || "Unable to load data."} ${detail}`);
+      console.error("Dashboard load failed:", error);
+      return false;
+    }
+  };
+
   const loadJobs = async () => {
     const data = await apiRequest("/api/jobs");
-    const items = data.jobs.map((job) => {
+    const items = toArray(data?.jobs).map((job) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
       label.textContent = `${job.title} — ${job.status}`;
@@ -74,7 +147,7 @@
 
   const loadTimeEntries = async () => {
     const data = await apiRequest("/api/time-entries");
-    const items = data.entries.map((entry) => {
+    const items = toArray(data?.entries).map((entry) => {
       const li = document.createElement("li");
       li.textContent = `${entry.status} — ${entry.clockIn}${entry.clockOut ? ` → ${entry.clockOut}` : ""}`;
       return li;
@@ -84,7 +157,7 @@
 
   const loadTimeOff = async () => {
     const data = await apiRequest("/api/time-off");
-    const items = data.requests.map((request) => {
+    const items = toArray(data?.requests).map((request) => {
       const li = document.createElement("li");
       li.textContent = `${request.startDate} → ${request.endDate} (${request.status})`;
       return li;
@@ -93,17 +166,34 @@
   };
 
   const loadAll = async () => {
-    await Promise.all([loadJobs(), loadTimeEntries(), loadTimeOff()]);
+    const tasks = [];
+    if (jobList) {
+      tasks.push(safeLoad(loadJobs, jobList, "Unable to load jobs."));
+    }
+    if (timeList || timeForm) {
+      tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
+    }
+    if (timeoffList || timeoffForm) {
+      tasks.push(safeLoad(loadTimeOff, timeoffList, "Unable to load time-off requests."));
+    }
+    const results = await Promise.all(tasks);
+    if (results.some((ok) => !ok)) {
+      setStatus("Some dashboard sections could not be loaded. Refresh to try again.");
+    } else {
+      setStatus("");
+    }
   };
 
   const boot = async () => {
     try {
-      await window.tnkAuth.requireAuth();
+      const user = await window.tnkAuth.requireAuth();
+      if (!user) return;
       const profile = await window.tnkAuth.getUserProfile();
       userEl.textContent = `Signed in as ${profile.user?.name || profile.user?.email || "Employee"}.`;
       await loadAll();
     } catch (error) {
-      userEl.textContent = "Unable to load employee portal.";
+      userEl.textContent = "Unable to load employee profile.";
+      setStatus("");
     }
   };
 
@@ -125,7 +215,7 @@
       timeForm.reset();
       loadTimeEntries();
     } catch (error) {
-      userEl.textContent = error.message;
+      setStatus(error.message);
     }
   });
 
@@ -140,7 +230,7 @@
       timeoffForm.reset();
       loadTimeOff();
     } catch (error) {
-      userEl.textContent = error.message;
+      setStatus(error.message);
     }
   });
 

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Completed Work | Employee Portal</title>
+  <meta name="description" content="Submit completed work for TNK Lawncare Plus." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/employee-portal.js" defer></script>
+</head>
+<body>
+  <header class="hero" style="padding-bottom: 3rem;">
+    <h1>Completed Work</h1>
+    <p>Submit completed jobs for admin review.</p>
+    <div class="cta-row">
+      <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
+      <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding-top: 1.5rem;">
+      <div class="container">
+        <p class="login-footer" id="employee-user">Loading employee profile...</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">CW</div>
+            <h3 class="portal-title">Submit Completed Jobs</h3>
+            <p class="portal-text">Use the Submit button on each job to notify admin.</p>
+            <ul id="employee-job-list"></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

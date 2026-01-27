@@ -12,11 +12,19 @@
   };
 
   const loadConfig = async () => {
-    const response = await fetch("/api/auth/config", { credentials: "omit" });
-    if (!response.ok) {
-      throw new Error("Unable to load authentication settings.");
+    try {
+      const response = await fetch("/api/auth/config", { credentials: "omit" });
+      if (response.ok) {
+        return response.json();
+      }
+    } catch (error) {
+      // Fall back to defaults if the config endpoint is unavailable.
     }
-    return response.json();
+    return {
+      rolesClaim: null,
+      adminRole: "admin",
+      employeeRole: "employee"
+    };
   };
 
   const getIdentity = () => {
@@ -88,22 +96,28 @@
     identity.open("signup");
   };
 
-  const logout = async (returnTo) => {
+  const logout = async (returnTo = "login.html") => {
     const { identity } = await init();
-    identity.logout();
-    if (returnTo) {
-      window.location.href = returnTo;
+    try {
+      const result = identity.logout();
+      if (result && typeof result.then === "function") {
+        await result;
+      }
+    } finally {
+      if (returnTo) {
+        window.location.href = returnTo;
+      }
     }
   };
 
-  const getAccessToken = async () => {
+  const getAccessToken = async (forceRefresh = false) => {
     const { identity } = await init();
     const user = identity.currentUser();
     if (!user) {
       throw new Error("Not authenticated");
     }
     if (typeof user.jwt === "function") {
-      return user.jwt();
+      return user.jwt(forceRefresh);
     }
     const token = user.token?.access_token;
     if (!token) {

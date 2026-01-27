@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customer Management | Admin Portal</title>
+  <meta name="description" content="Admin customer management for TNK Lawncare Plus." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/admin-portal.js" defer></script>
+</head>
+<body>
+  <header class="hero" style="padding-bottom: 3rem;">
+    <h1>Customer Management</h1>
+    <p>Create, update, and archive customer records.</p>
+    <div class="cta-row">
+      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
+      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding-top: 1.5rem;">
+      <div class="container">
+        <p class="login-footer" id="admin-user">Loading admin profile...</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">CM</div>
+            <h3 class="portal-title">Customer Intake</h3>
+            <form id="admin-customer-form" class="form-grid">
+              <div class="field">
+                <label for="customer-name">Customer Name</label>
+                <input id="customer-name" name="name" type="text" required />
+              </div>
+              <div class="field">
+                <label for="customer-contact">Contact Name</label>
+                <input id="customer-contact" name="contactName" type="text" />
+              </div>
+              <div class="field">
+                <label for="customer-email">Contact Email</label>
+                <input id="customer-email" name="contactEmail" type="email" />
+              </div>
+              <div class="field">
+                <label for="customer-phone">Contact Phone</label>
+                <input id="customer-phone" name="contactPhone" type="tel" />
+              </div>
+              <div class="form-actions">
+                <button class="button button--primary" type="submit">Add Customer</button>
+              </div>
+            </form>
+            <div class="login-note">
+              <strong>Customer List</strong>
+              <ul id="admin-customer-list"></ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

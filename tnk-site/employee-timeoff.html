@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Time-Off Requests | Employee Portal</title>
+  <meta name="description" content="Employee time-off requests for TNK Lawncare Plus." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/employee-portal.js" defer></script>
+</head>
+<body>
+  <header class="hero" style="padding-bottom: 3rem;">
+    <h1>Time-Off Requests</h1>
+    <p>Submit new requests and check approval status.</p>
+    <div class="cta-row">
+      <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
+      <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding-top: 1.5rem;">
+      <div class="container">
+        <p class="login-footer" id="employee-user">Loading employee profile...</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">TO</div>
+            <h3 class="portal-title">Request Time Off</h3>
+            <form id="employee-timeoff-form" class="form-grid">
+              <div class="field">
+                <label for="timeoff-start">Start Date</label>
+                <input id="timeoff-start" name="startDate" type="date" required />
+              </div>
+              <div class="field">
+                <label for="timeoff-end">End Date</label>
+                <input id="timeoff-end" name="endDate" type="date" required />
+              </div>
+              <div class="field">
+                <label for="timeoff-notes">Notes</label>
+                <input id="timeoff-notes" name="notes" type="text" />
+              </div>
+              <div class="form-actions">
+                <button class="button button--primary" type="submit">Submit Request</button>
+              </div>
+            </form>
+            <ul id="employee-timeoff-list"></ul>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
