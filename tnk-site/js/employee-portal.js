@@ -5,8 +5,12 @@
   const jobList = document.getElementById("employee-job-list");
   const timeForm = document.getElementById("employee-time-form");
   const timeList = document.getElementById("employee-time-list");
+  const clockStatusEl = document.getElementById("employee-clock-status");
   const timeoffForm = document.getElementById("employee-timeoff-form");
   const timeoffList = document.getElementById("employee-timeoff-list");
+  const payPeriodRangeEl = document.getElementById("employee-pay-period-range");
+  const payPeriodCurrentEl = document.getElementById("employee-pay-period-current");
+  const payPeriodLastEl = document.getElementById("employee-pay-period-last");
 
   if (!userEl || !logoutBtn) return;
 
@@ -75,6 +79,111 @@
 
   const toArray = (value) => (Array.isArray(value) ? value : []);
 
+  const formatDateTime = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(date);
+  };
+
+  const formatServiceDate = (value) => {
+    if (!value) return "";
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric"
+    }).format(date);
+  };
+
+  const formatDuration = (clockIn, clockOut) => {
+    if (!clockIn || !clockOut) return "";
+    const start = new Date(clockIn);
+    const end = new Date(clockOut);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "";
+    const diffMs = Math.max(0, end.getTime() - start.getTime());
+    const totalMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const hoursLabel = String(hours).padStart(2, "0");
+    const minutesLabel = String(minutes).padStart(2, "0");
+    return `${hoursLabel}:${minutesLabel}`;
+  };
+
+  const PAY_PERIOD_ANCHOR = new Date("2026-01-25T00:00:00");
+  const PAY_PERIOD_DAYS = 14;
+  const MS_PER_DAY = 86400000;
+
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const addDays = (date, days) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  };
+
+  const formatDate = (date) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric"
+    }).format(date);
+
+  const formatMinutes = (minutes) => {
+    const totalMinutes = Math.max(0, Math.round(minutes));
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+  };
+
+  const getPayPeriodForDate = (date) => {
+    const base = startOfDay(PAY_PERIOD_ANCHOR);
+    const target = startOfDay(date);
+    const diffDays = Math.floor((target.getTime() - base.getTime()) / MS_PER_DAY);
+    const index = Math.floor(diffDays / PAY_PERIOD_DAYS);
+    const start = addDays(base, index * PAY_PERIOD_DAYS);
+    const end = addDays(start, PAY_PERIOD_DAYS - 1);
+    return { index, start, end };
+  };
+
+  const getEntryInterval = (entry, now) => {
+    if (!entry?.clockIn) return null;
+    const start = new Date(entry.clockIn);
+    if (Number.isNaN(start.getTime())) return null;
+    const end = entry.clockOut ? new Date(entry.clockOut) : now;
+    if (Number.isNaN(end.getTime())) return null;
+    return { start, end, open: !entry.clockOut };
+  };
+
+  const getOverlapMinutes = (start, end, periodStart, periodEndExclusive) => {
+    const rangeStart = Math.max(start.getTime(), periodStart.getTime());
+    const rangeEnd = Math.min(end.getTime(), periodEndExclusive.getTime());
+    if (rangeEnd <= rangeStart) return 0;
+    return (rangeEnd - rangeStart) / 60000;
+  };
+
+  const sumMinutesForPeriod = (entries, periodStart, periodEnd, now, includeOpen) => {
+    if (!entries?.length) return 0;
+    const periodEndExclusive = addDays(periodEnd, 1);
+    return entries.reduce((total, entry) => {
+      const interval = getEntryInterval(entry, now);
+      if (!interval) return total;
+      if (interval.open && !includeOpen) return total;
+      return total + getOverlapMinutes(interval.start, interval.end, periodStart, periodEndExclusive);
+    }, 0);
+  };
+
+  const setClockStatus = (message = "") => {
+    if (!clockStatusEl) return;
+    clockStatusEl.textContent = message;
+  };
+
   const formatErrorSummary = (error) => {
     if (!error) return "Unknown error.";
     if (typeof error === "string") return error;
@@ -114,32 +223,69 @@
     const items = toArray(data?.jobs).map((job) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
-      label.textContent = `${job.title} — ${job.status}`;
-      const startBtn = document.createElement("button");
-      startBtn.className = "button button--primary";
-      startBtn.type = "button";
-      startBtn.textContent = "Start";
-      startBtn.addEventListener("click", async () => {
-        await apiRequest("/api/jobs", {
-          method: "PATCH",
-          body: JSON.stringify({ id: job.id, status: "in_progress" })
+      const statusLabel = String(job.status || "").replace("_", " ");
+      const customerLabel = job.customerName ? ` — ${job.customerName}` : "";
+      label.textContent = `${job.title}${customerLabel} (${statusLabel})`;
+
+      const meta = document.createElement("div");
+      meta.className = "job-meta";
+      const serviceDateLabel = job.serviceDate ? formatServiceDate(job.serviceDate) : "Not scheduled";
+      const recurrenceLabel = job.isRecurring
+        ? `Recurring every ${job.recurrenceInterval || 1} ${job.recurrenceUnit || "week"}(s)`
+        : "One-time job";
+      meta.textContent = `Service date: ${serviceDateLabel} · ${recurrenceLabel}`;
+
+      const timing = document.createElement("div");
+      timing.className = "job-meta";
+      const startedLabel = formatDateTime(job.startedAt);
+      const completedLabel = formatDateTime(job.completedAt);
+      const durationLabel = formatDuration(job.startedAt, job.completedAt);
+      const timingParts = [];
+      if (startedLabel) timingParts.push(`Started: ${startedLabel}`);
+      if (completedLabel) timingParts.push(`Completed: ${completedLabel}`);
+      if (durationLabel) timingParts.push(`Total: ${durationLabel}`);
+      timing.textContent = timingParts.join(" · ");
+
+      const isCompleted = ["submitted", "approved"].includes(job.status);
+      const actionWrap = document.createElement("span");
+      actionWrap.className = "portal-actions";
+
+      if (!isCompleted) {
+        const startBtn = document.createElement("button");
+        startBtn.className = "button button--primary";
+        startBtn.type = "button";
+        startBtn.textContent = "Start";
+        startBtn.addEventListener("click", async () => {
+          await apiRequest("/api/jobs", {
+            method: "PATCH",
+            body: JSON.stringify({ id: job.id, status: "in_progress" })
+          });
+          loadJobs();
         });
-        loadJobs();
-      });
-      const submitBtn = document.createElement("button");
-      submitBtn.className = "button button--accent";
-      submitBtn.type = "button";
-      submitBtn.textContent = "Submit";
-      submitBtn.addEventListener("click", async () => {
-        await apiRequest("/api/jobs", {
-          method: "PATCH",
-          body: JSON.stringify({ id: job.id, status: "submitted" })
+        actionWrap.appendChild(startBtn);
+
+        const completeBtn = document.createElement("button");
+        completeBtn.className = "button button--accent";
+        completeBtn.type = "button";
+        completeBtn.textContent = "Complete";
+        completeBtn.addEventListener("click", async () => {
+          await apiRequest("/api/jobs", {
+            method: "PATCH",
+            body: JSON.stringify({ id: job.id, status: "submitted" })
+          });
+          loadJobs();
         });
-        loadJobs();
-      });
+        actionWrap.appendChild(completeBtn);
+      } else {
+        const completedTag = document.createElement("span");
+        completedTag.className = "status-pill";
+        completedTag.textContent = job.status === "approved" ? "Approved" : "Submitted";
+        actionWrap.appendChild(completedTag);
+      }
       li.appendChild(label);
-      li.appendChild(startBtn);
-      li.appendChild(submitBtn);
+      li.appendChild(meta);
+      if (timingParts.length) li.appendChild(timing);
+      li.appendChild(actionWrap);
       return li;
     });
     renderList(jobList, items, "No assigned jobs found.");
@@ -147,12 +293,56 @@
 
   const loadTimeEntries = async () => {
     const data = await apiRequest("/api/time-entries");
-    const items = toArray(data?.entries).map((entry) => {
+    const entries = toArray(data?.entries);
+    const now = new Date();
+    const openEntry = entries.find((entry) => entry.status === "open" && entry.clockIn);
+    if (openEntry) {
+      const clockInLabel = formatDateTime(openEntry.clockIn);
+      setClockStatus(clockInLabel ? `Clocked in since ${clockInLabel}` : "Clocked in");
+    } else if (entries.length) {
+      const latestEntry = entries
+        .filter((entry) => entry.clockIn)
+        .sort((a, b) => new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime())[0];
+      const lastTime = formatDateTime(latestEntry?.clockOut || latestEntry?.clockIn);
+      const durationLabel = formatDuration(latestEntry?.clockIn, latestEntry?.clockOut);
+      if (lastTime && durationLabel) {
+        setClockStatus(`Clocked out (last at ${lastTime}, total ${durationLabel})`);
+      } else if (lastTime) {
+        setClockStatus(`Clocked out (last at ${lastTime})`);
+      } else {
+        setClockStatus("Clocked out");
+      }
+    } else {
+      setClockStatus("Clocked out");
+    }
+
+    const items = entries.map((entry) => {
       const li = document.createElement("li");
-      li.textContent = `${entry.status} — ${entry.clockIn}${entry.clockOut ? ` → ${entry.clockOut}` : ""}`;
+      const clockInLabel = formatDateTime(entry.clockIn);
+      const clockOutLabel = formatDateTime(entry.clockOut);
+      const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";
+      const durationLabel = formatDuration(entry.clockIn, entry.clockOut);
+      const durationSuffix = durationLabel ? ` (${durationLabel})` : "";
+      li.textContent = `${statusLabel} — ${clockInLabel || entry.clockIn}${clockOutLabel ? ` → ${clockOutLabel}` : ""}${durationSuffix}`;
       return li;
     });
     renderList(timeList, items, "No time entries yet.");
+
+    if (payPeriodCurrentEl || payPeriodLastEl || payPeriodRangeEl) {
+      const currentPeriod = getPayPeriodForDate(now);
+      const lastPeriod = {
+        index: currentPeriod.index - 1,
+        start: addDays(currentPeriod.start, -PAY_PERIOD_DAYS),
+        end: addDays(currentPeriod.end, -PAY_PERIOD_DAYS)
+      };
+      if (payPeriodRangeEl) {
+        payPeriodRangeEl.textContent = `Pay period: ${formatDate(currentPeriod.start)} – ${formatDate(currentPeriod.end)}`;
+      }
+      const currentMinutes = sumMinutesForPeriod(entries, currentPeriod.start, currentPeriod.end, now, true);
+      const lastMinutes = sumMinutesForPeriod(entries, lastPeriod.start, lastPeriod.end, now, false);
+      if (payPeriodCurrentEl) payPeriodCurrentEl.textContent = formatMinutes(currentMinutes);
+      if (payPeriodLastEl) payPeriodLastEl.textContent = formatMinutes(lastMinutes);
+    }
   };
 
   const loadTimeOff = async () => {
@@ -190,6 +380,9 @@
       if (!user) return;
       const profile = await window.tnkAuth.getUserProfile();
       userEl.textContent = `Signed in as ${profile.user?.name || profile.user?.email || "Employee"}.`;
+      apiRequest("/api/employees", { method: "POST", body: JSON.stringify({ action: "register" }) }).catch(
+        () => {}
+      );
       await loadAll();
     } catch (error) {
       userEl.textContent = "Unable to load employee profile.";

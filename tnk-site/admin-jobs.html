@@ -46,6 +46,31 @@
               <div class="field">
                 <label for="job-assigned">Assigned To (emails or user IDs)</label>
                 <input id="job-assigned" name="assignedTo" type="text" />
+                <span class="help-text">Separate multiple assignees with commas.</span>
+              </div>
+              <div class="field">
+                <label for="job-service-date">Service Date</label>
+                <input id="job-service-date" name="serviceDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="job-recurrence-type">Job Type</label>
+                <select id="job-recurrence-type" name="recurrenceType">
+                  <option value="one_time">One-time</option>
+                  <option value="recurring">Recurring</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="job-recurrence-interval">Recurrence Interval</label>
+                <input id="job-recurrence-interval" name="recurrenceInterval" type="number" min="1" value="1" />
+                <span class="help-text">Only used for recurring jobs.</span>
+              </div>
+              <div class="field">
+                <label for="job-recurrence-unit">Recurrence Unit</label>
+                <select id="job-recurrence-unit" name="recurrenceUnit">
+                  <option value="week">Week(s)</option>
+                  <option value="day">Day(s)</option>
+                  <option value="month">Month(s)</option>
+                </select>
               </div>
               <div class="field">
                 <label for="job-notes">Notes</label>
@@ -57,7 +82,7 @@
             </form>
             <div class="login-note">
               <strong>Job Queue</strong>
-              <ul id="admin-job-list"></ul>
+              <ul id="admin-job-list" class="portal-list"></ul>
             </div>
           </article>
         </div>

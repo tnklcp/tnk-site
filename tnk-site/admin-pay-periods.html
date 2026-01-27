@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Approvals | Admin Portal</title>
-  <meta name="description" content="Admin approvals for TNK Lawncare Plus." />
+  <title>Pay Period History | Admin Portal</title>
+  <meta name="description" content="Admin pay period history for TNK Lawncare Plus." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
@@ -13,8 +13,8 @@
 </head>
 <body>
   <header class="hero" style="padding-bottom: 3rem;">
-    <h1>Approvals</h1>
-    <p>Review completed jobs and time-off requests.</p>
+    <h1>Pay Period History</h1>
+    <p>View each employee's hours in their own tab.</p>
     <div class="cta-row">
       <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
       <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
@@ -30,20 +30,19 @@
 
     <section class="section">
       <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">JM</div>
-            <h3 class="portal-title">Submitted Jobs</h3>
-            <p class="portal-text">Review submitted work and update job status.</p>
-            <ul id="admin-job-list" class="portal-list"></ul>
-          </article>
-          <article class="portal-card">
-            <div class="portal-icon">AP</div>
-            <h3 class="portal-title">Time-Off Requests</h3>
-            <p class="portal-text">Approve or deny time off for the team.</p>
-            <ul id="admin-timeoff-list" class="portal-list"></ul>
-          </article>
-        </div>
+        <article class="portal-card portal-card--wide">
+          <div class="portal-icon">PP</div>
+          <h3 class="portal-title">Employee Tabs</h3>
+          <p class="portal-text">Select a tab to see pay periods and total hours for that employee only.</p>
+          <p class="portal-note" id="admin-pay-period-range"></p>
+          <div class="tab-shell">
+            <div class="tab-list" role="tablist" aria-label="Employees" id="admin-pay-period-tabs"></div>
+            <div class="tab-panel" role="tabpanel" id="admin-pay-period-panel" aria-live="polite">
+              <strong id="admin-pay-period-tab-title">Pay periods</strong>
+              <ul id="admin-pay-period-tab-list" class="portal-list"></ul>
+            </div>
+          </div>
+        </article>
       </div>
     </section>
   </main>

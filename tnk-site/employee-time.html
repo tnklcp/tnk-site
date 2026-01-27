@@ -14,7 +14,7 @@
 <body>
   <header class="hero" style="padding-bottom: 3rem;">
     <h1>Time Tracking</h1>
-    <p>Clock in/out and review your time logs.</p>
+    <p>Clock in/out for overall hours and review your time logs.</p>
     <div class="cta-row">
       <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
       <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
@@ -34,11 +34,8 @@
           <article class="portal-card">
             <div class="portal-icon">TT</div>
             <h3 class="portal-title">Clock In / Out</h3>
+            <span class="status-pill" id="employee-clock-status">Clocked out</span>
             <form id="employee-time-form" class="form-grid">
-              <div class="field">
-                <label for="time-job-id">Job ID</label>
-                <input id="time-job-id" name="jobId" type="text" />
-              </div>
               <div class="field">
                 <label for="time-notes">Notes</label>
                 <input id="time-notes" name="notes" type="text" />
@@ -48,7 +45,7 @@
                 <button class="button button--accent" type="submit" data-action="clock_out">Clock Out</button>
               </div>
             </form>
-            <ul id="employee-time-list"></ul>
+            <ul id="employee-time-list" class="portal-list"></ul>
           </article>
         </div>
       </div>
