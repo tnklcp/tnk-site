@@ -22,119 +22,146 @@
   </header>
 
   <main>
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="admin-user">Loading admin profile...</p>
-      </div>
-    </section>
-    <section class="section">
-      <div class="container">
-        <h2>Operations Overview</h2>
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">CM</div>
-            <h3 class="portal-title">Customer Management</h3>
-            <p class="portal-text">Create, update, and archive customer records.</p>
-            <a class="button button--primary" href="#">Open Customers</a>
-          </article>
-          <article class="portal-card">
-            <div class="portal-icon">JM</div>
-            <h3 class="portal-title">Job Management</h3>
-            <p class="portal-text">Assign work, track status, and review submissions.</p>
-            <a class="button button--primary" href="#">Open Jobs</a>
-          </article>
-          <article class="portal-card">
-            <div class="portal-icon">AP</div>
-            <h3 class="portal-title">Approvals</h3>
-            <p class="portal-text">Review completed jobs and time-off requests.</p>
-            <a class="button button--primary" href="#">Open Approvals</a>
-          </article>
-          <article class="portal-card">
-            <div class="portal-icon">TT</div>
-            <h3 class="portal-title">Time Tracking</h3>
-            <p class="portal-text">Monitor hours by employee, job, and date range.</p>
-            <a class="button button--primary" href="#">View Time Logs</a>
-          </article>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Admin Dashboard</h2>
+            <p class="dashboard-subtitle">Every operational workflow is visible at once.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+            <p class="dashboard-status" id="admin-status" role="status" aria-live="polite"></p>
+            <div class="dashboard-links">
+              <a class="dashboard-link" href="admin-customers.html">Customers</a>
+              <a class="dashboard-link" href="admin-jobs.html">Jobs</a>
+              <a class="dashboard-link" href="admin-approvals.html">Approvals</a>
+              <a class="dashboard-link" href="admin-time.html">Time Logs</a>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <section class="section">
-      <div class="container">
-        <h2>Live Operations</h2>
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">CM</div>
-            <h3 class="portal-title">Customer Intake</h3>
-            <form id="admin-customer-form" class="form-grid">
-              <div class="field">
-                <label for="customer-name">Customer Name</label>
-                <input id="customer-name" name="name" type="text" required />
+        <div class="dashboard-grid dashboard-grid--mosaic">
+          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-cut">
+            <div class="panel-header">
+              <div>
+                <h3>Customer Intake</h3>
+                <p class="panel-note">Add new customers and monitor the active roster.</p>
               </div>
-              <div class="field">
-                <label for="customer-contact">Contact Name</label>
-                <input id="customer-contact" name="contactName" type="text" />
-              </div>
-              <div class="field">
-                <label for="customer-email">Contact Email</label>
-                <input id="customer-email" name="contactEmail" type="email" />
-              </div>
-              <div class="field">
-                <label for="customer-phone">Contact Phone</label>
-                <input id="customer-phone" name="contactPhone" type="tel" />
-              </div>
-              <div class="form-actions">
-                <button class="button button--primary" type="submit">Add Customer</button>
-              </div>
-            </form>
-            <div class="login-note">
-              <strong>Customer List</strong>
-              <ul id="admin-customer-list"></ul>
+              <div class="panel-icon">CM</div>
+            </div>
+            <div class="panel-body">
+              <form id="admin-customer-form" class="form-grid">
+                <div class="field">
+                  <label for="customer-name">Customer Name</label>
+                  <input id="customer-name" name="name" type="text" required />
+                </div>
+                <div class="field">
+                  <label for="customer-contact">Contact Name</label>
+                  <input id="customer-contact" name="contactName" type="text" />
+                </div>
+                <div class="field">
+                  <label for="customer-email">Contact Email</label>
+                  <input id="customer-email" name="contactEmail" type="email" />
+                </div>
+                <div class="field">
+                  <label for="customer-phone">Contact Phone</label>
+                  <input id="customer-phone" name="contactPhone" type="tel" />
+                </div>
+                <div class="form-actions">
+                  <button class="button button--primary" type="submit">Add Customer</button>
+                </div>
+              </form>
             </div>
           </article>
 
-          <article class="portal-card">
-            <div class="portal-icon">JM</div>
-            <h3 class="portal-title">Create Job</h3>
-            <form id="admin-job-form" class="form-grid">
-              <div class="field">
-                <label for="job-title">Job Title</label>
-                <input id="job-title" name="title" type="text" required />
+          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-soft">
+            <div class="panel-header">
+              <div>
+                <h3>Customer List</h3>
+                <p class="panel-note">Active accounts and current status.</p>
               </div>
-              <div class="field">
-                <label for="job-customer">Customer</label>
-                <input id="job-customer" name="customerName" type="text" />
-              </div>
-              <div class="field">
-                <label for="job-assigned">Assigned To (emails or user IDs)</label>
-                <input id="job-assigned" name="assignedTo" type="text" />
-              </div>
-              <div class="field">
-                <label for="job-notes">Notes</label>
-                <input id="job-notes" name="notes" type="text" />
-              </div>
-              <div class="form-actions">
-                <button class="button button--primary" type="submit">Create Job</button>
-              </div>
-            </form>
-            <div class="login-note">
-              <strong>Job Queue</strong>
-              <ul id="admin-job-list"></ul>
+              <div class="panel-icon">CL</div>
+            </div>
+            <div class="panel-list">
+              <h4>Customer List</h4>
+              <ul id="admin-customer-list" class="portal-list"></ul>
             </div>
           </article>
 
-          <article class="portal-card">
-            <div class="portal-icon">TT</div>
-            <h3 class="portal-title">Time Tracking</h3>
-            <p class="portal-text">Latest clock-ins and clock-outs.</p>
-            <ul id="admin-time-list"></ul>
+          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
+            <div class="panel-header">
+              <div>
+                <h3>Create Job</h3>
+                <p class="panel-note">Assign work and keep the job queue moving.</p>
+              </div>
+              <div class="panel-icon">JM</div>
+            </div>
+            <div class="panel-body">
+              <form id="admin-job-form" class="form-grid">
+                <div class="field">
+                  <label for="job-title">Job Title</label>
+                  <input id="job-title" name="title" type="text" required />
+                </div>
+                <div class="field">
+                  <label for="job-customer">Customer</label>
+                  <input id="job-customer" name="customerName" type="text" />
+                </div>
+                <div class="field">
+                  <label for="job-assigned">Assigned To (emails or user IDs)</label>
+                  <input id="job-assigned" name="assignedTo" type="text" />
+                </div>
+                <div class="field">
+                  <label for="job-notes">Notes</label>
+                  <input id="job-notes" name="notes" type="text" />
+                </div>
+                <div class="form-actions">
+                  <button class="button button--primary" type="submit">Create Job</button>
+                </div>
+              </form>
+            </div>
           </article>
 
-          <article class="portal-card">
-            <div class="portal-icon">AP</div>
-            <h3 class="portal-title">Time-Off Requests</h3>
-            <p class="portal-text">Review and approve upcoming time off.</p>
-            <ul id="admin-timeoff-list"></ul>
+          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-cut">
+            <div class="panel-header">
+              <div>
+                <h3>Job Queue</h3>
+                <p class="panel-note">Prioritized list with quick status updates.</p>
+              </div>
+              <div class="panel-icon">JL</div>
+            </div>
+            <div class="panel-list">
+              <h4>Job Queue</h4>
+              <ul id="admin-job-list" class="portal-list"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--shape-arch">
+            <div class="panel-header">
+              <div>
+                <h3>Time Tracking</h3>
+                <p class="panel-note">Latest clock-ins and clock-outs.</p>
+              </div>
+              <div class="panel-icon">TT</div>
+            </div>
+            <div class="panel-list">
+              <h4>Recent Activity</h4>
+              <ul id="admin-time-list" class="portal-list"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--shape-pill">
+            <div class="panel-header">
+              <div>
+                <h3>Time-Off Requests</h3>
+                <p class="panel-note">Review, approve, or deny requests.</p>
+              </div>
+              <div class="panel-icon">AP</div>
+            </div>
+            <div class="panel-list">
+              <h4>Pending Requests</h4>
+              <ul id="admin-timeoff-list" class="portal-list"></ul>
+            </div>
           </article>
         </div>
       </div>

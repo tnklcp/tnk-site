@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Management | Admin Portal</title>
+  <meta name="description" content="Admin job management for TNK Lawncare Plus." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="js/script.js" defer></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/admin-portal.js" defer></script>
+</head>
+<body>
+  <header class="hero" style="padding-bottom: 3rem;">
+    <h1>Job Management</h1>
+    <p>Assign work, track status, and review submissions.</p>
+    <div class="cta-row">
+      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
+      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" style="padding-top: 1.5rem;">
+      <div class="container">
+        <p class="login-footer" id="admin-user">Loading admin profile...</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="portal-grid">
+          <article class="portal-card">
+            <div class="portal-icon">JM</div>
+            <h3 class="portal-title">Create Job</h3>
+            <form id="admin-job-form" class="form-grid">
+              <div class="field">
+                <label for="job-title">Job Title</label>
+                <input id="job-title" name="title" type="text" required />
+              </div>
+              <div class="field">
+                <label for="job-customer">Customer</label>
+                <input id="job-customer" name="customerName" type="text" />
+              </div>
+              <div class="field">
+                <label for="job-assigned">Assigned To (emails or user IDs)</label>
+                <input id="job-assigned" name="assignedTo" type="text" />
+              </div>
+              <div class="field">
+                <label for="job-notes">Notes</label>
+                <input id="job-notes" name="notes" type="text" />
+              </div>
+              <div class="form-actions">
+                <button class="button button--primary" type="submit">Create Job</button>
+              </div>
+            </form>
+            <div class="login-note">
+              <strong>Job Queue</strong>
+              <ul id="admin-job-list"></ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
