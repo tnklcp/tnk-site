@@ -144,3 +144,32 @@ document.addEventListener("keydown", (e) => {
     });
   });
 })();
+
+// ===== Estimate form required-field prompts =====
+(function initEstimateValidation() {
+  const form = document.querySelector('#estimate form');
+  if (!form) return;
+
+  const requiredFields = Array.from(form.querySelectorAll('[required]'));
+  const setRequiredMessage = (field) => {
+    if (field.validity.valueMissing) {
+      field.setCustomValidity('This is a required field.');
+    } else {
+      field.setCustomValidity('');
+    }
+  };
+
+  requiredFields.forEach(field => {
+    field.addEventListener('invalid', () => setRequiredMessage(field));
+    const clearEvent = field.type === 'radio' || field.type === 'checkbox' ? 'change' : 'input';
+    field.addEventListener(clearEvent, () => field.setCustomValidity(''));
+  });
+
+  form.addEventListener('submit', (event) => {
+    if (!form.checkValidity()) {
+      event.preventDefault();
+      requiredFields.forEach(field => setRequiredMessage(field));
+      form.reportValidity();
+    }
+  });
+})();
