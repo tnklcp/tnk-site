@@ -7,6 +7,7 @@
   const jobForm = document.getElementById("admin-job-form");
   const jobList = document.getElementById("admin-job-list");
   const timeList = document.getElementById("admin-time-list");
+  const openTimeList = document.getElementById("admin-open-time-list");
   const timeoffList = document.getElementById("admin-timeoff-list");
   const recurrenceTypeSelect = document.getElementById("job-recurrence-type");
   const recurrenceIntervalInput = document.getElementById("job-recurrence-interval");
@@ -20,6 +21,14 @@
   const payPeriodTabPanel = document.getElementById("admin-pay-period-panel");
   const payPeriodTabTitle = document.getElementById("admin-pay-period-tab-title");
   const payPeriodTabList = document.getElementById("admin-pay-period-tab-list");
+  const adjustForm = document.getElementById("admin-adjust-form");
+  const adjustStatusEl = document.getElementById("admin-adjust-status");
+  const adjustEmployeeSelect = document.getElementById("admin-adjust-employee");
+  const adjustDateInput = document.getElementById("admin-adjust-date");
+  const adjustTypeSelect = document.getElementById("admin-adjust-type");
+  const adjustHoursInput = document.getElementById("admin-adjust-hours");
+  const adjustMinutesInput = document.getElementById("admin-adjust-minutes");
+  const adjustNotesInput = document.getElementById("admin-adjust-notes");
 
   if (!userEl || !logoutBtn) return;
 
@@ -151,6 +160,11 @@
     return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
   };
 
+  const formatSignedMinutes = (minutes) => {
+    const sign = minutes < 0 ? "-" : "+";
+    return `${sign}${formatMinutes(Math.abs(minutes))}`;
+  };
+
   const getPayPeriodForDate = (date) => {
     const base = startOfDay(PAY_PERIOD_ANCHOR);
     const target = startOfDay(date);
@@ -181,6 +195,15 @@
     if (!entries?.length) return 0;
     const periodEndExclusive = addDays(periodEnd, 1);
     return entries.reduce((total, entry) => {
+      if (typeof entry.adjustMinutes === "number") {
+        const effective = new Date(entry.clockIn);
+        if (!Number.isNaN(effective.getTime())) {
+          if (effective >= periodStart && effective < periodEndExclusive) {
+            return total + entry.adjustMinutes;
+          }
+        }
+        return total;
+      }
       const interval = getEntryInterval(entry, now);
       if (!interval) return total;
       if (interval.open && !includeOpen) return total;
@@ -446,8 +469,15 @@
 
   const loadTimeEntries = async () => {
     const data = await apiRequest("/api/time-entries");
-    const items = toArray(data?.entries).map((entry) => {
+    const entries = toArray(data?.entries);
+    const items = entries.map((entry) => {
       const li = document.createElement("li");
+      if (typeof entry.adjustMinutes === "number") {
+        const effectiveLabel = formatDateTime(entry.clockIn);
+        const noteLabel = entry.notes ? ` · ${entry.notes}` : "";
+        li.textContent = `${entry.userEmail || entry.userId} — Adjustment ${formatSignedMinutes(entry.adjustMinutes)} (${effectiveLabel || entry.clockIn})${noteLabel}`;
+        return li;
+      }
       const clockInLabel = formatDateTime(entry.clockIn);
       const clockOutLabel = formatDateTime(entry.clockOut);
       const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";
@@ -455,6 +485,32 @@
       return li;
     });
     renderList(timeList, items, "No time entries recorded yet.");
+
+    const openItems = entries
+      .filter((entry) => entry.status === "open" && typeof entry.adjustMinutes !== "number")
+      .map((entry) => {
+        const li = document.createElement("li");
+        const label = document.createElement("div");
+        const clockInLabel = formatDateTime(entry.clockIn);
+        label.textContent = `${entry.userEmail || entry.userId} — Clocked in ${clockInLabel || entry.clockIn}`;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "button button--accent";
+        button.textContent = "Clock Out";
+        button.addEventListener("click", async () => {
+          if (!window.confirm(`Clock out ${entry.userEmail || entry.userId}?`)) return;
+          await apiRequest("/api/time-entries", {
+            method: "POST",
+            body: JSON.stringify({ action: "admin_clock_out", entryId: entry.id })
+          });
+          loadTimeEntries();
+          loadPayPeriods();
+        });
+        li.appendChild(label);
+        li.appendChild(button);
+        return li;
+      });
+    renderList(openTimeList, openItems, "No open clocks right now.");
   };
 
   const loadTimeOff = async () => {
@@ -527,6 +583,17 @@
     const employeeList = Array.from(employeeMap.values()).sort((a, b) =>
       String(a.label || "").localeCompare(String(b.label || ""))
     );
+
+    if (adjustEmployeeSelect) {
+      adjustEmployeeSelect.innerHTML = "";
+      employeeList.forEach((employee) => {
+        const option = document.createElement("option");
+        option.value = employee.id;
+        option.textContent = employee.label;
+        if (employee.email) option.dataset.email = employee.email;
+        adjustEmployeeSelect.appendChild(option);
+      });
+    }
 
     const currentItems = employeeList.map((employee) => {
       const minutes = sumMinutesForPeriod(
@@ -656,7 +723,7 @@
     if (jobForm || jobList) {
       tasks.push(safeLoad(loadJobs, jobList, "Unable to load jobs."));
     }
-    if (timeList) {
+    if (timeList || openTimeList) {
       tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
     }
     if (timeoffList) {
@@ -732,6 +799,49 @@
       setStatus(error.message);
     }
   });
+
+  adjustForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!adjustEmployeeSelect || !adjustDateInput) return;
+    if (adjustStatusEl) adjustStatusEl.textContent = "";
+    const hours = adjustHoursInput?.value ? Number(adjustHoursInput.value) : 0;
+    const minutes = adjustMinutesInput?.value ? Number(adjustMinutesInput.value) : 0;
+    const totalMinutes = Math.round(hours * 60 + minutes);
+    const isSubtract = adjustTypeSelect?.value === "subtract";
+    const signedMinutes = isSubtract ? -Math.abs(totalMinutes) : Math.abs(totalMinutes);
+    if (!signedMinutes) {
+      if (adjustStatusEl) adjustStatusEl.textContent = "Enter hours or minutes.";
+      return;
+    }
+    try {
+      await apiRequest("/api/time-entries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "admin_adjust",
+          userId: adjustEmployeeSelect.value,
+          userEmail: adjustEmployeeSelect.selectedOptions[0]?.dataset.email || undefined,
+          date: adjustDateInput.value,
+          minutes: signedMinutes,
+          notes: adjustNotesInput?.value || ""
+        })
+      });
+      if (adjustStatusEl) adjustStatusEl.textContent = "Adjustment saved.";
+      if (adjustHoursInput) adjustHoursInput.value = "";
+      if (adjustMinutesInput) adjustMinutesInput.value = "";
+      if (adjustNotesInput) adjustNotesInput.value = "";
+      loadTimeEntries();
+      loadPayPeriods();
+    } catch (error) {
+      if (adjustStatusEl) adjustStatusEl.textContent = formatErrorSummary(error);
+    }
+  });
+
+  if (adjustDateInput) {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    adjustDateInput.value = `${today.getFullYear()}-${month}-${day}`;
+  }
 
   recurrenceTypeSelect?.addEventListener("change", () =>
     applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect)

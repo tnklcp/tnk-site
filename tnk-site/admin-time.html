@@ -38,11 +38,57 @@
             <ul id="admin-time-list" class="portal-list"></ul>
           </article>
           <article class="portal-card">
+            <div class="portal-icon">OC</div>
+            <h3 class="portal-title">Open Clocks</h3>
+            <p class="portal-text">Force clock-outs for employees still clocked in.</p>
+            <ul id="admin-open-time-list" class="portal-list"></ul>
+          </article>
+          <article class="portal-card">
             <div class="portal-icon">PP</div>
             <h3 class="portal-title">Current Pay Period</h3>
             <p class="portal-text">Running totals for the active pay period.</p>
             <p class="portal-note" id="admin-pay-period-range"></p>
             <ul id="admin-pay-period-current-list" class="portal-list"></ul>
+          </article>
+          <article class="portal-card portal-card--wide">
+            <div class="portal-icon">AD</div>
+            <h3 class="portal-title">Adjust Pay Period Hours</h3>
+            <p class="portal-text">Add or remove hours for a specific employee.</p>
+            <form id="admin-adjust-form" class="portal-adjust-form">
+              <div class="job-inline">
+                <label class="field">
+                  Employee
+                  <select id="admin-adjust-employee" name="userId" required></select>
+                </label>
+                <label class="field">
+                  Effective Date
+                  <input type="date" id="admin-adjust-date" name="date" required />
+                </label>
+                <label class="field">
+                  Type
+                  <select id="admin-adjust-type" name="type">
+                    <option value="add">Add hours</option>
+                    <option value="subtract">Subtract hours</option>
+                  </select>
+                </label>
+                <label class="field">
+                  Hours
+                  <input type="number" id="admin-adjust-hours" name="hours" step="0.25" min="0" placeholder="0" />
+                </label>
+                <label class="field">
+                  Minutes
+                  <input type="number" id="admin-adjust-minutes" name="minutes" step="1" min="0" max="59" placeholder="0" />
+                </label>
+              </div>
+              <label class="field">
+                Notes
+                <input type="text" id="admin-adjust-notes" name="notes" placeholder="Reason for adjustment" />
+              </label>
+              <div class="portal-actions">
+                <button class="button button--primary" type="submit">Save Adjustment</button>
+                <span class="status-pill" id="admin-adjust-status" aria-live="polite"></span>
+              </div>
+            </form>
           </article>
           <article class="portal-card">
             <div class="portal-icon">PH</div>
