@@ -142,6 +142,11 @@
     return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
   };
 
+  const formatSignedMinutes = (minutes) => {
+    const sign = minutes < 0 ? "-" : "+";
+    return `${sign}${formatMinutes(Math.abs(minutes))}`;
+  };
+
   const getPayPeriodForDate = (date) => {
     const base = startOfDay(PAY_PERIOD_ANCHOR);
     const target = startOfDay(date);
@@ -172,6 +177,15 @@
     if (!entries?.length) return 0;
     const periodEndExclusive = addDays(periodEnd, 1);
     return entries.reduce((total, entry) => {
+      if (typeof entry.adjustMinutes === "number") {
+        const effective = new Date(entry.clockIn);
+        if (!Number.isNaN(effective.getTime())) {
+          if (effective >= periodStart && effective < periodEndExclusive) {
+            return total + entry.adjustMinutes;
+          }
+        }
+        return total;
+      }
       const interval = getEntryInterval(entry, now);
       if (!interval) return total;
       if (interval.open && !includeOpen) return total;
@@ -295,13 +309,15 @@
     const data = await apiRequest("/api/time-entries");
     const entries = toArray(data?.entries);
     const now = new Date();
-    const openEntry = entries.find((entry) => entry.status === "open" && entry.clockIn);
+    const openEntry = entries.find(
+      (entry) => entry.status === "open" && entry.clockIn && typeof entry.adjustMinutes !== "number"
+    );
     if (openEntry) {
       const clockInLabel = formatDateTime(openEntry.clockIn);
       setClockStatus(clockInLabel ? `Clocked in since ${clockInLabel}` : "Clocked in");
     } else if (entries.length) {
       const latestEntry = entries
-        .filter((entry) => entry.clockIn)
+        .filter((entry) => entry.clockIn && typeof entry.adjustMinutes !== "number")
         .sort((a, b) => new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime())[0];
       const lastTime = formatDateTime(latestEntry?.clockOut || latestEntry?.clockIn);
       const durationLabel = formatDuration(latestEntry?.clockIn, latestEntry?.clockOut);
@@ -318,6 +334,12 @@
 
     const items = entries.map((entry) => {
       const li = document.createElement("li");
+      if (typeof entry.adjustMinutes === "number") {
+        const effectiveLabel = formatDateTime(entry.clockIn);
+        const noteLabel = entry.notes ? ` · ${entry.notes}` : "";
+        li.textContent = `Adjustment ${formatSignedMinutes(entry.adjustMinutes)} — ${effectiveLabel || entry.clockIn}${noteLabel}`;
+        return li;
+      }
       const clockInLabel = formatDateTime(entry.clockIn);
       const clockOutLabel = formatDateTime(entry.clockOut);
       const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";

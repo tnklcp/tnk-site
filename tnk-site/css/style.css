@@ -186,7 +186,7 @@ input[type="file"] { padding: 6px; }
 .portal-title { margin: 0; color: var(--clr-primary-600); font-size: 1.25rem; font-weight: 800; text-align: center; }
 .portal-text { margin: 0; opacity: .9; text-align: center; }
 .portal-card .button { margin-top: auto; align-self: center; }
-.portal-card--wide { max-width: 980px; margin: 0 auto; }
+.portal-card--wide { max-width: 980px; margin: 0 auto; grid-column: 1 / -1; }
 .portal-note {
   margin: .5rem 0 0;
   font-size: .92rem;
@@ -352,6 +352,18 @@ input[type="file"] { padding: 6px; }
   flex-wrap: wrap;
   align-items: center;
   gap: .5rem;
+}
+.portal-adjust-form {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  margin: 0;
+  max-width: none;
+}
+.portal-adjust-form .job-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .5rem .75rem;
 }
 .portal-list li select { min-width: 150px; }
 .pay-period-range {
