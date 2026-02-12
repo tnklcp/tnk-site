@@ -105,6 +105,16 @@ a { color: inherit; text-underline-offset: 2px; }
 #about p, #service-area p { font-size: var(--fs-lead); max-width: 50rem; margin: 0 auto; line-height: 1.7; }
 
 /* ========= Services Grid ========= */
+.card-box {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: calc(var(--radius) + 6px);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-1);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.card-box :where(.services-grid, .pricing-grid) { max-width: 100%; }
 .services-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 25px; justify-items: center; align-items: stretch; max-width: 900px; margin: 0 auto; }
 .service-card { background-color: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 25px; text-align: left; width: 100%; max-width: 400px; transition: transform .25s ease, box-shadow .25s ease; }
 .service-card[data-tier] { cursor: pointer; }
@@ -153,7 +163,7 @@ input[type="file"] { padding: 6px; }
 .team-heading { margin: 0 0 var(--space-6); color: var(--clr-primary); font-size: clamp(1.25rem, 1vw + 1rem, 1.75rem); text-align: center; }
 
 /* ========= Pricing / Specials / Testimonials ========= */
-.pricing-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--space-6); max-width:1100px; margin: 0 auto; }
+.pricing-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--space-6); max-width: 980px; margin: 0 auto; }
 .price-card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: var(--space-6) var(--space-5); text-align:center; transition: transform .25s ease, box-shadow .25s ease; display:flex; flex-direction:column; }
 .price-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-2); }
 .price-card .price { font-size: 1.1rem; margin: .35rem 0 var(--space-4); color: var(--clr-primary-600); }
@@ -554,6 +564,7 @@ body.modal-open { overflow: hidden; }
 @media (max-width: 900px) {
   .container, .section, form { padding-inline: 1rem; }
   .portal-grid { grid-template-columns: 1fr; }
+  .card-box { padding: var(--space-5); }
 }
 @media (max-width: 760px) {
   .dashboard-panel,

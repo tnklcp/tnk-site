@@ -83,48 +83,63 @@
         Clear, upfront rates with bi-weekly and monthly options. Final pricing depends on lot size, slope, access, and add-ons.
       </p>
 
-      <div class="pricing-grid">
-        <div class="price-card reveal" style="--reveal-delay:0ms">
-          <h3>Essential Care</h3>
-          <div class="price">
-            <div>Starting at <span>$75</span></div>
+      <div class="card-box">
+        <div class="pricing-grid">
+          <div class="price-card reveal" style="--reveal-delay:0ms">
+            <h3>Essential Care</h3>
+            <div class="price">
+              <div>Starting at <span>$75</span></div>
+            </div>
+            <ul>
+              <li>Mowing</li>
+              <li>Blowing Off Hard Surfaces</li>
+              <li>Proactive Property Inspection</li>
+            </ul>
+            <button class="button button--accent" data-plan="essential">Pick Essential</button>
           </div>
-          <ul>
-            <li>Mowing</li>
-            <li>Blowing Off Hard Surfaces</li>
-            <li>Proactive Property Inspection</li>
-          </ul>
-          <button class="button button--accent" data-plan="essential">Pick Essential</button>
-        </div>
-        <div class="price-card reveal" style="--reveal-delay:120ms">
-          <h3>Standard Care</h3>
-          <div class="price">
-            <div>Starting at <span>$115</span></div>
+          <div class="price-card reveal" style="--reveal-delay:120ms">
+            <h3>Standard Care</h3>
+            <div class="price">
+              <div>Starting at <span>$115</span></div>
+            </div>
+            <ul>
+              <li>Includes Essential Care, plus:</li>
+              <li>Annual Garden Bed Weeding</li>
+              <li>Annual Compost Refresh for Garden Beds</li>
+              <li>Pruning of Shrubs/Plants as Needed</li>
+              <li>Debris Clean-Up (Leaves, Branches, etc.)</li>
+            </ul>
+            <button class="button button--accent" data-plan="standard">Pick Standard</button>
           </div>
-          <ul>
-            <li>Includes Essential Care, plus:</li>
-            <li>Annual Garden Bed Weeding</li>
-            <li>Annual Compost Refresh for Garden Beds</li>
-            <li>Pruning of Shrubs/Plants as Needed</li>
-            <li>Debris Clean-Up (Leaves, Branches, etc.)</li>
-          </ul>
-          <button class="button button--accent" data-plan="standard">Pick Standard</button>
-        </div>
-        <div class="price-card reveal" style="--reveal-delay:240ms">
-          <h3>Premium Care</h3>
-          <div class="price">
-            <div>Starting at <span>$175</span></div>
+          <div class="price-card reveal" style="--reveal-delay:240ms">
+            <h3>Premium Care</h3>
+            <div class="price">
+              <div>Starting at <span>$175</span></div>
+            </div>
+            <ul>
+              <li>Includes Standard Care, plus:</li>
+              <li>Ongoing Garden Bed Weeding as Needed</li>
+              <li>Compost Refresh Semi-Annually</li>
+              <li>Gutter Cleaning Semi-Annually</li>
+              <li>Hand Weeding of Garden Beds/Walkways</li>
+              <li>Insulating Hose Spigots as Needed</li>
+              <li>Removing Cobwebs Around Entryways/Structures</li>
+            </ul>
+            <button class="button button--accent" data-plan="premium">Pick Premium</button>
           </div>
-          <ul>
-            <li>Includes Standard Care, plus:</li>
-            <li>Ongoing Garden Bed Weeding as Needed</li>
-            <li>Compost Refresh Semi-Annually</li>
-            <li>Gutter Cleaning Semi-Annually</li>
-            <li>Hand Weeding of Garden Beds/Walkways</li>
-            <li>Insulating Hose Spigots as Needed</li>
-            <li>Removing Cobwebs Around Entryways/Structures</li>
-          </ul>
-          <button class="button button--accent" data-plan="premium">Pick Premium</button>
+          <div class="price-card reveal" style="--reveal-delay:360ms">
+            <h3>Gutter Cleaning</h3>
+            <div class="price">
+              <div>Starting at <span>$195</span></div>
+            </div>
+            <ul>
+              <li>Remove all large and compacted debris</li>
+              <li>Clear downspouts completely</li>
+              <li>Flush the entire system to verify drainage</li>
+              <li>Confirm proper water flow before leaving</li>
+            </ul>
+            <a class="button button--accent" href="#estimate">Request Gutter Cleaning</a>
+          </div>
         </div>
       </div>
     </div>
@@ -166,42 +181,44 @@
   <section id="services" class="section reveal">
     <div class="container">
       <h2>Our Services</h2>
-      <div class="services-grid">
-        <div class="service-card reveal" data-tier="essential" style="--reveal-delay:0ms" role="button" tabindex="0" aria-label="Select Essential Care and scroll to the estimate form">
-          <h3>Essential Care</h3>
-          <ul>
-            <li><strong>Mowing:</strong> Regular mowing to maintain a neat, healthy lawn and proper grass height.</li>
-            <li><strong>Blowing Off Hard Surfaces:</strong> Clearing leaves, clippings, and debris.</li>
-            <li><strong>Proactive Property Inspection:</strong> Identify potential lawn or landscape issues early.</li>
-          </ul>
-        </div>
-        <div class="service-card reveal" data-tier="standard" style="--reveal-delay:120ms" role="button" tabindex="0" aria-label="Select Standard Care and scroll to the estimate form">
-          <h3>Standard Care</h3>
-          <ul>
-            <li>Includes Essential Care, Plus:</li>
-            <li><strong>Annual Garden Bed Weeding:</strong> Seasonal refresh of garden beds.</li>
-            <li><strong>Annual Compost Refresh:</strong> Compost refresh for garden beds.</li>
-            <li><strong>Pruning of Shrubs/Plants:</strong> As needed to maintain healthy growth.</li>
-            <li><strong>Debris Clean-Up:</strong> Removal of leaves, branches, and debris.</li>
-          </ul>
-        </div>
-        <div class="service-card reveal" data-tier="premium" style="--reveal-delay:240ms" role="button" tabindex="0" aria-label="Select Premium Care and scroll to the estimate form">
-          <h3>Premium Care</h3>
-          <ul>
-            <li>Includes Standard Care, Plus:</li>
-            <li><strong>Ongoing Garden Bed Weeding:</strong> As needed throughout the season.</li>
-            <li><strong>Compost Refresh:</strong> Semi-annual compost refresh.</li>
-            <li><strong>Gutter Cleaning:</strong> Semi-annual cleaning for proper drainage.</li>
-            <li><strong>Hand Weeding:</strong> Garden beds and walkways.</li>
-            <li><strong>Insulating Hose Spigots:</strong> As needed to prevent freeze damage.</li>
-            <li><strong>Removing Cobwebs:</strong> Around entryways and structures.</li>
-          </ul>
-        </div>
-        <div class="service-card reveal" data-tier="storm" style="--reveal-delay:360ms" role="button" tabindex="0" aria-label="Select Storm Damage Protection Inspection and scroll to the estimate form">
-          <h3>Storm Damage Protection Inspection</h3>
-          <p>
-            <strong>Comprehensive Property Assessment:</strong> We inspect trees, fences, gutters, and outdoor structures and recommend proactive measures to reduce storm damage year-round.
-          </p>
+      <div class="card-box">
+        <div class="services-grid">
+          <div class="service-card reveal" data-tier="essential" style="--reveal-delay:0ms" role="button" tabindex="0" aria-label="Select Essential Care and scroll to the estimate form">
+            <h3>Essential Care</h3>
+            <ul>
+              <li><strong>Mowing:</strong> Regular mowing to maintain a neat, healthy lawn and proper grass height.</li>
+              <li><strong>Blowing Off Hard Surfaces:</strong> Clearing leaves, clippings, and debris.</li>
+              <li><strong>Proactive Property Inspection:</strong> Identify potential lawn or landscape issues early.</li>
+            </ul>
+          </div>
+          <div class="service-card reveal" data-tier="standard" style="--reveal-delay:120ms" role="button" tabindex="0" aria-label="Select Standard Care and scroll to the estimate form">
+            <h3>Standard Care</h3>
+            <ul>
+              <li>Includes Essential Care, Plus:</li>
+              <li><strong>Annual Garden Bed Weeding:</strong> Seasonal refresh of garden beds.</li>
+              <li><strong>Annual Compost Refresh:</strong> Compost refresh for garden beds.</li>
+              <li><strong>Pruning of Shrubs/Plants:</strong> As needed to maintain healthy growth.</li>
+              <li><strong>Debris Clean-Up:</strong> Removal of leaves, branches, and debris.</li>
+            </ul>
+          </div>
+          <div class="service-card reveal" data-tier="premium" style="--reveal-delay:240ms" role="button" tabindex="0" aria-label="Select Premium Care and scroll to the estimate form">
+            <h3>Premium Care</h3>
+            <ul>
+              <li>Includes Standard Care, Plus:</li>
+              <li><strong>Ongoing Garden Bed Weeding:</strong> As needed throughout the season.</li>
+              <li><strong>Compost Refresh:</strong> Semi-annual compost refresh.</li>
+              <li><strong>Gutter Cleaning:</strong> Semi-annual cleaning for proper drainage.</li>
+              <li><strong>Hand Weeding:</strong> Garden beds and walkways.</li>
+              <li><strong>Insulating Hose Spigots:</strong> As needed to prevent freeze damage.</li>
+              <li><strong>Removing Cobwebs:</strong> Around entryways and structures.</li>
+            </ul>
+          </div>
+          <div class="service-card reveal" data-tier="storm" style="--reveal-delay:360ms" role="button" tabindex="0" aria-label="Select Storm Damage Protection Inspection and scroll to the estimate form">
+            <h3>Storm Damage Protection Inspection</h3>
+            <p>
+              <strong>Comprehensive Property Assessment:</strong> We inspect trees, fences, gutters, and outdoor structures and recommend proactive measures to reduce storm damage year-round.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -297,7 +314,7 @@
 
           <div class="sublegend">Regular Checks</div>
           <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Inspect Gutters and Drains for Clogs</span><input type="checkbox" name="storm_checks" value="Inspect gutters and drains for clogs" /></label>
+            <label class="option-btn"><span>Gutter Inspection + Cleaning (Clogs, Drains, Downspouts)</span><input type="checkbox" name="storm_checks" value="Gutter inspection and cleaning (clogs, drains, downspouts)" /></label>
             <label class="option-btn"><span>Assess/Remove Hazardous Branches (Light Trimming)</span><input type="checkbox" name="storm_checks" value="Assess/remove hazardous branches near the house (light trimming)" /></label>
             <label class="option-btn"><span>Identify/Address Other Potential Hazards</span><input type="checkbox" name="storm_checks" value="Identify/address other potential storm hazards" /></label>
           </div>
