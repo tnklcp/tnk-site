@@ -80,42 +80,49 @@
     <div class="container">
       <h2>Simple Pricing</h2>
       <p style="text-align:center;max-width:52rem;margin:0 auto var(--space-6);">
-        Clear, upfront rates. Small lots and simple mow/trim start at <strong>$45</strong>. Final pricing depends on lot size, slope, access, and add-ons.
+        Clear, upfront rates with bi-weekly and monthly options. Final pricing depends on lot size, slope, access, and add-ons.
       </p>
 
       <div class="pricing-grid">
         <div class="price-card reveal" style="--reveal-delay:0ms">
-          <h3>Essential</h3>
-          <div class="price">From <span>$45</span></div>
+          <h3>Essential Care</h3>
+          <div class="price">
+            <div>Starting at <span>$75</span></div>
+          </div>
           <ul>
-            <li>Lawn Mowing</li>
-            <li>String Trimming</li>
-            <li>Blowing Off Sidewalks, Driveways, Patios</li>
+            <li>Mowing</li>
+            <li>Blowing Off Hard Surfaces</li>
             <li>Proactive Property Inspection</li>
           </ul>
           <button class="button button--accent" data-plan="essential">Pick Essential</button>
         </div>
         <div class="price-card reveal" style="--reveal-delay:120ms">
-          <h3>Standard</h3>
-          <div class="price">From <span>$65</span></div>
+          <h3>Standard Care</h3>
+          <div class="price">
+            <div>Starting at <span>$115</span></div>
+          </div>
           <ul>
-            <li>Shrub &amp; Plant Pruning</li>
-            <li>Collect &amp; Bag Debris (Leaves, Branches, Trimmings)</li>
-            <li>Inspect Shrubs/Plants for Disease or Stress</li>
-            <li>Pruning of Bushes</li>
+            <li>Includes Essential Care, plus:</li>
+            <li>Annual Garden Bed Weeding</li>
+            <li>Annual Compost Refresh for Garden Beds</li>
+            <li>Pruning of Shrubs/Plants as Needed</li>
+            <li>Debris Clean-Up (Leaves, Branches, etc.)</li>
           </ul>
           <button class="button button--accent" data-plan="standard">Pick Standard</button>
         </div>
         <div class="price-card reveal" style="--reveal-delay:240ms">
-          <h3>Premium</h3>
-          <div class="price">From <span>$95</span></div>
+          <h3>Premium Care</h3>
+          <div class="price">
+            <div>Starting at <span>$175</span></div>
+          </div>
           <ul>
-            <li>Hand-Weeding Garden Beds</li>
-            <li>Hand-Pull Weeds From Lawn Areas</li>
-            <li>Check/Insulate Hose Spigots (Seasonal)</li>
-            <li>Remove Cobwebs (Entryways/Structures)</li>
-            <li>Fertilize Lawn/Gardens (Log Product/Date)</li>
-            <li>Inspect Mulch Condition</li>
+            <li>Includes Standard Care, plus:</li>
+            <li>Ongoing Garden Bed Weeding as Needed</li>
+            <li>Compost Refresh Semi-Annually</li>
+            <li>Gutter Cleaning Semi-Annually</li>
+            <li>Hand Weeding of Garden Beds/Walkways</li>
+            <li>Insulating Hose Spigots as Needed</li>
+            <li>Removing Cobwebs Around Entryways/Structures</li>
           </ul>
           <button class="button button--accent" data-plan="premium">Pick Premium</button>
         </div>
@@ -163,8 +170,7 @@
         <div class="service-card reveal" data-tier="essential" style="--reveal-delay:0ms" role="button" tabindex="0" aria-label="Select Essential Care and scroll to the estimate form">
           <h3>Essential Care</h3>
           <ul>
-            <li><strong>Lawn Mowing:</strong> Regular mowing to maintain a neat, healthy lawn and proper grass height.</li>
-            <li><strong>String Trimming:</strong> Precise trimming along sidewalks, driveways, and garden edges.</li>
+            <li><strong>Mowing:</strong> Regular mowing to maintain a neat, healthy lawn and proper grass height.</li>
             <li><strong>Blowing Off Hard Surfaces:</strong> Clearing leaves, clippings, and debris.</li>
             <li><strong>Proactive Property Inspection:</strong> Identify potential lawn or landscape issues early.</li>
           </ul>
@@ -173,18 +179,22 @@
           <h3>Standard Care</h3>
           <ul>
             <li>Includes Essential Care, Plus:</li>
-            <li><strong>Pruning of Shrubs and Plants:</strong> Maintain healthy growth and shape.</li>
-            <li><strong>Debris Clean-Up:</strong> Removal of fallen leaves, branches, and debris.</li>
+            <li><strong>Annual Garden Bed Weeding:</strong> Seasonal refresh of garden beds.</li>
+            <li><strong>Annual Compost Refresh:</strong> Compost refresh for garden beds.</li>
+            <li><strong>Pruning of Shrubs/Plants:</strong> As needed to maintain healthy growth.</li>
+            <li><strong>Debris Clean-Up:</strong> Removal of leaves, branches, and debris.</li>
           </ul>
         </div>
         <div class="service-card reveal" data-tier="premium" style="--reveal-delay:240ms" role="button" tabindex="0" aria-label="Select Premium Care and scroll to the estimate form">
           <h3>Premium Care</h3>
           <ul>
             <li>Includes Standard Care, Plus:</li>
-            <li><strong>Hand Weeding of Garden Beds:</strong> Remove unwanted plants carefully.</li>
-            <li><strong>Insulating Hose Spigots:</strong> Winter preparation to prevent frozen pipes.</li>
+            <li><strong>Ongoing Garden Bed Weeding:</strong> As needed throughout the season.</li>
+            <li><strong>Compost Refresh:</strong> Semi-annual compost refresh.</li>
+            <li><strong>Gutter Cleaning:</strong> Semi-annual cleaning for proper drainage.</li>
+            <li><strong>Hand Weeding:</strong> Garden beds and walkways.</li>
+            <li><strong>Insulating Hose Spigots:</strong> As needed to prevent freeze damage.</li>
             <li><strong>Removing Cobwebs:</strong> Around entryways and structures.</li>
-            <li><strong>Seasonal Fertilization:</strong> Promote healthy growth all year.</li>
           </ul>
         </div>
         <div class="service-card reveal" data-tier="storm" style="--reveal-delay:360ms" role="button" tabindex="0" aria-label="Select Storm Damage Protection Inspection and scroll to the estimate form">
@@ -234,38 +244,45 @@
           </div>
         </fieldset>
 
+        <fieldset class="option-group slim">
+          <legend>What Level of Care Are You Looking For?</legend>
+          <div class="option-grid option-grid--2">
+            <label class="option-btn"><span>Full-Service Lawn Care</span><input type="radio" name="care_level" value="Full-service lawn care" required /></label>
+            <label class="option-btn"><span>Essential Services Only</span><input type="radio" name="care_level" value="Essential services only" required /></label>
+          </div>
+        </fieldset>
+
         <!-- Essential -->
         <details open class="details-card" data-tier="essential">
           <summary>Essential Care</summary>
           <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Lawn Mowing</span><input type="checkbox" name="services" value="Lawn Mowing" /></label>
-            <label class="option-btn"><span>String Trimming</span><input type="checkbox" name="services" value="String Trimming" /></label>
-            <label class="option-btn"><span>Blowing Off Sidewalks, Driveways, Patios</span><input type="checkbox" name="services" value="Blowing Off Hard Surfaces" /></label>
+            <label class="option-btn"><span>Mowing</span><input type="checkbox" name="services" value="Mowing" /></label>
+            <label class="option-btn"><span>Blowing Off Hard Surfaces</span><input type="checkbox" name="services" value="Blowing Off Hard Surfaces" /></label>
             <label class="option-btn"><span>Proactive Property Inspection</span><input type="checkbox" name="services" value="Proactive Property Inspection" /></label>
           </div>
         </details>
 
         <!-- Standard -->
         <details class="details-card" data-tier="standard">
-          <summary>Standard Care (Includes Essential +)</summary>
+          <summary>Standard Care (Includes Essential Care +)</summary>
           <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Shrub &amp; Plant Pruning</span><input type="checkbox" name="services" value="Shrub & Plant Pruning" /></label>
-            <label class="option-btn"><span>Collect &amp; Bag Debris (Leaves, Branches, Trimmings)</span><input type="checkbox" name="services" value="Collect & Bag Debris" /></label>
-            <label class="option-btn"><span>Inspect Shrubs/Plants for Disease or Stress</span><input type="checkbox" name="services" value="Plant Health Inspection" /></label>
-            <label class="option-btn"><span>Pruning of Bushes</span><input type="checkbox" name="services" value="Pruning of Bushes" /></label>
+            <label class="option-btn"><span>Annual Garden Bed Weeding</span><input type="checkbox" name="services" value="Annual Garden Bed Weeding" /></label>
+            <label class="option-btn"><span>Annual Compost Refresh for Garden Beds</span><input type="checkbox" name="services" value="Annual Compost Refresh for Garden Beds" /></label>
+            <label class="option-btn"><span>Pruning of Shrubs/Plants as Needed</span><input type="checkbox" name="services" value="Pruning of Shrubs/Plants as Needed" /></label>
+            <label class="option-btn"><span>Debris Clean-Up (Leaves, Branches, etc.)</span><input type="checkbox" name="services" value="Debris Clean-Up (Leaves, Branches, etc.)" /></label>
           </div>
         </details>
 
         <!-- Premium -->
         <details class="details-card" data-tier="premium">
-          <summary>Premium Care (Includes Standard +)</summary>
+          <summary>Premium Care (Includes Standard Care +)</summary>
           <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>Hand-Weeding Garden Beds</span><input type="checkbox" name="services" value="Hand-Weeding Garden Beds" /></label>
-            <label class="option-btn"><span>Hand-Pull Weeds From Lawn Areas</span><input type="checkbox" name="services" value="Hand-Pull Weeds (Lawn)" /></label>
-            <label class="option-btn"><span>Check/Insulate Hose Spigots (Seasonal)</span><input type="checkbox" name="services" value="Insulate Hose Spigots" /></label>
-            <label class="option-btn"><span>Remove Cobwebs (Entryways/Structures)</span><input type="checkbox" name="services" value="Remove Cobwebs" /></label>
-            <label class="option-btn"><span>Fertilize Lawn/Gardens (Log Product/Date)</span><input type="checkbox" name="services" value="Seasonal Fertilization" /></label>
-            <label class="option-btn"><span>Inspect Mulch Condition</span><input type="checkbox" name="services" value="Inspect Mulch Condition" /></label>
+            <label class="option-btn"><span>Ongoing Garden Bed Weeding as Needed</span><input type="checkbox" name="services" value="Ongoing Garden Bed Weeding as Needed" /></label>
+            <label class="option-btn"><span>Compost Refresh Semi-Annually</span><input type="checkbox" name="services" value="Compost Refresh Semi-Annually" /></label>
+            <label class="option-btn"><span>Gutter Cleaning Semi-Annually</span><input type="checkbox" name="services" value="Gutter Cleaning Semi-Annually" /></label>
+            <label class="option-btn"><span>Hand Weeding of Garden Beds/Walkways</span><input type="checkbox" name="services" value="Hand Weeding of Garden Beds/Walkways" /></label>
+            <label class="option-btn"><span>Insulating Hose Spigots as Needed</span><input type="checkbox" name="services" value="Insulating Hose Spigots as Needed" /></label>
+            <label class="option-btn"><span>Removing Cobwebs Around Entryways/Structures</span><input type="checkbox" name="services" value="Removing Cobwebs Around Entryways/Structures" /></label>
           </div>
         </details>
 
@@ -274,12 +291,8 @@
           <summary>Storm Damage Prevention Service</summary>
           <div class="sublegend">Scheduling Options</div>
           <div class="option-grid option-grid--2">
-            <label class="option-btn"><span>1x Per Month</span><input type="checkbox" name="storm_schedule" value="1x per month" /></label>
-            <label class="option-btn"><span>2x Per Month</span><input type="checkbox" name="storm_schedule" value="2x per month" /></label>
-            <label class="option-btn"><span>Custom: Pre-Storm Only</span><input type="checkbox" name="storm_schedule" value="Custom: Pre-Storm Only" /></label>
-            <label class="option-btn"><span>Custom: Post-Storm Only</span><input type="checkbox" name="storm_schedule" value="Custom: Post-Storm Only" /></label>
-            <label class="option-btn"><span>Custom: Both Pre- &amp; Post-Storm</span><input type="checkbox" name="storm_schedule" value="Custom: Both Pre- & Post-Storm" /></label>
-            <label class="option-btn"><span>Custom: Seasonal (Fall – Spring)</span><input type="checkbox" name="storm_schedule" value="Custom: Seasonal (Fall – Spring)" /></label>
+            <label class="option-btn"><span>Seasonal (Fall – Spring)</span><input type="radio" name="storm_schedule" value="Seasonal (Fall – Spring)" /></label>
+            <label class="option-btn"><span>Year-Round</span><input type="radio" name="storm_schedule" value="Year-round" /></label>
           </div>
 
           <div class="sublegend">Regular Checks</div>
