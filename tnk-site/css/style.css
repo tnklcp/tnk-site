@@ -99,10 +99,16 @@ a { color: inherit; text-underline-offset: 2px; }
 .hero-inner { max-width: 900px; margin: 0 auto; text-align: center; }
 .hero :where(img, h1, p, .cta-row, .process-strip) { position: relative; z-index: 1; }
 .hero img { max-width: 350px; margin: 0 auto var(--space-4); }
-.hero h1 { font-size: var(--fs-hero); margin: 0; }
+.hero h1 { font-size: var(--fs-hero); margin: 0; display: inline-block; max-width: 100%; }
 .hero p { margin: var(--space-3) 0 0; }
-.hero-subheadline { font-size: var(--fs-lead); font-weight: 700; max-width: 48rem; margin-inline: auto; text-align: center; }
-.hero-meta { font-size: 1.05rem; }
+.hero-subheadline {
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  text-align: center;
+  display: inline-block;
+  max-width: 100%;
+}
+.hero-meta { font-size: 1.05rem; display: inline-block; max-width: 100%; }
 .hero-cred { font-weight: 700; color: var(--clr-primary-600); letter-spacing: .2px; }
 .hero .cta-row { display: flex; justify-content: center; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-4); }
 .process-strip {
