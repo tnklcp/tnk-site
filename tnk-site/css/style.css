@@ -649,7 +649,21 @@ body.modal-open { overflow: hidden; }
   .container, .section, form { padding-inline: 1rem; }
   .portal-grid { grid-template-columns: 1fr; }
   .card-box { padding: var(--space-5); }
-  .nav-inner { flex-direction: column; }
+  .nav-inner { flex-direction: column; align-items: stretch; text-align: center; }
+  .nav-brand { font-size: 1.05rem; }
+  .nav-links {
+    width: 100%;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid rgba(30,47,30,.12);
+  }
+  .nav-links a { padding: .35rem 0; }
+  .nav-cta {
+    width: 100%;
+    text-align: center;
+    padding: .55rem 1rem;
+  }
   .process-strip { grid-template-columns: 1fr; }
   .process-step { justify-content: center; text-align: center; }
   .process-step::after { display: none; }
