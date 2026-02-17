@@ -4,23 +4,87 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Page Not Found | TNK Lawncare Plus</title>
+  <meta name="description" content="We couldn't find that page. Return to The Neighborhood Kids Lawncare Plus homepage." />
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    .wrap { min-height: 70vh; display:grid; place-items:center; padding:2rem 1rem; }
-    .card { background: var(--clr-surface); border-radius: var(--radius); box-shadow: var(--shadow-2); padding: 2rem; max-width: 640px; text-align:center; }
-    .card h1 { margin:0 0 .5rem; color: var(--clr-primary-600); }
-    .links { display:flex; gap:.75rem; justify-content:center; flex-wrap:wrap; margin-top:1rem; }
-  </style> 
+  <script src="js/script.js" defer></script>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>We can’t find that page.</h1>
-      <p>Try one of these:</p>
-      <div class="links">
-        <a class="button" href="index.html">Home</a>
+  <nav class="site-nav" aria-label="Primary">
+    <div class="container nav-inner">
+      <div class="nav-top">
+        <a class="nav-brand" href="index.html">The Neighborhood <span>Kids</span> Lawncare Plus</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
+          <span class="nav-toggle__line" aria-hidden="true"></span>
+          <span class="nav-toggle__line" aria-hidden="true"></span>
+          <span class="nav-toggle__line" aria-hidden="true"></span>
+        </button>
+      </div>
+      <div class="nav-links" id="primary-nav">
+        <a href="index.html#about">About</a>
+        <a href="index.html#services">Services</a>
+        <a href="index.html#pricing">Pricing</a>
+        <a href="index.html#testimonials">Reviews</a>
+        <a href="index.html#service-area">Service Area</a>
+        <a class="nav-cta" href="index.html#estimate">Request Free Estimate</a>
       </div>
     </div>
-  </div>
+  </nav>
+
+  <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
+
+  <header class="hero hero--compact">
+    <div class="container hero-inner">
+      <h1>We can’t find that page.</h1>
+      <p>Return to the main site or jump back to the homepage.</p>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="section">
+      <div class="container page-center">
+        <div class="page-card">
+          <h2>Start here</h2>
+          <p>Try one of these:</p>
+          <div class="cta-row">
+            <a class="button button--primary" href="index.html">Home</a>
+            <a class="button button--accent" href="index.html#estimate">Request an Estimate</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid centered">
+        <div class="footer-brand">
+          <img class="footer-logo" src="images/IMG_3082.jpeg" alt="The Neighborhood Kids Lawncare Plus Logo With Phone Number" width="220" height="220" loading="lazy" decoding="async" />
+          <p class="footer-tag">Based on the Oregon Coast • Serving Pacific City to Depoe Bay</p>
+        </div>
+
+        <div class="footer-contact">
+          <h3 class="footer-heading">Contact</h3>
+          <p>Email: <a href="mailto:TNKLCP@gmail.com">TNKLCP@gmail.com</a></p>
+          <p>Call: <a href="tel:+15419214416">541-921-4416</a></p>
+          <p>Hours: 8am–6pm • Available 24/7 for storm emergencies</p>
+          <p class="footer-copy">&copy; 2025 The Neighborhood Kids Lawncare Plus</p>
+        </div>
+
+        <div class="footer-social">
+          <h3 class="footer-heading">Follow</h3>
+          <div class="social-links">
+            <a class="social-link" href="https://www.facebook.com/the.neighborhood.kids.lawn.care.plus" target="_blank" rel="noopener noreferrer" aria-label="Visit Us on Facebook">
+              <img src="images/facebook.svg" alt="" width="28" height="28" />
+              <span>Facebook</span>
+            </a>
+            <a class="social-link" href="https://www.instagram.com/the_neighborhood_kids_lawncare?igsh=MXAwNmhoMGpzOGo4dg==" target="_blank" rel="noopener noreferrer" aria-label="Visit Us on Instagram">
+              <img src="images/instagram.svg" alt="" width="28" height="28" />
+              <span>Instagram</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>

@@ -17,6 +17,9 @@
   <meta name="twitter:image" content="https://theneighborhoodkidslawncare.com/images/IMG_2713.png" />
   <link rel="icon" href="images/IMG_2713.png" type="image/png" />
   <link rel="apple-touch-icon" href="images/IMG_2713.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   
   <script src="js/script.js" defer></script>
@@ -58,7 +61,7 @@
   <nav class="site-nav" aria-label="Primary">
     <div class="container nav-inner">
       <div class="nav-top">
-        <a class="nav-brand" href="#top">The Neighborhood Kids Lawncare Plus</a>
+        <a class="nav-brand" href="#top">The Neighborhood <span>Kids</span> Lawncare Plus</a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Toggle menu">
           <span class="nav-toggle__line" aria-hidden="true"></span>
           <span class="nav-toggle__line" aria-hidden="true"></span>
@@ -81,28 +84,35 @@
 
   <!-- Hero -->
   <header id="top" class="hero">
-    <div class="hero-inner">
-      <img src="images/IMG_2713.png" alt="The Neighborhood Kids Lawncare Plus Logo" width="350" height="350" decoding="async" />
-      <h1>The Neighborhood Kids Lawncare Plus</h1>
-      <p class="hero-subheadline">Reliable, professional lawn and property care delivered on schedule with clear, written quotes.</p>
-      <p class="hero-meta">
-        Serving Pacific City to Depoe Bay •
-        Call: <a href="tel:+15419214416" aria-label="Call 541 921 4416">541-921-4416</a>
-      </p>
-      <p class="hero-cred">Locally owned • Insured</p>
-      <div class="process-strip" role="list" aria-label="Estimate process">
-        <div class="process-step" role="listitem">
-          <span class="process-step__num" aria-hidden="true">1</span>
-          <span class="process-step__label">Request estimate</span>
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <p class="hero-eyebrow">The Neighborhood Kids Lawncare Plus</p>
+        <h1>Premium Lawn &amp; Property Care<br />on the Oregon Coast</h1>
+        <p class="hero-lead">Reliable crews. Written quotes. Seasonal maintenance plans built around your property.</p>
+        <p class="hero-area">Serving Pacific City • Neskowin • Otis • Lincoln City • Depoe Bay</p>
+        <ul class="hero-checklist" aria-label="Company highlights">
+          <li>Locally owned</li>
+          <li>Fully insured</li>
+          <li>Professional uniformed crews</li>
+          <li>5‑star rated</li>
+        </ul>
+        <div class="hero-actions">
+          <a class="button button--cta" href="#estimate">Request My Free Estimate</a>
+          <div class="hero-call">Call Now: <a href="tel:+15419214416">541-921-4416</a></div>
         </div>
-        <div class="process-step" role="listitem">
-          <span class="process-step__num" aria-hidden="true">2</span>
-          <span class="process-step__label">Written quote</span>
+        <div class="hero-badges" aria-label="Trust indicators">
+          <div class="badge-card">
+            <span class="badge-title">4.9</span>
+            <span class="badge-note">Average Rating</span>
+          </div>
+          <div class="badge-card">
+            <span class="badge-title">150+</span>
+            <span class="badge-note">Coastal Properties Annually</span>
+          </div>
         </div>
-        <div class="process-step" role="listitem">
-          <span class="process-step__num" aria-hidden="true">3</span>
-          <span class="process-step__label">Scheduled service</span>
-        </div>
+      </div>
+      <div class="hero-visual">
+        <img src="images/1222.jpg" alt="Lawncare team ready to serve along the Oregon Coast" width="560" height="600" loading="eager" decoding="async" />
       </div>
     </div>
   </header>
