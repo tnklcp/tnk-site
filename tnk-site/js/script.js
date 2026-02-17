@@ -2,6 +2,48 @@
    UI interactions + Scroll Reveal + Estimate helpers
    ========================================================= */
 
+// ===== Mobile nav toggle =====
+(function initMobileNav() {
+  const toggle = document.querySelector(".nav-toggle");
+  const links = document.querySelector(".nav-links");
+  if (!toggle || !links) return;
+
+  const mq = window.matchMedia("(max-width: 900px)");
+  const setState = (open) => {
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    links.classList.toggle("is-open", open);
+    if (open) {
+      links.removeAttribute("aria-hidden");
+    } else {
+      links.setAttribute("aria-hidden", "true");
+    }
+  };
+
+  const syncForViewport = () => {
+    if (mq.matches) {
+      setState(false);
+    } else {
+      links.classList.remove("is-open");
+      links.removeAttribute("aria-hidden");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  };
+
+  toggle.addEventListener("click", () => {
+    const isOpen = toggle.getAttribute("aria-expanded") === "true";
+    setState(!isOpen);
+  });
+
+  links.addEventListener("click", (event) => {
+    if (mq.matches && event.target.closest("a")) {
+      setState(false);
+    }
+  });
+
+  syncForViewport();
+  mq.addEventListener("change", syncForViewport);
+})();
+
 // ===== Modal open/close =====
 const body = document.body;
 const openButtons = document.querySelectorAll("[data-modal-open]");
