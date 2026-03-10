@@ -109,24 +109,23 @@ document.addEventListener("keydown", (e) => {
   const storm     = document.querySelector('details[data-tier="storm"]');
 
   const E = [
-    'Lawn Mowing (Alternating Patterns)',
-    'String Trimming (Edges, Beds)',
+    'Mowing',
     'Blowing Off Hard Surfaces',
-    'Turf Inspection'
+    'Proactive Property Inspection'
   ];
   const S = [
-    'Shrub & Plant Pruning',
-    'Collect & Bag Debris',
-    'Plant Health Inspection',
-    'Hand-Pull Weeds (Walkways)'
+    'Annual Garden Bed Weeding',
+    'Annual Compost Refresh for Garden Beds',
+    'Pruning of Shrubs/Plants as Needed',
+    'Debris Clean-Up (Leaves, Branches, etc.)'
   ];
   const P = [
-    'Hand-Weeding Garden Beds',
-    'Hand-Pull Weeds (Lawn)',
-    'Insulate Hose Spigots',
-    'Remove Cobwebs',
-    'Seasonal Fertilization',
-    'Inspect Mulch Condition'
+    'Ongoing Garden Bed Weeding as Needed',
+    'Compost Refresh Semi-Annually',
+    'Gutter Cleaning Semi-Annually',
+    'Hand Weeding of Garden Beds/Walkways',
+    'Insulating Hose Spigots as Needed',
+    'Removing Cobwebs Around Entryways/Structures'
   ];
 
   const setChecked = (container, labels) => {
@@ -150,6 +149,9 @@ document.addEventListener("keydown", (e) => {
     if (selectedPlan) selectedPlan.value = plan;
     clearAll();
     openDetails([essential, standard, premium, storm]);
+
+    const careLevel = form.querySelector('input[name="care_level"][value="Full-service lawn care"]');
+    if (careLevel) careLevel.checked = true;
 
     if (plan === 'essential') {
       setChecked(essential, E);

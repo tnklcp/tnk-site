@@ -70,6 +70,37 @@
                 <button class="button button--accent" type="submit" data-action="clock_out">Clock Out</button>
               </div>
             </form>
+            <form id="employee-adjust-form" class="portal-adjust-form" style="margin-top: 1rem;">
+              <div class="job-inline">
+                <label class="field">
+                  Effective Date
+                  <input type="date" id="employee-adjust-date" name="date" required />
+                </label>
+                <label class="field">
+                  Type
+                  <select id="employee-adjust-type" name="type">
+                    <option value="add">Add hours</option>
+                    <option value="subtract">Subtract hours</option>
+                  </select>
+                </label>
+                <label class="field">
+                  Hours
+                  <input type="number" id="employee-adjust-hours" name="hours" step="0.25" min="0" placeholder="0" />
+                </label>
+                <label class="field">
+                  Minutes
+                  <input type="number" id="employee-adjust-minutes" name="minutes" step="1" min="0" max="59" placeholder="0" />
+                </label>
+              </div>
+              <label class="field">
+                Notes
+                <input type="text" id="employee-adjust-notes" name="notes" placeholder="Reason for adjustment" />
+              </label>
+              <div class="portal-actions">
+                <button class="button button--primary" type="submit">Save Adjustment</button>
+                <span class="status-pill" id="employee-adjust-status" aria-live="polite"></span>
+              </div>
+            </form>
             <ul id="employee-time-list" class="portal-list"></ul>
           </article>
         </div>

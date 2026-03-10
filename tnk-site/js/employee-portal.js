@@ -6,6 +6,13 @@
   const timeForm = document.getElementById("employee-time-form");
   const timeList = document.getElementById("employee-time-list");
   const clockStatusEl = document.getElementById("employee-clock-status");
+  const adjustForm = document.getElementById("employee-adjust-form");
+  const adjustStatusEl = document.getElementById("employee-adjust-status");
+  const adjustDateInput = document.getElementById("employee-adjust-date");
+  const adjustTypeSelect = document.getElementById("employee-adjust-type");
+  const adjustHoursInput = document.getElementById("employee-adjust-hours");
+  const adjustMinutesInput = document.getElementById("employee-adjust-minutes");
+  const adjustNotesInput = document.getElementById("employee-adjust-notes");
   const timeoffForm = document.getElementById("employee-timeoff-form");
   const timeoffList = document.getElementById("employee-timeoff-list");
   const payPeriodRangeEl = document.getElementById("employee-pay-period-range");
@@ -433,6 +440,46 @@
       setStatus(error.message);
     }
   });
+
+  adjustForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!adjustDateInput) return;
+    if (adjustStatusEl) adjustStatusEl.textContent = "";
+    const hours = adjustHoursInput?.value ? Number(adjustHoursInput.value) : 0;
+    const minutes = adjustMinutesInput?.value ? Number(adjustMinutesInput.value) : 0;
+    const totalMinutes = Math.round(hours * 60 + minutes);
+    const isSubtract = adjustTypeSelect?.value === "subtract";
+    const signedMinutes = isSubtract ? -Math.abs(totalMinutes) : Math.abs(totalMinutes);
+    if (!signedMinutes) {
+      if (adjustStatusEl) adjustStatusEl.textContent = "Enter hours or minutes.";
+      return;
+    }
+    try {
+      await apiRequest("/api/time-entries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "employee_adjust",
+          date: adjustDateInput.value,
+          minutes: signedMinutes,
+          notes: adjustNotesInput?.value || ""
+        })
+      });
+      if (adjustStatusEl) adjustStatusEl.textContent = "Adjustment saved.";
+      if (adjustHoursInput) adjustHoursInput.value = "";
+      if (adjustMinutesInput) adjustMinutesInput.value = "";
+      if (adjustNotesInput) adjustNotesInput.value = "";
+      loadTimeEntries();
+    } catch (error) {
+      if (adjustStatusEl) adjustStatusEl.textContent = formatErrorSummary(error);
+    }
+  });
+
+  if (adjustDateInput) {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    adjustDateInput.value = `${today.getFullYear()}-${month}-${day}`;
+  }
 
   timeoffForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
