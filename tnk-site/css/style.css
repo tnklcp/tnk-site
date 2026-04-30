@@ -803,10 +803,12 @@ body.modal-open { overflow: hidden; }
     text-align: center;
     padding: .55rem 1rem;
   }
-  .hero-grid { grid-template-columns: 1fr; }
+  .hero-grid { grid-template-columns: 1fr; gap: var(--space-6); }
   .hero-content { max-width: 100%; }
   .hero-visual { justify-items: center; }
   .hero-visual img { width: min(100%, 520px); }
+  #about iframe,
+  .section iframe { aspect-ratio: 16 / 9; height: auto; width: 100%; }
 }
 @media (max-width: 760px) {
   .dashboard-panel,
@@ -819,16 +821,49 @@ body.modal-open { overflow: hidden; }
   .dashboard-meta { width: 100%; }
   .portal-list { max-height: none; }
   .hero-checklist { grid-template-columns: 1fr; }
-  .hero-actions { align-items: flex-start; }
+  .hero-actions { align-items: stretch; flex-direction: column; gap: var(--space-3); }
+  .hero-actions .button--cta { width: 100%; text-align: center; padding: .95rem 1.4rem; }
+  .hero-call { text-align: center; }
   .hero::before {
     background:
       linear-gradient(180deg, rgba(246, 244, 238, 0.96) 0%, rgba(246, 244, 238, 0.88) 60%, rgba(246, 244, 238, 0.8) 100%),
       url("../images/12.jpg") center/cover no-repeat;
   }
+  .hero-badges { width: 100%; }
+  .badge-card { flex: 1 1 calc(50% - .4rem); min-width: 0; padding: .65rem .8rem; }
+  .section { padding-left: 1rem; padding-right: 1rem; }
+  .footer-grid.centered { gap: var(--space-5); }
+}
+@media (max-width: 640px) {
+  .form-grid--2 { grid-template-columns: 1fr; gap: var(--space-3); }
+  .option-grid--2 { grid-template-columns: 1fr; }
+  form { padding: 18px; margin: 28px auto; }
+  .card-box { padding: var(--space-4); }
+  .service-card { padding: 18px; }
+  .price-card { padding: var(--space-5) var(--space-4); }
+  .button { padding: .85rem 1.4rem; margin: var(--space-3) var(--space-1); }
+  .button--xl { width: 100%; max-width: 420px; padding: .95rem 1.4rem; }
+  .modal__dialog { width: min(94vw, 560px); margin: 4vh auto; padding: 1rem 1rem 1.25rem; max-height: 90vh; }
+  .modal__close { top: .25rem; right: .35rem; }
+  .nav-brand { font-size: .98rem; }
+  h1 { line-height: 1.2; }
+  h2, h3 { line-height: 1.25; }
+  .hero { padding: clamp(2rem, 8vw, 3.5rem) 0; }
+  .hero h1 { font-size: clamp(1.7rem, 5vw + 1rem, 2.3rem); }
+  .gallery-h { grid-auto-columns: 78%; }
+  .gallery-item img { height: 200px; }
+  .details-card > summary { padding: .75rem 1.25rem .75rem 0; font-size: 1rem; }
+  .details-card { padding: .25rem .75rem 1rem; }
 }
 @media (max-width: 560px) {
   .form-actions { grid-template-columns: 1fr; }
-  .form-actions [role="status"] { text-align: center; }
+  .form-actions [role="status"] { text-align: center; min-width: 0; }
+  .form-actions .button { width: 100%; }
+}
+@media (max-width: 400px) {
+  .hero-checklist { gap: .35rem; }
+  .badge-card { flex: 1 1 100%; }
+  .nav-brand { font-size: .92rem; }
 }
 
 /* ========= Reduced Motion ========= */
