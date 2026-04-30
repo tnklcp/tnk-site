@@ -390,6 +390,24 @@
         <!-- Hidden fields (for tier buttons) -->
         <input type="hidden" name="selected_plan" id="selected_plan" />
 
+        <!-- Referral Source -->
+        <fieldset class="option-group slim">
+          <legend>How Did You Hear About Us?</legend>
+          <div class="option-grid option-grid--2">
+            <label class="option-btn"><span>Google</span><input type="radio" name="heard_about" value="Google" required /></label>
+            <label class="option-btn"><span>Facebook</span><input type="radio" name="heard_about" value="Facebook" required /></label>
+            <label class="option-btn"><span>Neighbor</span><input type="radio" name="heard_about" value="Neighbor" required /></label>
+            <label class="option-btn"><span>Door Hanger</span><input type="radio" name="heard_about" value="Door Hanger" required /></label>
+            <label class="option-btn"><span>Radio</span><input type="radio" name="heard_about" value="Radio" required /></label>
+            <label class="option-btn"><span>Online Ad</span><input type="radio" name="heard_about" value="Online Ad" required /></label>
+            <label class="option-btn"><span>Other</span><input type="radio" name="heard_about" value="Other" required /></label>
+          </div>
+          <div class="field heard-about-other" hidden>
+            <label for="heard_about_other">Please specify how you heard about us</label>
+            <input id="heard_about_other" type="text" name="heard_about_other" maxlength="120" />
+          </div>
+        </fieldset>
+
         <!-- Notes & Photos -->
         <div class="form-grid form-grid--2">
           <div class="field">
