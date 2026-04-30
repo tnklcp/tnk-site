@@ -183,6 +183,37 @@ export default async (req: Request) => {
         return jsonResponse({ entry }, 201);
       }
 
+      if (action === "employee_adjust") {
+        const minutesValue = parseNumber(payload.minutes);
+        const hoursValue = parseNumber(payload.hours);
+        const adjustMinutes =
+          minutesValue !== null ? minutesValue : hoursValue !== null ? hoursValue * 60 : null;
+        if (adjustMinutes === null || !Number.isFinite(adjustMinutes) || adjustMinutes === 0) {
+          return jsonResponse({ error: "Adjustment minutes are required." }, 400);
+        }
+        const effectiveDate = parseEffectiveDate(payload.date || payload.effectiveDate);
+        if (!effectiveDate) {
+          return jsonResponse({ error: "Invalid adjustment date." }, 400);
+        }
+        const now = new Date().toISOString();
+        const entry: TimeEntry = {
+          id: crypto.randomUUID(),
+          userId: auth.subject,
+          userEmail: auth.email,
+          status: "closed",
+          clockIn: effectiveDate.toISOString(),
+          clockOut: effectiveDate.toISOString(),
+          notes: payload.notes ? String(payload.notes) : undefined,
+          entryType: "adjustment",
+          adjustMinutes: Math.round(adjustMinutes),
+          adjustedBy: auth.subject,
+          adjustedAt: now
+        };
+        entries.push(entry);
+        await writeCollection(COLLECTION_KEY, entries);
+        return jsonResponse({ entry }, 201);
+      }
+
       return jsonResponse({ error: "Unknown action." }, 400);
     }
 
