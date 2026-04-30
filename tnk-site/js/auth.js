@@ -2,8 +2,11 @@
   const state = {
     identity: null,
     config: null,
-    ready: null
+    ready: null,
+    refreshTimer: null
   };
+
+  const TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
   const setStatus = (el, message) => {
     if (el) {
@@ -44,10 +47,44 @@
       const identity = getIdentity();
       identity.init();
       state.config = config;
+      scheduleTokenRefresh();
+      identity.on("login", () => {
+        scheduleTokenRefresh();
+        refreshTokenSafely(true);
+      });
+      identity.on("logout", () => {
+        if (state.refreshTimer) {
+          clearInterval(state.refreshTimer);
+          state.refreshTimer = null;
+        }
+      });
       return { identity, config };
     })();
 
     return state.ready;
+  };
+
+  const refreshTokenSafely = async (forceRefresh = false) => {
+    try {
+      const identity = state.identity || getIdentity();
+      const user = identity.currentUser();
+      if (!user) return null;
+      if (typeof user.jwt === "function") {
+        return await user.jwt(forceRefresh);
+      }
+    } catch (error) {
+      // Ignore transient refresh errors; the next API call will retry.
+    }
+    return null;
+  };
+
+  const scheduleTokenRefresh = () => {
+    if (state.refreshTimer) {
+      clearInterval(state.refreshTimer);
+    }
+    state.refreshTimer = setInterval(() => {
+      refreshTokenSafely(false);
+    }, TOKEN_REFRESH_INTERVAL_MS);
   };
 
   const handleRedirectIfPresent = async () => false;
@@ -133,6 +170,7 @@
       window.location.href = redirectTo || "login.html";
       return null;
     }
+    await refreshTokenSafely(false);
     return user;
   };
 
@@ -140,6 +178,14 @@
     const { identity } = await init();
     identity.on(event, handler);
   };
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && state.identity) {
+        refreshTokenSafely(false);
+      }
+    });
+  }
 
   window.tnkAuth = {
     init,

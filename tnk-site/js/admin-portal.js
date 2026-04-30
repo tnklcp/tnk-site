@@ -29,6 +29,14 @@
   const adjustHoursInput = document.getElementById("admin-adjust-hours");
   const adjustMinutesInput = document.getElementById("admin-adjust-minutes");
   const adjustNotesInput = document.getElementById("admin-adjust-notes");
+  const dailyTabs = document.getElementById("admin-daily-tabs");
+  const dailyTabPanel = document.getElementById("admin-daily-panel");
+  const dailyTabTitle = document.getElementById("admin-daily-tab-title");
+  const dailyTabList = document.getElementById("admin-daily-tab-list");
+  const dailyRangeEl = document.getElementById("admin-daily-range");
+  const dailyStartInput = document.getElementById("admin-daily-start");
+  const dailyEndInput = document.getElementById("admin-daily-end");
+  const dailyResetBtn = document.getElementById("admin-daily-reset");
 
   if (!userEl || !logoutBtn) return;
 
@@ -715,6 +723,218 @@
     }
   };
 
+  const toIsoDate = (date) => {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+  };
+
+  const parseIsoDate = (value) => {
+    if (!value) return null;
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const computeDailyTotals = (entries, rangeStart, rangeEnd, now) => {
+    const totals = new Map();
+    if (!entries?.length) return totals;
+    const cursor = new Date(rangeStart);
+    while (cursor <= rangeEnd) {
+      totals.set(toIsoDate(cursor), 0);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    entries.forEach((entry) => {
+      if (typeof entry.adjustMinutes === "number") {
+        const effective = parseIsoDate(toIsoDate(new Date(entry.clockIn)));
+        if (!effective) return;
+        if (effective < rangeStart || effective > rangeEnd) return;
+        const key = toIsoDate(effective);
+        totals.set(key, (totals.get(key) || 0) + entry.adjustMinutes);
+        return;
+      }
+      const interval = getEntryInterval(entry, now);
+      if (!interval) return;
+      const dayCursor = startOfDay(interval.start);
+      while (dayCursor <= interval.end) {
+        const dayStart = startOfDay(dayCursor);
+        const dayEnd = addDays(dayStart, 1);
+        const overlap = getOverlapMinutes(interval.start, interval.end, dayStart, dayEnd);
+        if (overlap > 0 && dayStart >= rangeStart && dayStart <= rangeEnd) {
+          const key = toIsoDate(dayStart);
+          totals.set(key, (totals.get(key) || 0) + overlap);
+        }
+        dayCursor.setDate(dayCursor.getDate() + 1);
+      }
+    });
+    return totals;
+  };
+
+  const dailyState = {
+    employees: [],
+    rangeStart: null,
+    rangeEnd: null,
+    activeIndex: 0
+  };
+
+  const renderDailyTotals = () => {
+    if (!dailyTabList) return;
+    const employee = dailyState.employees[dailyState.activeIndex];
+    if (!employee || !dailyState.rangeStart || !dailyState.rangeEnd) {
+      if (dailyTabTitle) dailyTabTitle.textContent = "Daily hours";
+      renderList(dailyTabList, [], "No employees found.");
+      return;
+    }
+    if (dailyTabTitle) dailyTabTitle.textContent = `${employee.label} — daily hours`;
+    const now = new Date();
+    const totals = computeDailyTotals(employee.entries, dailyState.rangeStart, dailyState.rangeEnd, now);
+    const sortedKeys = Array.from(totals.keys()).sort();
+    let grandTotal = 0;
+    const items = sortedKeys.map((key) => {
+      const minutes = totals.get(key) || 0;
+      grandTotal += minutes;
+      const li = document.createElement("li");
+      const label = document.createElement("div");
+      const date = parseIsoDate(key);
+      label.textContent = date ? formatDate(date) : key;
+      const total = document.createElement("span");
+      total.textContent = minutes < 0 ? formatSignedMinutes(minutes) : formatMinutes(minutes);
+      li.appendChild(label);
+      li.appendChild(total);
+      return li;
+    });
+    const totalLi = document.createElement("li");
+    const totalLabel = document.createElement("div");
+    totalLabel.textContent = "Total";
+    totalLabel.style.fontWeight = "700";
+    const totalValue = document.createElement("span");
+    totalValue.textContent = formatMinutes(grandTotal);
+    totalValue.style.fontWeight = "700";
+    totalLi.appendChild(totalLabel);
+    totalLi.appendChild(totalValue);
+    items.push(totalLi);
+    renderList(dailyTabList, items, "No hours in this range.");
+  };
+
+  const renderDailyTabs = () => {
+    if (!dailyTabs) return;
+    dailyTabs.innerHTML = "";
+    if (!dailyState.employees.length) {
+      if (dailyTabTitle) dailyTabTitle.textContent = "Daily hours";
+      renderList(dailyTabList, [], "No employees found.");
+      return;
+    }
+    const tabEntries = dailyState.employees.map((employee, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tab-button";
+      button.textContent = employee.label;
+      button.id = `daily-hours-tab-${index}`;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(index === dailyState.activeIndex));
+      if (index === dailyState.activeIndex) button.classList.add("is-active");
+      button.addEventListener("click", () => {
+        dailyState.activeIndex = index;
+        Array.from(dailyTabs.children).forEach((child, idx) => {
+          const isActive = idx === index;
+          child.classList.toggle("is-active", isActive);
+          child.setAttribute("aria-selected", String(isActive));
+        });
+        if (dailyTabPanel) {
+          dailyTabPanel.setAttribute("aria-labelledby", button.id);
+        }
+        renderDailyTotals();
+      });
+      dailyTabs.appendChild(button);
+      return button;
+    });
+    if (dailyTabPanel && tabEntries.length) {
+      dailyTabPanel.setAttribute("aria-labelledby", tabEntries[dailyState.activeIndex]?.id || tabEntries[0].id);
+    }
+    renderDailyTotals();
+  };
+
+  const updateDailyRangeLabel = () => {
+    if (!dailyRangeEl) return;
+    if (!dailyState.rangeStart || !dailyState.rangeEnd) {
+      dailyRangeEl.textContent = "";
+      return;
+    }
+    dailyRangeEl.textContent = `Showing ${formatDate(dailyState.rangeStart)} – ${formatDate(dailyState.rangeEnd)}`;
+  };
+
+  const applyDailyInputs = () => {
+    if (!dailyState.rangeStart || !dailyState.rangeEnd) return;
+    if (dailyStartInput) dailyStartInput.value = toIsoDate(dailyState.rangeStart);
+    if (dailyEndInput) dailyEndInput.value = toIsoDate(dailyState.rangeEnd);
+  };
+
+  const loadDailyHours = async () => {
+    const [employeeData, timeData] = await Promise.all([
+      apiRequest("/api/employees"),
+      apiRequest("/api/time-entries")
+    ]);
+    const employees = toArray(employeeData?.employees);
+    const entries = toArray(timeData?.entries);
+    const now = new Date();
+    if (!dailyState.rangeStart || !dailyState.rangeEnd) {
+      const period = getPayPeriodForDate(now);
+      dailyState.rangeStart = period.start;
+      dailyState.rangeEnd = period.end;
+    }
+
+    const employeeMap = new Map();
+    employees.forEach((employee) => {
+      employeeMap.set(employee.id, {
+        ...employee,
+        label: employee.name || employee.email || employee.id,
+        entries: []
+      });
+    });
+    entries.forEach((entry) => {
+      const id = entry.userId;
+      if (!employeeMap.has(id)) {
+        employeeMap.set(id, {
+          id,
+          email: entry.userEmail,
+          name: entry.userEmail,
+          label: entry.userEmail || id,
+          entries: []
+        });
+      }
+      employeeMap.get(id).entries.push(entry);
+    });
+    dailyState.employees = Array.from(employeeMap.values()).sort((a, b) =>
+      String(a.label || "").localeCompare(String(b.label || ""))
+    );
+    if (dailyState.activeIndex >= dailyState.employees.length) {
+      dailyState.activeIndex = 0;
+    }
+    applyDailyInputs();
+    updateDailyRangeLabel();
+    renderDailyTabs();
+  };
+
+  const handleDailyRangeChange = () => {
+    const start = parseIsoDate(dailyStartInput?.value);
+    const end = parseIsoDate(dailyEndInput?.value);
+    if (!start || !end || end < start) return;
+    dailyState.rangeStart = start;
+    dailyState.rangeEnd = end;
+    updateDailyRangeLabel();
+    renderDailyTotals();
+  };
+
+  dailyStartInput?.addEventListener("change", handleDailyRangeChange);
+  dailyEndInput?.addEventListener("change", handleDailyRangeChange);
+  dailyResetBtn?.addEventListener("click", () => {
+    const period = getPayPeriodForDate(new Date());
+    dailyState.rangeStart = period.start;
+    dailyState.rangeEnd = period.end;
+    applyDailyInputs();
+    updateDailyRangeLabel();
+    renderDailyTotals();
+  });
+
   const loadAll = async () => {
     const tasks = [];
     if (customerForm || customerList) {
@@ -737,6 +957,9 @@
       payPeriodTabList
     ) {
       tasks.push(safeLoad(loadPayPeriods, payPeriodCurrentList, "Unable to load pay periods."));
+    }
+    if (dailyTabs || dailyTabList) {
+      tasks.push(safeLoad(loadDailyHours, dailyTabList, "Unable to load daily hours."));
     }
     const results = await Promise.all(tasks);
     if (results.some((ok) => !ok)) {
