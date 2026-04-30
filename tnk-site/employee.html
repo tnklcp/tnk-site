@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Employee Portal | TNK Lawncare Plus</title>
-  <meta name="description" content="Employee portal for assigned jobs, time tracking, and time-off requests." />
+  <meta name="description" content="Employee portal for assigned jobs and time tracking." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
@@ -52,7 +52,7 @@
         <div class="dashboard-header">
           <div>
             <h2 class="dashboard-title">Employee Dashboard</h2>
-            <p class="dashboard-subtitle">All job, time, and time-off details in one view.</p>
+            <p class="dashboard-subtitle">Job and time details in one view.</p>
           </div>
           <div class="dashboard-meta">
             <p class="login-footer" id="employee-user">Loading employee profile...</p>
@@ -60,7 +60,6 @@
             <div class="dashboard-links">
               <a class="dashboard-link" href="employee-jobs.html">Jobs</a>
               <a class="dashboard-link" href="employee-time.html">Time Log</a>
-              <a class="dashboard-link" href="employee-timeoff.html">Time Off</a>
               <a class="dashboard-link" href="employee-completed.html">Completed</a>
             </div>
           </div>
@@ -169,49 +168,6 @@
             <div class="panel-list">
               <h4>Time Log</h4>
               <ul id="employee-time-list" class="portal-list"></ul>
-            </div>
-          </article>
-
-          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
-            <div class="panel-header">
-              <div>
-                <h3>Request Time Off</h3>
-                <p class="panel-note">Submit new requests and monitor approvals.</p>
-              </div>
-              <div class="panel-icon">TO</div>
-            </div>
-            <div class="panel-body">
-              <form id="employee-timeoff-form" class="form-grid">
-                <div class="field">
-                  <label for="timeoff-start">Start Date</label>
-                  <input id="timeoff-start" name="startDate" type="date" required />
-                </div>
-                <div class="field">
-                  <label for="timeoff-end">End Date</label>
-                  <input id="timeoff-end" name="endDate" type="date" required />
-                </div>
-                <div class="field">
-                  <label for="timeoff-notes">Notes</label>
-                  <input id="timeoff-notes" name="notes" type="text" />
-                </div>
-                <div class="form-actions">
-                  <button class="button button--primary" type="submit">Submit Request</button>
-                </div>
-              </form>
-            </div>
-          </article>
-
-          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-pill">
-            <div class="panel-header">
-              <div>
-                <h3>Time-Off Requests</h3>
-                <p class="panel-note">Current request history and status.</p>
-              </div>
-              <div class="panel-icon">TO</div>
-            </div>
-            <div class="panel-list">
-              <h4>Requests</h4>
-              <ul id="employee-timeoff-list" class="portal-list"></ul>
             </div>
           </article>
         </div>

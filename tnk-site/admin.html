@@ -9,6 +9,7 @@
   <script src="js/script.js" defer></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
   <script src="js/auth.js" defer></script>
+  <script src="js/tax-2026.js" defer></script>
   <script src="js/admin-portal.js" defer></script>
 </head>
 <body>
@@ -35,15 +36,34 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Admin Portal</h1>
-    <p>Manage customers, jobs, approvals, and reporting.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="index.html">Return to Site</a>
-      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link is-active" href="admin.html"><span class="admin-subnav__dot"></span>Dashboard</a>
+        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
+        <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link" href="admin-daily-hours.html">Daily Hours</a>
+        <a class="admin-subnav__link" href="admin-pay-rates.html">Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p>Customers, jobs, approvals, and reporting at a glance.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="index.html">Return to Site</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
@@ -51,20 +71,40 @@
       <div class="container">
         <div class="dashboard-header">
           <div>
-            <h2 class="dashboard-title">Admin Dashboard</h2>
-            <p class="dashboard-subtitle">Every operational workflow is visible at once.</p>
+            <h2 class="dashboard-title">Today at TNK</h2>
+            <p class="dashboard-subtitle">Live operational view of customers, jobs, and crew time.</p>
           </div>
           <div class="dashboard-meta">
             <p class="login-footer" id="admin-user">Loading admin profile...</p>
             <p class="dashboard-status" id="admin-status" role="status" aria-live="polite"></p>
-            <div class="dashboard-links">
-              <a class="dashboard-link" href="admin-customers.html">Customers</a>
-              <a class="dashboard-link" href="admin-jobs.html">Jobs</a>
-              <a class="dashboard-link" href="admin-approvals.html">Approvals</a>
-              <a class="dashboard-link" href="admin-time.html">Time Logs</a>
-              <a class="dashboard-link" href="admin-pay-periods.html">Pay Periods</a>
-              <a class="dashboard-link" href="admin-daily-hours.html">Daily Hours</a>
-            </div>
+          </div>
+        </div>
+
+        <div class="admin-stats">
+          <div class="admin-stat">
+            <span class="admin-stat__label">Active Customers</span>
+            <span class="admin-stat__value" id="admin-stat-customers">—</span>
+            <span class="admin-stat__hint">Currently on the books</span>
+          </div>
+          <div class="admin-stat">
+            <span class="admin-stat__label">Open Jobs</span>
+            <span class="admin-stat__value" id="admin-stat-jobs-open">—</span>
+            <span class="admin-stat__hint">Not yet approved or rejected</span>
+          </div>
+          <div class="admin-stat">
+            <span class="admin-stat__label">On the Clock</span>
+            <span class="admin-stat__value" id="admin-stat-clocked-in">—</span>
+            <span class="admin-stat__hint">Employees currently clocked in</span>
+          </div>
+          <div class="admin-stat">
+            <span class="admin-stat__label">Period Hours</span>
+            <span class="admin-stat__value" id="admin-stat-period-hours">—</span>
+            <span class="admin-stat__hint">All employees, current pay period</span>
+          </div>
+          <div class="admin-stat">
+            <span class="admin-stat__label">Period Pay</span>
+            <span class="admin-stat__value" id="admin-stat-period-pay">—</span>
+            <span class="admin-stat__hint">Hours × pay rate, this period</span>
           </div>
         </div>
 
@@ -204,14 +244,14 @@
           <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--shape-pill">
             <div class="panel-header">
               <div>
-                <h3>Time-Off Requests</h3>
-                <p class="panel-note">Review, approve, or deny requests.</p>
+                <h3>Pay Rates</h3>
+                <p class="panel-note">Set each employee's hourly rate. Rate flows into the period totals below.</p>
               </div>
-              <div class="panel-icon">AP</div>
+              <div class="panel-icon">$$</div>
             </div>
             <div class="panel-list">
-              <h4>Pending Requests</h4>
-              <ul id="admin-timeoff-list" class="portal-list"></ul>
+              <h4>Employees</h4>
+              <ul id="admin-pay-rate-list" class="portal-list"></ul>
             </div>
           </article>
 

@@ -35,38 +35,61 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Approvals</h1>
-    <p>Review completed jobs and time-off requests.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
-      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link" href="admin.html">Dashboard</a>
+        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link is-active" href="admin-approvals.html"><span class="admin-subnav__dot"></span>Approvals</a>
+        <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link" href="admin-daily-hours.html">Daily Hours</a>
+        <a class="admin-subnav__link" href="admin-pay-rates.html">Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Approvals</h1>
+        <p>Review submitted jobs.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="admin.html">Dashboard</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="admin-user">Loading admin profile...</p>
-      </div>
-    </section>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Approvals</h2>
+            <p class="dashboard-subtitle">Decide on submitted jobs in one place.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+          </div>
+        </div>
 
-    <section class="section">
-      <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">JM</div>
-            <h3 class="portal-title">Submitted Jobs</h3>
-            <p class="portal-text">Review submitted work and update job status.</p>
-            <ul id="admin-job-list" class="portal-list"></ul>
-          </article>
-          <article class="portal-card">
-            <div class="portal-icon">AP</div>
-            <h3 class="portal-title">Time-Off Requests</h3>
-            <p class="portal-text">Approve or deny time off for the team.</p>
-            <ul id="admin-timeoff-list" class="portal-list"></ul>
+        <div class="dashboard-grid dashboard-grid--mosaic">
+          <article class="dashboard-panel dashboard-panel--span-12">
+            <div class="panel-header">
+              <div>
+                <h3>Submitted Jobs</h3>
+                <p class="panel-note">Approve or reject completed work inline.</p>
+              </div>
+              <div class="panel-icon">JM</div>
+            </div>
+            <div class="panel-list">
+              <ul id="admin-job-list" class="portal-list"></ul>
+            </div>
           </article>
         </div>
       </div>

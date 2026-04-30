@@ -13,8 +13,6 @@
   const adjustHoursInput = document.getElementById("employee-adjust-hours");
   const adjustMinutesInput = document.getElementById("employee-adjust-minutes");
   const adjustNotesInput = document.getElementById("employee-adjust-notes");
-  const timeoffForm = document.getElementById("employee-timeoff-form");
-  const timeoffList = document.getElementById("employee-timeoff-list");
   const payPeriodRangeEl = document.getElementById("employee-pay-period-range");
   const payPeriodCurrentEl = document.getElementById("employee-pay-period-current");
   const payPeriodLastEl = document.getElementById("employee-pay-period-last");
@@ -374,16 +372,6 @@
     }
   };
 
-  const loadTimeOff = async () => {
-    const data = await apiRequest("/api/time-off");
-    const items = toArray(data?.requests).map((request) => {
-      const li = document.createElement("li");
-      li.textContent = `${request.startDate} → ${request.endDate} (${request.status})`;
-      return li;
-    });
-    renderList(timeoffList, items, "No time-off requests yet.");
-  };
-
   const loadAll = async () => {
     const tasks = [];
     if (jobList) {
@@ -391,9 +379,6 @@
     }
     if (timeList || timeForm) {
       tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
-    }
-    if (timeoffList || timeoffForm) {
-      tasks.push(safeLoad(loadTimeOff, timeoffList, "Unable to load time-off requests."));
     }
     const results = await Promise.all(tasks);
     if (results.some((ok) => !ok)) {
@@ -480,21 +465,6 @@
     const day = String(today.getDate()).padStart(2, "0");
     adjustDateInput.value = `${today.getFullYear()}-${month}-${day}`;
   }
-
-  timeoffForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(timeoffForm);
-    try {
-      await apiRequest("/api/time-off", {
-        method: "POST",
-        body: JSON.stringify(Object.fromEntries(formData.entries()))
-      });
-      timeoffForm.reset();
-      loadTimeOff();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  });
 
   boot();
 })();

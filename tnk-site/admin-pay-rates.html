@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Time-Off Requests | Employee Portal</title>
-  <meta name="description" content="Employee time-off requests for TNK Lawncare Plus." />
+  <title>Pay Rates | Admin Portal</title>
+  <meta name="description" content="Manage employee pay rates and tax profiles." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
   <script src="js/auth.js" defer></script>
-  <script src="js/employee-portal.js" defer></script>
+  <script src="js/tax-2026.js" defer></script>
+  <script src="js/admin-portal.js" defer></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Primary">
@@ -35,48 +36,75 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Time-Off Requests</h1>
-    <p>Submit new requests and check approval status.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
-      <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link" href="admin.html">Dashboard</a>
+        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
+        <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link" href="admin-daily-hours.html">Daily Hours</a>
+        <a class="admin-subnav__link is-active" href="admin-pay-rates.html"><span class="admin-subnav__dot"></span>Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Pay Rates &amp; Tax Profiles</h1>
+        <p>Set hourly rates and configure each employee's 2026 tax profile.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="admin.html">Dashboard</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="employee-user">Loading employee profile...</p>
-      </div>
-    </section>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Pay Rates</h2>
+            <p class="dashboard-subtitle">Hourly rates feed pay-period totals and the tax calculator.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+            <p class="dashboard-status" id="admin-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
 
-    <section class="section">
-      <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">TO</div>
-            <h3 class="portal-title">Request Time Off</h3>
-            <form id="employee-timeoff-form" class="form-grid">
-              <div class="field">
-                <label for="timeoff-start">Start Date</label>
-                <input id="timeoff-start" name="startDate" type="date" required />
+        <div class="dashboard-grid dashboard-grid--mosaic">
+          <article class="dashboard-panel dashboard-panel--span-12 dashboard-panel--shape-soft">
+            <div class="panel-header">
+              <div>
+                <h3>Hourly Pay Rates</h3>
+                <p class="panel-note">Edit and save each employee's hourly rate.</p>
               </div>
-              <div class="field">
-                <label for="timeoff-end">End Date</label>
-                <input id="timeoff-end" name="endDate" type="date" required />
+              <div class="panel-icon">$$</div>
+            </div>
+            <div class="panel-list">
+              <ul id="admin-pay-rate-list" class="portal-list"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-12 dashboard-panel--shape-arch">
+            <div class="panel-header">
+              <div>
+                <h3>Tax Profiles</h3>
+                <p class="panel-note">State, filing status, and withholding details used by the calculator.</p>
               </div>
-              <div class="field">
-                <label for="timeoff-notes">Notes</label>
-                <input id="timeoff-notes" name="notes" type="text" />
-              </div>
-              <div class="form-actions">
-                <button class="button button--primary" type="submit">Submit Request</button>
-              </div>
-            </form>
-            <ul id="employee-timeoff-list" class="portal-list"></ul>
+              <div class="panel-icon">TX</div>
+            </div>
+            <div class="panel-list">
+              <ul id="admin-tax-profile-list" class="portal-list"></ul>
+            </div>
           </article>
         </div>
       </div>
@@ -89,7 +117,6 @@
           <img class="footer-logo" src="images/IMG_3082.jpeg" alt="The Neighborhood Kids Lawncare Plus Logo With Phone Number" width="220" height="220" loading="lazy" decoding="async" />
           <p class="footer-tag">Based on the Oregon Coast • Serving Pacific City to Depoe Bay</p>
         </div>
-
         <div class="footer-contact">
           <h3 class="footer-heading">Contact</h3>
           <p>Email: <a href="mailto:TNKLCP@gmail.com">TNKLCP@gmail.com</a></p>
@@ -97,7 +124,6 @@
           <p>Hours: 8am–6pm • Available 24/7 for storm emergencies</p>
           <p class="footer-copy">&copy; 2025 The Neighborhood Kids Lawncare Plus</p>
         </div>
-
         <div class="footer-social">
           <h3 class="footer-heading">Follow</h3>
           <div class="social-links">
@@ -114,6 +140,5 @@
       </div>
     </div>
   </footer>
-
 </body>
 </html>

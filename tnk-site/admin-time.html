@@ -35,50 +35,98 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Time Tracking</h1>
-    <p>Monitor hours by employee, job, and date range.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
-      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link" href="admin.html">Dashboard</a>
+        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
+        <a class="admin-subnav__link is-active" href="admin-time.html"><span class="admin-subnav__dot"></span>Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link" href="admin-daily-hours.html">Daily Hours</a>
+        <a class="admin-subnav__link" href="admin-pay-rates.html">Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Time Tracking</h1>
+        <p>Monitor crew hours, clock-outs, and pay-period adjustments.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="admin.html">Dashboard</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="admin-user">Loading admin profile...</p>
-      </div>
-    </section>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Time Tracking</h2>
+            <p class="dashboard-subtitle">Day-by-day clock-ins, open clocks, and pay period totals.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+          </div>
+        </div>
 
-    <section class="section">
-      <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">TT</div>
-            <h3 class="portal-title">Time Logs</h3>
-            <p class="portal-text">Latest clock-ins and clock-outs.</p>
-            <ul id="admin-time-list" class="portal-list"></ul>
+        <div class="dashboard-grid dashboard-grid--mosaic">
+          <article class="dashboard-panel dashboard-panel--span-7">
+            <div class="panel-header">
+              <div>
+                <h3>Time Logs</h3>
+                <p class="panel-note">Grouped by date with names and totals.</p>
+              </div>
+              <div class="panel-icon">TT</div>
+            </div>
+            <div class="panel-list">
+              <ul id="admin-time-list" class="portal-list"></ul>
+            </div>
           </article>
-          <article class="portal-card">
-            <div class="portal-icon">OC</div>
-            <h3 class="portal-title">Open Clocks</h3>
-            <p class="portal-text">Force clock-outs for employees still clocked in.</p>
-            <ul id="admin-open-time-list" class="portal-list"></ul>
+
+          <article class="dashboard-panel dashboard-panel--span-5">
+            <div class="panel-header">
+              <div>
+                <h3>Open Clocks</h3>
+                <p class="panel-note">Force clock-out for anyone still on the clock.</p>
+              </div>
+              <div class="panel-icon">OC</div>
+            </div>
+            <div class="panel-list">
+              <ul id="admin-open-time-list" class="portal-list"></ul>
+            </div>
           </article>
-          <article class="portal-card">
-            <div class="portal-icon">PP</div>
-            <h3 class="portal-title">Current Pay Period</h3>
-            <p class="portal-text">Running totals for the active pay period.</p>
-            <p class="portal-note" id="admin-pay-period-range"></p>
-            <ul id="admin-pay-period-current-list" class="portal-list"></ul>
+
+          <article class="dashboard-panel dashboard-panel--span-5">
+            <div class="panel-header">
+              <div>
+                <h3>Current Pay Period</h3>
+                <p class="panel-note">Running totals for everyone.</p>
+              </div>
+              <div class="panel-icon">PP</div>
+            </div>
+            <p class="pay-period-range" id="admin-pay-period-range"></p>
+            <div class="panel-list">
+              <ul id="admin-pay-period-current-list" class="portal-list"></ul>
+            </div>
           </article>
-          <article class="portal-card portal-card--wide">
-            <div class="portal-icon">AD</div>
-            <h3 class="portal-title">Adjust Pay Period Hours</h3>
-            <p class="portal-text">Add or remove hours for a specific employee.</p>
+
+          <article class="dashboard-panel dashboard-panel--span-7">
+            <div class="panel-header">
+              <div>
+                <h3>Adjust Hours</h3>
+                <p class="panel-note">Add or subtract minutes for an employee on a given date.</p>
+              </div>
+              <div class="panel-icon">AD</div>
+            </div>
             <form id="admin-adjust-form" class="portal-adjust-form">
               <div class="job-inline">
                 <label class="field">
@@ -115,10 +163,15 @@
               </div>
             </form>
           </article>
-          <article class="portal-card">
-            <div class="portal-icon">PH</div>
-            <h3 class="portal-title">Pay Period History</h3>
-            <p class="portal-text">Open the employee tabs to view pay periods without mixing hours.</p>
+
+          <article class="dashboard-panel dashboard-panel--span-12">
+            <div class="panel-header">
+              <div>
+                <h3>Pay Period History</h3>
+                <p class="panel-note">Open the dedicated view to browse each employee's prior periods.</p>
+              </div>
+              <div class="panel-icon">PH</div>
+            </div>
             <a class="button button--primary" href="admin-pay-periods.html">Open Pay Period History</a>
           </article>
         </div>

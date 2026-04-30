@@ -35,30 +35,58 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Customer Management</h1>
-    <p>Create, update, and archive customer records.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
-      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link" href="admin.html">Dashboard</a>
+        <a class="admin-subnav__link is-active" href="admin-customers.html"><span class="admin-subnav__dot"></span>Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
+        <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link" href="admin-daily-hours.html">Daily Hours</a>
+        <a class="admin-subnav__link" href="admin-pay-rates.html">Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Customer Management</h1>
+        <p>Create, update, and archive customer records.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="admin.html">Dashboard</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="admin-user">Loading admin profile...</p>
-      </div>
-    </section>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Customers</h2>
+            <p class="dashboard-subtitle">Add new customers and manage the active roster.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+          </div>
+        </div>
 
-    <section class="section">
-      <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">CM</div>
-            <h3 class="portal-title">Customer Intake</h3>
+        <div class="dashboard-grid dashboard-grid--mosaic">
+          <article class="dashboard-panel dashboard-panel--span-5">
+            <div class="panel-header">
+              <div>
+                <h3>Customer Intake</h3>
+                <p class="panel-note">Add a new customer and track their status.</p>
+              </div>
+              <div class="panel-icon">CM</div>
+            </div>
             <form id="admin-customer-form" class="form-grid">
               <div class="field">
                 <label for="customer-name">Customer Name</label>
@@ -80,8 +108,17 @@
                 <button class="button button--primary" type="submit">Add Customer</button>
               </div>
             </form>
-            <div class="login-note">
-              <strong>Customer List</strong>
+          </article>
+
+          <article class="dashboard-panel dashboard-panel--span-7">
+            <div class="panel-header">
+              <div>
+                <h3>Customer List</h3>
+                <p class="panel-note">Active accounts and their status.</p>
+              </div>
+              <div class="panel-icon">CL</div>
+            </div>
+            <div class="panel-list">
               <ul id="admin-customer-list" class="portal-list"></ul>
             </div>
           </article>
