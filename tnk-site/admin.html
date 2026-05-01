@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal | TNK Lawncare Plus</title>
-  <meta name="description" content="Admin portal for managing customers, jobs, approvals, and reporting." />
+  <meta name="description" content="Admin portal for managing approvals, time tracking, and reporting." />
   <link rel="stylesheet" href="css/style.css" />
   <script src="js/script.js" defer></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
@@ -41,8 +41,6 @@
       <span class="admin-subnav__brand">Admin</span>
       <div class="admin-subnav__links">
         <a class="admin-subnav__link is-active" href="admin.html"><span class="admin-subnav__dot"></span>Dashboard</a>
-        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
-        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
         <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
         <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
         <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
@@ -57,7 +55,7 @@
     <div class="container hero-inner">
       <div>
         <h1>Admin Dashboard</h1>
-        <p>Customers, jobs, approvals, and reporting at a glance.</p>
+        <p>Approvals, time tracking, and reporting at a glance.</p>
       </div>
       <div class="cta-row">
         <a class="button button--primary" href="index.html">Return to Site</a>
@@ -72,7 +70,7 @@
         <div class="dashboard-header">
           <div>
             <h2 class="dashboard-title">Today at TNK</h2>
-            <p class="dashboard-subtitle">Live operational view of customers, jobs, and crew time.</p>
+            <p class="dashboard-subtitle">Live operational view of approvals, payroll, and crew time.</p>
           </div>
           <div class="dashboard-meta">
             <p class="login-footer" id="admin-user">Loading admin profile...</p>
@@ -81,16 +79,6 @@
         </div>
 
         <div class="admin-stats">
-          <div class="admin-stat">
-            <span class="admin-stat__label">Active Customers</span>
-            <span class="admin-stat__value" id="admin-stat-customers">—</span>
-            <span class="admin-stat__hint">Currently on the books</span>
-          </div>
-          <div class="admin-stat">
-            <span class="admin-stat__label">Open Jobs</span>
-            <span class="admin-stat__value" id="admin-stat-jobs-open">—</span>
-            <span class="admin-stat__hint">Not yet approved or rejected</span>
-          </div>
           <div class="admin-stat">
             <span class="admin-stat__label">On the Clock</span>
             <span class="admin-stat__value" id="admin-stat-clocked-in">—</span>
@@ -109,124 +97,6 @@
         </div>
 
         <div class="dashboard-grid dashboard-grid--mosaic">
-          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-cut">
-            <div class="panel-header">
-              <div>
-                <h3>Customer Intake</h3>
-                <p class="panel-note">Add new customers and monitor the active roster.</p>
-              </div>
-              <div class="panel-icon">CM</div>
-            </div>
-            <div class="panel-body">
-              <form id="admin-customer-form" class="form-grid">
-                <div class="field">
-                  <label for="customer-name">Customer Name</label>
-                  <input id="customer-name" name="name" type="text" required />
-                </div>
-                <div class="field">
-                  <label for="customer-contact">Contact Name</label>
-                  <input id="customer-contact" name="contactName" type="text" />
-                </div>
-                <div class="field">
-                  <label for="customer-email">Contact Email</label>
-                  <input id="customer-email" name="contactEmail" type="email" />
-                </div>
-                <div class="field">
-                  <label for="customer-phone">Contact Phone</label>
-                  <input id="customer-phone" name="contactPhone" type="tel" />
-                </div>
-                <div class="form-actions">
-                  <button class="button button--primary" type="submit">Add Customer</button>
-                </div>
-              </form>
-            </div>
-          </article>
-
-          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-soft">
-            <div class="panel-header">
-              <div>
-                <h3>Customer List</h3>
-                <p class="panel-note">Active accounts and current status.</p>
-              </div>
-              <div class="panel-icon">CL</div>
-            </div>
-            <div class="panel-list">
-              <h4>Customer List</h4>
-              <ul id="admin-customer-list" class="portal-list"></ul>
-            </div>
-          </article>
-
-          <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--shape-soft">
-            <div class="panel-header">
-              <div>
-                <h3>Create Job</h3>
-                <p class="panel-note">Assign work and keep the job queue moving.</p>
-              </div>
-              <div class="panel-icon">JM</div>
-            </div>
-            <div class="panel-body">
-              <form id="admin-job-form" class="form-grid">
-                <div class="field">
-                  <label for="job-title">Job Title</label>
-                  <input id="job-title" name="title" type="text" required />
-                </div>
-                <div class="field">
-                  <label for="job-customer">Customer</label>
-                  <input id="job-customer" name="customerName" type="text" />
-                </div>
-                <div class="field">
-                  <label for="job-assigned">Assigned To (emails or user IDs)</label>
-                  <input id="job-assigned" name="assignedTo" type="text" />
-                </div>
-                <div class="field">
-                  <label for="job-service-date">Service Date</label>
-                  <input id="job-service-date" name="serviceDate" type="date" />
-                </div>
-                <div class="field">
-                  <label for="job-recurrence-type">Job Type</label>
-                  <select id="job-recurrence-type" name="recurrenceType">
-                    <option value="one_time">One-time</option>
-                    <option value="recurring">Recurring</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="job-recurrence-interval">Recurrence Interval</label>
-                  <input id="job-recurrence-interval" name="recurrenceInterval" type="number" min="1" value="1" />
-                  <span class="help-text">Only used for recurring jobs.</span>
-                </div>
-                <div class="field">
-                  <label for="job-recurrence-unit">Recurrence Unit</label>
-                  <select id="job-recurrence-unit" name="recurrenceUnit">
-                    <option value="week">Week(s)</option>
-                    <option value="day">Day(s)</option>
-                    <option value="month">Month(s)</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="job-notes">Notes</label>
-                  <input id="job-notes" name="notes" type="text" />
-                </div>
-                <div class="form-actions">
-                  <button class="button button--primary" type="submit">Create Job</button>
-                </div>
-              </form>
-            </div>
-          </article>
-
-          <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--shape-cut">
-            <div class="panel-header">
-              <div>
-                <h3>Job Queue</h3>
-                <p class="panel-note">Prioritized list with quick status updates.</p>
-              </div>
-              <div class="panel-icon">JL</div>
-            </div>
-            <div class="panel-list">
-              <h4>Job Queue</h4>
-              <ul id="admin-job-list" class="portal-list"></ul>
-            </div>
-          </article>
-
           <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--shape-arch">
             <div class="panel-header">
               <div>
