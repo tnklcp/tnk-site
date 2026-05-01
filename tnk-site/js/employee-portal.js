@@ -2,7 +2,6 @@
   const userEl = document.getElementById("employee-user");
   const statusEl = document.getElementById("employee-status");
   const logoutBtn = document.getElementById("employee-logout");
-  const jobList = document.getElementById("employee-job-list");
   const timeForm = document.getElementById("employee-time-form");
   const timeList = document.getElementById("employee-time-list");
   const clockStatusEl = document.getElementById("employee-clock-status");
@@ -97,17 +96,6 @@
     }).format(date);
   };
 
-  const formatServiceDate = (value) => {
-    if (!value) return "";
-    const date = new Date(`${value}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric"
-    }).format(date);
-  };
-
   const formatDuration = (clockIn, clockOut) => {
     if (!clockIn || !clockOut) return "";
     const start = new Date(clockIn);
@@ -139,6 +127,26 @@
       day: "2-digit",
       year: "numeric"
     }).format(date);
+
+  const formatDayHeading = (date) =>
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }).format(date);
+
+  const formatTimeOnly = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit"
+    }).format(date);
+  };
+
+  const groupKeyForDate = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
   const formatMinutes = (minutes) => {
     const totalMinutes = Math.max(0, Math.round(minutes));
@@ -215,11 +223,80 @@
     el.innerHTML = "";
     if (!items.length) {
       const li = document.createElement("li");
+      li.className = "portal-list__empty";
       li.textContent = emptyMessage;
       el.appendChild(li);
       return;
     }
     items.forEach((item) => el.appendChild(item));
+  };
+
+  const renderTimeEntryItems = (entries) => {
+    const sorted = [...entries].sort((a, b) => {
+      const aTime = new Date(a.clockIn || 0).getTime();
+      const bTime = new Date(b.clockIn || 0).getTime();
+      return bTime - aTime;
+    });
+
+    const groups = new Map();
+    sorted.forEach((entry) => {
+      const ts = new Date(entry.clockIn);
+      if (Number.isNaN(ts.getTime())) return;
+      const key = groupKeyForDate(ts);
+      if (!groups.has(key)) {
+        groups.set(key, { heading: formatDayHeading(ts), entries: [] });
+      }
+      groups.get(key).entries.push(entry);
+    });
+
+    const items = [];
+    Array.from(groups.values()).forEach((group) => {
+      const headerLi = document.createElement("li");
+      headerLi.className = "time-log-day";
+      headerLi.textContent = group.heading;
+      items.push(headerLi);
+
+      group.entries.forEach((entry) => {
+        const li = document.createElement("li");
+        li.className = "time-log-entry";
+
+        const name = document.createElement("div");
+        name.className = "time-log-name";
+
+        const detail = document.createElement("div");
+        detail.className = "time-log-detail";
+
+        if (typeof entry.adjustMinutes === "number") {
+          name.textContent = formatSignedMinutes(entry.adjustMinutes);
+          const effectiveLabel = formatTimeOnly(entry.clockIn);
+          const segments = [];
+          if (effectiveLabel) segments.push(`Effective ${effectiveLabel}`);
+          if (entry.notes) segments.push(entry.notes);
+          detail.textContent = segments.join(" · ") || "Manual time adjustment";
+          li.dataset.kind = "adjustment";
+        } else if (entry.status === "open") {
+          name.textContent = "Clocked in";
+          const clockInLabel = formatTimeOnly(entry.clockIn);
+          detail.textContent = clockInLabel ? `Started at ${clockInLabel} · Still on the clock` : "Still on the clock";
+          li.dataset.kind = "open";
+        } else {
+          name.textContent = "Clocked out";
+          const clockInLabel = formatTimeOnly(entry.clockIn);
+          const clockOutLabel = formatTimeOnly(entry.clockOut);
+          const durationLabel = formatDuration(entry.clockIn, entry.clockOut);
+          const segments = [];
+          if (clockInLabel || clockOutLabel) segments.push(`${clockInLabel || "Start"} to ${clockOutLabel || "End"}`);
+          if (durationLabel) segments.push(`Total ${durationLabel}`);
+          detail.textContent = segments.join(" · ") || "Closed time entry";
+          li.dataset.kind = "closed";
+        }
+
+        li.append(name, detail);
+        items.push(li);
+      });
+    });
+
+    return items;
   };
 
   const safeLoad = async (loader, listEl, errorMessage) => {
@@ -235,78 +312,6 @@
       console.error("Dashboard load failed:", error);
       return false;
     }
-  };
-
-  const loadJobs = async () => {
-    const data = await apiRequest("/api/jobs");
-    const items = toArray(data?.jobs).map((job) => {
-      const li = document.createElement("li");
-      const label = document.createElement("div");
-      const statusLabel = String(job.status || "").replace("_", " ");
-      label.textContent = `${job.title} (${statusLabel})`;
-
-      const meta = document.createElement("div");
-      meta.className = "job-meta";
-      const serviceDateLabel = job.serviceDate ? formatServiceDate(job.serviceDate) : "Not scheduled";
-      const recurrenceLabel = job.isRecurring
-        ? `Recurring every ${job.recurrenceInterval || 1} ${job.recurrenceUnit || "week"}(s)`
-        : "One-time job";
-      meta.textContent = `Service date: ${serviceDateLabel} · ${recurrenceLabel}`;
-
-      const timing = document.createElement("div");
-      timing.className = "job-meta";
-      const startedLabel = formatDateTime(job.startedAt);
-      const completedLabel = formatDateTime(job.completedAt);
-      const durationLabel = formatDuration(job.startedAt, job.completedAt);
-      const timingParts = [];
-      if (startedLabel) timingParts.push(`Started: ${startedLabel}`);
-      if (completedLabel) timingParts.push(`Completed: ${completedLabel}`);
-      if (durationLabel) timingParts.push(`Total: ${durationLabel}`);
-      timing.textContent = timingParts.join(" · ");
-
-      const isCompleted = ["submitted", "approved"].includes(job.status);
-      const actionWrap = document.createElement("span");
-      actionWrap.className = "portal-actions";
-
-      if (!isCompleted) {
-        const startBtn = document.createElement("button");
-        startBtn.className = "button button--primary";
-        startBtn.type = "button";
-        startBtn.textContent = "Start";
-        startBtn.addEventListener("click", async () => {
-          await apiRequest("/api/jobs", {
-            method: "PATCH",
-            body: JSON.stringify({ id: job.id, status: "in_progress" })
-          });
-          loadJobs();
-        });
-        actionWrap.appendChild(startBtn);
-
-        const completeBtn = document.createElement("button");
-        completeBtn.className = "button button--accent";
-        completeBtn.type = "button";
-        completeBtn.textContent = "Complete";
-        completeBtn.addEventListener("click", async () => {
-          await apiRequest("/api/jobs", {
-            method: "PATCH",
-            body: JSON.stringify({ id: job.id, status: "submitted" })
-          });
-          loadJobs();
-        });
-        actionWrap.appendChild(completeBtn);
-      } else {
-        const completedTag = document.createElement("span");
-        completedTag.className = "status-pill";
-        completedTag.textContent = job.status === "approved" ? "Approved" : "Submitted";
-        actionWrap.appendChild(completedTag);
-      }
-      li.appendChild(label);
-      li.appendChild(meta);
-      if (timingParts.length) li.appendChild(timing);
-      li.appendChild(actionWrap);
-      return li;
-    });
-    renderList(jobList, items, "No assigned jobs found.");
   };
 
   const loadTimeEntries = async () => {
@@ -336,22 +341,7 @@
       setClockStatus("Clocked out");
     }
 
-    const items = entries.map((entry) => {
-      const li = document.createElement("li");
-      if (typeof entry.adjustMinutes === "number") {
-        const effectiveLabel = formatDateTime(entry.clockIn);
-        const noteLabel = entry.notes ? ` · ${entry.notes}` : "";
-        li.textContent = `Adjustment ${formatSignedMinutes(entry.adjustMinutes)} — ${effectiveLabel || entry.clockIn}${noteLabel}`;
-        return li;
-      }
-      const clockInLabel = formatDateTime(entry.clockIn);
-      const clockOutLabel = formatDateTime(entry.clockOut);
-      const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";
-      const durationLabel = formatDuration(entry.clockIn, entry.clockOut);
-      const durationSuffix = durationLabel ? ` (${durationLabel})` : "";
-      li.textContent = `${statusLabel} — ${clockInLabel || entry.clockIn}${clockOutLabel ? ` → ${clockOutLabel}` : ""}${durationSuffix}`;
-      return li;
-    });
+    const items = renderTimeEntryItems(entries);
     renderList(timeList, items, "No time entries yet.");
 
     if (payPeriodCurrentEl || payPeriodLastEl || payPeriodRangeEl) {
@@ -373,9 +363,6 @@
 
   const loadAll = async () => {
     const tasks = [];
-    if (jobList) {
-      tasks.push(safeLoad(loadJobs, jobList, "Unable to load jobs."));
-    }
     if (timeList || timeForm) {
       tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
     }
