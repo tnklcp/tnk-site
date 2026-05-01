@@ -35,73 +35,100 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
+  <header class="hero hero--compact employee-hero">
     <div class="container hero-inner">
-    <h1>Time Tracking</h1>
-    <p>Clock in/out for overall hours and review your time logs.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
-      <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
-    </div>
+      <p class="employee-kicker">Time Log</p>
+      <h1>Time Tracking</h1>
+      <p>Clock in, make corrections, and review recent time activity in one focused workspace.</p>
+      <div class="cta-row">
+        <a class="button button--primary" href="employee.html">Return to Employee Portal</a>
+        <button class="button button--accent" type="button" id="employee-logout">Log Out</button>
       </div>
+    </div>
   </header>
 
-  <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+  <main id="main" class="employee-main">
+    <section class="section employee-profile-strip">
       <div class="container">
-        <p class="login-footer" id="employee-user">Loading employee profile...</p>
+        <div class="employee-meta employee-meta--strip">
+          <span class="employee-meta__label">Profile</span>
+          <p class="login-footer employee-profile" id="employee-user">Loading employee profile...</p>
+        </div>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section employee-time-section">
       <div class="container">
-        <div class="portal-grid">
-          <article class="portal-card">
-            <div class="portal-icon">TT</div>
-            <h3 class="portal-title">Clock In / Out</h3>
-            <span class="status-pill" id="employee-clock-status">Clocked out</span>
-            <form id="employee-time-form" class="form-grid">
-              <div class="field">
-                <label for="time-notes">Notes</label>
-                <input id="time-notes" name="notes" type="text" />
+        <div class="employee-time-layout">
+          <article class="portal-card employee-time-card employee-time-card--controls">
+            <div class="employee-card-heading">
+              <div>
+                <p class="employee-kicker">Current Shift</p>
+                <h3 class="portal-title">Clock In / Out</h3>
               </div>
-              <div class="form-actions">
-                <button class="button button--primary" type="submit" data-action="clock_in">Clock In</button>
-                <button class="button button--accent" type="submit" data-action="clock_out">Clock Out</button>
+              <span class="status-pill" id="employee-clock-status">Clocked out</span>
+            </div>
+
+            <div class="employee-form-stack">
+              <form id="employee-time-form" class="form-grid employee-time-form">
+                <div class="field">
+                  <label for="time-notes">Notes</label>
+                  <input id="time-notes" name="notes" type="text" placeholder="Optional note for this entry" />
+                </div>
+                <div class="form-actions">
+                  <button class="button button--primary" type="submit" data-action="clock_in">Clock In</button>
+                  <button class="button button--accent" type="submit" data-action="clock_out">Clock Out</button>
+                </div>
+              </form>
+
+              <form id="employee-adjust-form" class="portal-adjust-form employee-adjust-card">
+                <div class="employee-adjust-heading">
+                  <h4>Adjust Hours</h4>
+                  <p>Use this for corrections that should appear separately in the log.</p>
+                </div>
+                <div class="job-inline">
+                  <label class="field">
+                    Effective Date
+                    <input type="date" id="employee-adjust-date" name="date" required />
+                  </label>
+                  <label class="field">
+                    Type
+                    <select id="employee-adjust-type" name="type">
+                      <option value="add">Add hours</option>
+                      <option value="subtract">Subtract hours</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    Hours
+                    <input type="number" id="employee-adjust-hours" name="hours" step="0.25" min="0" placeholder="0" />
+                  </label>
+                  <label class="field">
+                    Minutes
+                    <input type="number" id="employee-adjust-minutes" name="minutes" step="1" min="0" max="59" placeholder="0" />
+                  </label>
+                </div>
+                <label class="field">
+                  Notes
+                  <input type="text" id="employee-adjust-notes" name="notes" placeholder="Reason for adjustment" />
+                </label>
+                <div class="portal-actions">
+                  <button class="button button--primary" type="submit">Save Adjustment</button>
+                  <span class="status-pill" id="employee-adjust-status" aria-live="polite"></span>
+                </div>
+              </form>
+            </div>
+          </article>
+
+          <article class="portal-card employee-time-card employee-time-card--log">
+            <div class="employee-card-heading">
+              <div>
+                <p class="employee-kicker">Recent Activity</p>
+                <h3 class="portal-title">Time Log</h3>
               </div>
-            </form>
-            <form id="employee-adjust-form" class="portal-adjust-form" style="margin-top: 1rem;">
-              <div class="job-inline">
-                <label class="field">
-                  Effective Date
-                  <input type="date" id="employee-adjust-date" name="date" required />
-                </label>
-                <label class="field">
-                  Type
-                  <select id="employee-adjust-type" name="type">
-                    <option value="add">Add hours</option>
-                    <option value="subtract">Subtract hours</option>
-                  </select>
-                </label>
-                <label class="field">
-                  Hours
-                  <input type="number" id="employee-adjust-hours" name="hours" step="0.25" min="0" placeholder="0" />
-                </label>
-                <label class="field">
-                  Minutes
-                  <input type="number" id="employee-adjust-minutes" name="minutes" step="1" min="0" max="59" placeholder="0" />
-                </label>
-              </div>
-              <label class="field">
-                Notes
-                <input type="text" id="employee-adjust-notes" name="notes" placeholder="Reason for adjustment" />
-              </label>
-              <div class="portal-actions">
-                <button class="button button--primary" type="submit">Save Adjustment</button>
-                <span class="status-pill" id="employee-adjust-status" aria-live="polite"></span>
-              </div>
-            </form>
-            <ul id="employee-time-list" class="portal-list"></ul>
+            </div>
+            <div class="panel-list employee-time-log">
+              <ul id="employee-time-list" class="portal-list"></ul>
+            </div>
           </article>
         </div>
       </div>
