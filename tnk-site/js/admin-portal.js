@@ -8,7 +8,6 @@
   const jobList = document.getElementById("admin-job-list");
   const timeList = document.getElementById("admin-time-list");
   const openTimeList = document.getElementById("admin-open-time-list");
-  const timeoffList = document.getElementById("admin-timeoff-list");
   const recurrenceTypeSelect = document.getElementById("job-recurrence-type");
   const recurrenceIntervalInput = document.getElementById("job-recurrence-interval");
   const recurrenceUnitSelect = document.getElementById("job-recurrence-unit");
@@ -37,8 +36,22 @@
   const dailyStartInput = document.getElementById("admin-daily-start");
   const dailyEndInput = document.getElementById("admin-daily-end");
   const dailyResetBtn = document.getElementById("admin-daily-reset");
+  const statCustomers = document.getElementById("admin-stat-customers");
+  const statJobsOpen = document.getElementById("admin-stat-jobs-open");
+  const statClockedIn = document.getElementById("admin-stat-clocked-in");
+  const statPeriodHours = document.getElementById("admin-stat-period-hours");
+  const statPeriodPay = document.getElementById("admin-stat-period-pay");
+  const payRateList = document.getElementById("admin-pay-rate-list");
+  const taxProfileList = document.getElementById("admin-tax-profile-list");
+  const taxCalcForm = document.getElementById("admin-tax-calc-form");
+  const taxCalcEmployeeSelect = document.getElementById("admin-tax-calc-employee");
+  const taxCalcResult = document.getElementById("admin-tax-calc-result");
 
   if (!userEl || !logoutBtn) return;
+
+  const setStat = (el, value) => {
+    if (el) el.textContent = String(value);
+  };
 
   const setStatus = (message = "") => {
     if (!statusEl) return;
@@ -262,7 +275,9 @@
 
   const loadCustomers = async () => {
     const data = await apiRequest("/api/customers");
-    const items = toArray(data?.customers).map((customer) => {
+    const customers = toArray(data?.customers);
+    setStat(statCustomers, customers.filter((c) => c.status !== "archived").length);
+    const items = customers.map((customer) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
       label.textContent = `${customer.name} (${customer.status})`;
@@ -287,7 +302,12 @@
 
   const loadJobs = async () => {
     const data = await apiRequest("/api/jobs");
-    const items = toArray(data?.jobs).map((job) => {
+    const allJobs = toArray(data?.jobs);
+    setStat(
+      statJobsOpen,
+      allJobs.filter((job) => !["approved", "rejected"].includes(String(job.status))).length
+    );
+    const items = allJobs.map((job) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
       const statusLabel = String(job.status || "").replace("_", " ");
@@ -475,23 +495,132 @@
     renderList(jobList, items, "No jobs created yet.");
   };
 
+  const employeeNameCache = new Map();
+
+  const refreshEmployeeNameCache = async () => {
+    try {
+      const data = await apiRequest("/api/employees");
+      const employees = toArray(data?.employees);
+      employees.forEach((employee) => {
+        const label = employee.name || employee.email || employee.id;
+        employeeNameCache.set(employee.id, label);
+        if (employee.email) employeeNameCache.set(employee.email, label);
+      });
+    } catch (error) {
+      console.warn("Unable to load employee names", error);
+    }
+  };
+
+  const labelForEntry = (entry) => {
+    if (employeeNameCache.has(entry.userId)) return employeeNameCache.get(entry.userId);
+    if (entry.userEmail && employeeNameCache.has(entry.userEmail)) {
+      return employeeNameCache.get(entry.userEmail);
+    }
+    if (entry.userEmail) {
+      const fromEmail = String(entry.userEmail).split("@")[0] || "";
+      if (fromEmail) {
+        return fromEmail
+          .split(/[._-]+/)
+          .filter(Boolean)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ") || entry.userEmail;
+      }
+      return entry.userEmail;
+    }
+    return entry.userId;
+  };
+
+  const formatTimeOnly = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit"
+    }).format(date);
+  };
+
+  const formatDayHeading = (date) =>
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    }).format(date);
+
+  const groupKeyForDate = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
   const loadTimeEntries = async () => {
+    if (!employeeNameCache.size) {
+      await refreshEmployeeNameCache();
+    }
     const data = await apiRequest("/api/time-entries");
     const entries = toArray(data?.entries);
-    const items = entries.map((entry) => {
-      const li = document.createElement("li");
-      if (typeof entry.adjustMinutes === "number") {
-        const effectiveLabel = formatDateTime(entry.clockIn);
-        const noteLabel = entry.notes ? ` · ${entry.notes}` : "";
-        li.textContent = `${entry.userEmail || entry.userId} — Adjustment ${formatSignedMinutes(entry.adjustMinutes)} (${effectiveLabel || entry.clockIn})${noteLabel}`;
-        return li;
-      }
-      const clockInLabel = formatDateTime(entry.clockIn);
-      const clockOutLabel = formatDateTime(entry.clockOut);
-      const statusLabel = entry.status === "open" ? "Clocked in" : "Clocked out";
-      li.textContent = `${entry.userEmail || entry.userId} — ${statusLabel} (${clockInLabel || entry.clockIn}${clockOutLabel ? ` → ${clockOutLabel}` : ""})`;
-      return li;
+
+    setStat(
+      statClockedIn,
+      entries.filter((entry) => entry.status === "open" && typeof entry.adjustMinutes !== "number").length
+    );
+
+    const sorted = [...entries].sort((a, b) => {
+      const aTime = new Date(a.clockIn || 0).getTime();
+      const bTime = new Date(b.clockIn || 0).getTime();
+      return bTime - aTime;
     });
+
+    const groups = new Map();
+    sorted.forEach((entry) => {
+      const ts = new Date(entry.clockIn);
+      if (Number.isNaN(ts.getTime())) return;
+      const key = groupKeyForDate(ts);
+      if (!groups.has(key)) {
+        groups.set(key, { heading: formatDayHeading(ts), entries: [] });
+      }
+      groups.get(key).entries.push(entry);
+    });
+
+    const items = [];
+    Array.from(groups.values()).forEach((group) => {
+      const headerLi = document.createElement("li");
+      headerLi.className = "time-log-day";
+      headerLi.textContent = group.heading;
+      items.push(headerLi);
+
+      group.entries.forEach((entry) => {
+        const li = document.createElement("li");
+        li.className = "time-log-entry";
+        const name = document.createElement("div");
+        name.className = "time-log-name";
+        name.textContent = labelForEntry(entry);
+
+        const detail = document.createElement("div");
+        detail.className = "time-log-detail";
+
+        if (typeof entry.adjustMinutes === "number") {
+          const noteLabel = entry.notes ? ` · ${entry.notes}` : "";
+          detail.textContent = `Adjustment ${formatSignedMinutes(entry.adjustMinutes)}${noteLabel}`;
+          li.dataset.kind = "adjustment";
+        } else if (entry.status === "open") {
+          detail.textContent = `Clocked in at ${formatTimeOnly(entry.clockIn)} · Still on the clock`;
+          li.dataset.kind = "open";
+        } else {
+          const clockInLabel = formatTimeOnly(entry.clockIn);
+          const clockOutLabel = formatTimeOnly(entry.clockOut);
+          const duration = formatDuration(entry.clockIn, entry.clockOut);
+          const segments = [];
+          segments.push(`${clockInLabel} → ${clockOutLabel}`);
+          if (duration) segments.push(`Total ${duration}`);
+          detail.textContent = segments.join(" · ");
+          li.dataset.kind = "closed";
+        }
+
+        li.appendChild(name);
+        li.appendChild(detail);
+        items.push(li);
+      });
+    });
+
     renderList(timeList, items, "No time entries recorded yet.");
 
     const openItems = entries
@@ -500,13 +629,14 @@
         const li = document.createElement("li");
         const label = document.createElement("div");
         const clockInLabel = formatDateTime(entry.clockIn);
-        label.textContent = `${entry.userEmail || entry.userId} — Clocked in ${clockInLabel || entry.clockIn}`;
+        const employeeLabel = labelForEntry(entry);
+        label.textContent = `${employeeLabel} — Clocked in ${clockInLabel || entry.clockIn}`;
         const button = document.createElement("button");
         button.type = "button";
         button.className = "button button--accent";
         button.textContent = "Clock Out";
         button.addEventListener("click", async () => {
-          if (!window.confirm(`Clock out ${entry.userEmail || entry.userId}?`)) return;
+          if (!window.confirm(`Clock out ${employeeLabel}?`)) return;
           await apiRequest("/api/time-entries", {
             method: "POST",
             body: JSON.stringify({ action: "admin_clock_out", entryId: entry.id })
@@ -521,32 +651,327 @@
     renderList(openTimeList, openItems, "No open clocks right now.");
   };
 
-  const loadTimeOff = async () => {
-    const data = await apiRequest("/api/time-off");
-    const items = toArray(data?.requests).map((request) => {
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+      Number.isFinite(value) ? value : 0
+    );
+
+  const minutesToHours = (minutes) => Math.max(0, minutes) / 60;
+
+  const filingStatusLabel = (value) => {
+    switch (value) {
+      case "mfj":
+        return "Married, joint";
+      case "mfs":
+        return "Married, separate";
+      case "hoh":
+        return "Head of household";
+      case "single":
+        return "Single";
+      default:
+        return "—";
+    }
+  };
+
+  const renderPayRates = (employeeList, currentPeriod, now) => {
+    if (!payRateList) return;
+    if (!employeeList.length) {
+      renderList(payRateList, [], "No employees yet.");
+      return;
+    }
+    const items = employeeList.map((employee) => {
       const li = document.createElement("li");
-      const text = document.createElement("div");
-      text.textContent = `${request.userEmail || request.userId}: ${request.startDate} → ${request.endDate} (${request.status})`;
-      li.appendChild(text);
-      if (request.status === "pending") {
-        ["approved", "denied"].forEach((status) => {
-          const button = document.createElement("button");
-          button.className = "button button--primary";
-          button.type = "button";
-          button.textContent = status === "approved" ? "Approve" : "Deny";
-          button.addEventListener("click", async () => {
-            await apiRequest("/api/time-off", {
-              method: "PATCH",
-              body: JSON.stringify({ id: request.id, status })
-            });
-            loadTimeOff();
+      li.className = "pay-rate-row";
+
+      const label = document.createElement("div");
+      label.className = "pay-rate-row__label";
+      const name = document.createElement("strong");
+      name.textContent = employee.label;
+      label.appendChild(name);
+      const meta = document.createElement("span");
+      meta.className = "pay-rate-row__meta";
+      const minutes = sumMinutesForPeriod(
+        employee.entries,
+        currentPeriod.start,
+        currentPeriod.end,
+        now,
+        true
+      );
+      const hours = minutesToHours(minutes);
+      const rate = Number.isFinite(employee.payRate) ? Number(employee.payRate) : 0;
+      const pay = hours * rate;
+      meta.textContent = `${formatMinutes(minutes)} this period · ${formatCurrency(pay)} gross`;
+      label.appendChild(meta);
+
+      const inputWrap = document.createElement("div");
+      inputWrap.className = "pay-rate-row__input";
+      const rateLabel = document.createElement("label");
+      rateLabel.textContent = "$/hr";
+      const rateInput = document.createElement("input");
+      rateInput.type = "number";
+      rateInput.min = "0";
+      rateInput.step = "0.01";
+      rateInput.value = Number.isFinite(employee.payRate) ? String(employee.payRate) : "";
+      rateInput.placeholder = "0.00";
+      rateLabel.appendChild(rateInput);
+      inputWrap.appendChild(rateLabel);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "button button--primary";
+      saveBtn.textContent = "Save";
+      saveBtn.addEventListener("click", async () => {
+        const newRate = Number(rateInput.value);
+        if (!Number.isFinite(newRate) || newRate < 0) {
+          saveBtn.textContent = "Invalid";
+          return;
+        }
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving…";
+        try {
+          await apiRequest("/api/employees", {
+            method: "PATCH",
+            body: JSON.stringify({ id: employee.id, payRate: newRate })
           });
-          li.appendChild(button);
-        });
-      }
+          saveBtn.textContent = "Saved";
+          await loadPayPeriods();
+        } catch (error) {
+          saveBtn.textContent = "Retry";
+          console.error("Pay rate save failed", error);
+        } finally {
+          saveBtn.disabled = false;
+          setTimeout(() => {
+            saveBtn.textContent = "Save";
+          }, 1500);
+        }
+      });
+
+      inputWrap.appendChild(saveBtn);
+      li.appendChild(label);
+      li.appendChild(inputWrap);
       return li;
     });
-    renderList(timeoffList, items, "No time-off requests yet.");
+    renderList(payRateList, items, "No employees yet.");
+  };
+
+  const renderTaxProfiles = (employeeList) => {
+    if (!taxProfileList) return;
+    if (!window.tnkTax2026) {
+      renderList(taxProfileList, [], "Tax module unavailable.");
+      return;
+    }
+    if (!employeeList.length) {
+      renderList(taxProfileList, [], "No employees yet.");
+      return;
+    }
+    const stateOptions = window.tnkTax2026.stateOptions();
+    const items = employeeList.map((employee) => {
+      const profile = employee.taxProfile || {};
+      const li = document.createElement("li");
+      li.className = "tax-profile-row";
+
+      const header = document.createElement("div");
+      header.className = "tax-profile-row__header";
+      const title = document.createElement("strong");
+      title.textContent = employee.label;
+      header.appendChild(title);
+      li.appendChild(header);
+
+      const grid = document.createElement("div");
+      grid.className = "tax-profile-row__grid";
+
+      const makeField = (labelText, control) => {
+        const wrap = document.createElement("label");
+        wrap.className = "field";
+        const span = document.createElement("span");
+        span.textContent = labelText;
+        wrap.appendChild(span);
+        wrap.appendChild(control);
+        return wrap;
+      };
+
+      const stateSelect = document.createElement("select");
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "—";
+      stateSelect.appendChild(blank);
+      stateOptions.forEach((option) => {
+        const opt = document.createElement("option");
+        opt.value = option.code;
+        opt.textContent = `${option.code} — ${option.name}`;
+        if (profile.state === option.code) opt.selected = true;
+        stateSelect.appendChild(opt);
+      });
+
+      const filingSelect = document.createElement("select");
+      window.tnkTax2026.filingStatuses.forEach((option) => {
+        const opt = document.createElement("option");
+        opt.value = option.value;
+        opt.textContent = option.label;
+        if (profile.filingStatus === option.value) opt.selected = true;
+        filingSelect.appendChild(opt);
+      });
+
+      const dependentsInput = document.createElement("input");
+      dependentsInput.type = "number";
+      dependentsInput.min = "0";
+      dependentsInput.step = "1";
+      dependentsInput.value = profile.dependents != null ? String(profile.dependents) : "";
+      dependentsInput.placeholder = "0";
+
+      const addlInput = document.createElement("input");
+      addlInput.type = "number";
+      addlInput.min = "0";
+      addlInput.step = "0.01";
+      addlInput.value = profile.additionalWithholding != null ? String(profile.additionalWithholding) : "";
+      addlInput.placeholder = "0.00";
+
+      const preTaxInput = document.createElement("input");
+      preTaxInput.type = "number";
+      preTaxInput.min = "0";
+      preTaxInput.step = "0.01";
+      preTaxInput.value = profile.preTaxDeductionsPerCheck != null
+        ? String(profile.preTaxDeductionsPerCheck)
+        : "";
+      preTaxInput.placeholder = "0.00";
+
+      const otherIncomeInput = document.createElement("input");
+      otherIncomeInput.type = "number";
+      otherIncomeInput.min = "0";
+      otherIncomeInput.step = "1";
+      otherIncomeInput.value = profile.annualOtherIncome != null ? String(profile.annualOtherIncome) : "";
+      otherIncomeInput.placeholder = "0";
+
+      grid.appendChild(makeField("State", stateSelect));
+      grid.appendChild(makeField("Filing status", filingSelect));
+      grid.appendChild(makeField("Dependents (CTC)", dependentsInput));
+      grid.appendChild(makeField("Extra fed/check", addlInput));
+      grid.appendChild(makeField("Pre-tax/check", preTaxInput));
+      grid.appendChild(makeField("Other annual income", otherIncomeInput));
+      li.appendChild(grid);
+
+      const actions = document.createElement("div");
+      actions.className = "portal-actions";
+      const status = document.createElement("span");
+      status.className = "status-pill";
+      status.setAttribute("aria-live", "polite");
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "button";
+      saveBtn.className = "button button--primary";
+      saveBtn.textContent = "Save tax profile";
+      saveBtn.addEventListener("click", async () => {
+        status.textContent = "";
+        saveBtn.disabled = true;
+        try {
+          const taxProfile = {
+            state: stateSelect.value || null,
+            filingStatus: filingSelect.value || null,
+            dependents: dependentsInput.value ? Number(dependentsInput.value) : 0,
+            additionalWithholding: addlInput.value ? Number(addlInput.value) : 0,
+            preTaxDeductionsPerCheck: preTaxInput.value ? Number(preTaxInput.value) : 0,
+            annualOtherIncome: otherIncomeInput.value ? Number(otherIncomeInput.value) : 0
+          };
+          await apiRequest("/api/employees", {
+            method: "PATCH",
+            body: JSON.stringify({ id: employee.id, taxProfile })
+          });
+          status.textContent = "Saved";
+          await loadPayPeriods();
+        } catch (error) {
+          status.textContent = formatErrorSummary(error);
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+      actions.appendChild(saveBtn);
+      actions.appendChild(status);
+      li.appendChild(actions);
+      return li;
+    });
+    renderList(taxProfileList, items, "No employees yet.");
+  };
+
+  const taxCalcState = { employees: [] };
+
+  const renderTaxCalcEmployees = () => {
+    if (!taxCalcEmployeeSelect) return;
+    taxCalcEmployeeSelect.innerHTML = "";
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "— Manual entry —";
+    taxCalcEmployeeSelect.appendChild(blank);
+    taxCalcState.employees.forEach((employee) => {
+      const opt = document.createElement("option");
+      opt.value = employee.id;
+      opt.textContent = employee.label;
+      taxCalcEmployeeSelect.appendChild(opt);
+    });
+  };
+
+  const renderTaxResult = (result) => {
+    if (!taxCalcResult) return;
+    taxCalcResult.innerHTML = "";
+    if (!result) {
+      taxCalcResult.textContent = "Enter the inputs above and recalculate.";
+      return;
+    }
+    const annual = result.annual;
+    const period = result.perPaycheck;
+    const wrap = document.createElement("div");
+    wrap.className = "tax-result";
+
+    const head = document.createElement("p");
+    head.className = "tax-result__head";
+    const stateName = annual.stateName ? `${annual.stateName} ` : "";
+    const note = annual.stateNote ? ` (${annual.stateNote})` : "";
+    head.textContent = `${stateName}2026 estimate · effective rate ${(result.effectiveRate * 100).toFixed(2)}%${note}`;
+    wrap.appendChild(head);
+
+    const makeRow = (label, value) => {
+      const row = document.createElement("div");
+      row.className = "tax-result__row";
+      const span = document.createElement("span");
+      span.textContent = label;
+      const strong = document.createElement("strong");
+      strong.textContent = value;
+      row.appendChild(span);
+      row.appendChild(strong);
+      return row;
+    };
+
+    const annualBlock = document.createElement("div");
+    annualBlock.className = "tax-result__block";
+    const annualTitle = document.createElement("h4");
+    annualTitle.textContent = "Annual";
+    annualBlock.appendChild(annualTitle);
+    annualBlock.appendChild(makeRow("Gross wages", formatCurrency(annual.gross)));
+    annualBlock.appendChild(makeRow("Pre-tax deductions", formatCurrency(annual.preTax)));
+    annualBlock.appendChild(makeRow("Federal income tax", formatCurrency(annual.federal)));
+    annualBlock.appendChild(makeRow("Social Security (6.2%)", formatCurrency(annual.socialSecurity)));
+    annualBlock.appendChild(makeRow("Medicare (1.45% +)", formatCurrency(annual.medicare)));
+    annualBlock.appendChild(makeRow("State income tax", formatCurrency(annual.state)));
+    annualBlock.appendChild(makeRow("Total tax", formatCurrency(annual.totalTax)));
+    annualBlock.appendChild(makeRow("Net take-home", formatCurrency(annual.net)));
+    wrap.appendChild(annualBlock);
+
+    if (period) {
+      const periodBlock = document.createElement("div");
+      periodBlock.className = "tax-result__block";
+      const periodTitle = document.createElement("h4");
+      periodTitle.textContent = "This pay period";
+      periodBlock.appendChild(periodTitle);
+      periodBlock.appendChild(makeRow("Gross", formatCurrency(period.gross)));
+      periodBlock.appendChild(makeRow("Pre-tax deductions", formatCurrency(period.preTax)));
+      periodBlock.appendChild(makeRow("Federal", formatCurrency(period.federal)));
+      periodBlock.appendChild(makeRow("Social Security", formatCurrency(period.socialSecurity)));
+      periodBlock.appendChild(makeRow("Medicare", formatCurrency(period.medicare)));
+      periodBlock.appendChild(makeRow("State", formatCurrency(period.state)));
+      periodBlock.appendChild(makeRow("Total tax", formatCurrency(period.totalTax)));
+      periodBlock.appendChild(makeRow("Net pay", formatCurrency(period.net)));
+      wrap.appendChild(periodBlock);
+    }
+
+    taxCalcResult.appendChild(wrap);
   };
 
   const loadPayPeriods = async () => {
@@ -611,16 +1036,60 @@
         now,
         true
       );
+      const hours = minutesToHours(minutes);
+      const rate = Number.isFinite(employee.payRate) ? Number(employee.payRate) : 0;
+      const pay = hours * rate;
       const li = document.createElement("li");
       const label = document.createElement("div");
-      label.textContent = employee.label;
+      label.textContent = `${employee.label}${rate ? ` · ${formatCurrency(rate)}/hr` : ""}`;
       const total = document.createElement("span");
-      total.textContent = formatMinutes(minutes);
+      total.textContent = rate
+        ? `${formatMinutes(minutes)} · ${formatCurrency(pay)}`
+        : formatMinutes(minutes);
       li.appendChild(label);
       li.appendChild(total);
       return li;
     });
     renderList(payPeriodCurrentList, currentItems, "No employee hours yet.");
+
+    let totalPeriodMinutes = 0;
+    let totalPeriodPay = 0;
+    employeeList.forEach((employee) => {
+      const minutes = sumMinutesForPeriod(
+        employee.entries,
+        currentPeriod.start,
+        currentPeriod.end,
+        now,
+        true
+      );
+      totalPeriodMinutes += minutes;
+      const rate = Number.isFinite(employee.payRate) ? Number(employee.payRate) : 0;
+      totalPeriodPay += minutesToHours(minutes) * rate;
+    });
+    setStat(statPeriodHours, formatMinutes(totalPeriodMinutes));
+    setStat(statPeriodPay, formatCurrency(totalPeriodPay));
+
+    renderPayRates(employeeList, currentPeriod, now);
+    renderTaxProfiles(employeeList);
+    taxCalcState.employees = employeeList.map((employee) => {
+      const minutes = sumMinutesForPeriod(
+        employee.entries,
+        currentPeriod.start,
+        currentPeriod.end,
+        now,
+        true
+      );
+      const rate = Number.isFinite(employee.payRate) ? Number(employee.payRate) : 0;
+      return {
+        id: employee.id,
+        label: employee.label,
+        payRate: rate,
+        taxProfile: employee.taxProfile || {},
+        currentPeriodMinutes: minutes,
+        currentPeriodGross: minutesToHours(minutes) * rate
+      };
+    });
+    renderTaxCalcEmployees();
 
     const getEmployeePeriods = (employee, timestamp) => {
       let createdAt = employee.createdAt ? new Date(employee.createdAt) : timestamp;
@@ -647,15 +1116,21 @@
 
     const renderEmployeeHistory = (employee, timestamp, titleEl, listEl) => {
       const periods = getEmployeePeriods(employee, timestamp);
+      const rate = Number.isFinite(employee.payRate) ? Number(employee.payRate) : 0;
       if (titleEl) {
-        titleEl.textContent = `${employee.label} pay periods`;
+        titleEl.textContent = rate
+          ? `${employee.label} pay periods · ${formatCurrency(rate)}/hr`
+          : `${employee.label} pay periods`;
       }
       const listItems = periods.map((period) => {
         const li = document.createElement("li");
         const label = document.createElement("div");
         label.textContent = `${formatDate(period.start)} – ${formatDate(period.end)}`;
         const total = document.createElement("span");
-        total.textContent = formatMinutes(period.minutes);
+        const pay = minutesToHours(period.minutes) * rate;
+        total.textContent = rate
+          ? `${formatMinutes(period.minutes)} · ${formatCurrency(pay)}`
+          : formatMinutes(period.minutes);
         li.appendChild(label);
         li.appendChild(total);
         return li;
@@ -946,15 +1421,17 @@
     if (timeList || openTimeList) {
       tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
     }
-    if (timeoffList) {
-      tasks.push(safeLoad(loadTimeOff, timeoffList, "Unable to load time-off requests."));
-    }
     if (
       payPeriodCurrentList ||
       payPeriodEmployeeList ||
       payPeriodHistoryList ||
       payPeriodTabs ||
-      payPeriodTabList
+      payPeriodTabList ||
+      payRateList ||
+      taxProfileList ||
+      taxCalcEmployeeSelect ||
+      statPeriodHours ||
+      statPeriodPay
     ) {
       tasks.push(safeLoad(loadPayPeriods, payPeriodCurrentList, "Unable to load pay periods."));
     }
@@ -1070,6 +1547,56 @@
     applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect)
   );
   applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect);
+
+  taxCalcForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!window.tnkTax2026 || !taxCalcResult) return;
+    const formData = new FormData(taxCalcForm);
+    const employeeId = String(formData.get("employeeId") || "");
+    const matched = taxCalcState.employees.find((e) => e.id === employeeId);
+    const annualGross = Number(formData.get("annualGross"));
+    const periodGrossRaw = formData.get("periodGross");
+    const periodGross = periodGrossRaw === "" || periodGrossRaw == null
+      ? (matched ? matched.currentPeriodGross : NaN)
+      : Number(periodGrossRaw);
+    const result = window.tnkTax2026.calculate({
+      annualGross: Number.isFinite(annualGross) ? annualGross : 0,
+      periodGross: Number.isFinite(periodGross) ? periodGross : NaN,
+      periodsPerYear: Number(formData.get("periodsPerYear")) || 26,
+      filingStatus: String(formData.get("filingStatus") || "single"),
+      state: String(formData.get("state") || "").toUpperCase(),
+      dependents: Number(formData.get("dependents")) || 0,
+      additionalWithholding: Number(formData.get("additionalWithholding")) || 0,
+      preTaxDeductionsPerCheck: Number(formData.get("preTaxDeductionsPerCheck")) || 0,
+      annualOtherIncome: Number(formData.get("annualOtherIncome")) || 0
+    });
+    renderTaxResult(result);
+  });
+
+  taxCalcEmployeeSelect?.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement) || !taxCalcForm) return;
+    const employee = taxCalcState.employees.find((e) => e.id === target.value);
+    if (!employee) return;
+    const profile = employee.taxProfile || {};
+    const setField = (name, value) => {
+      const field = taxCalcForm.elements.namedItem(name);
+      if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+        field.value = value == null ? "" : String(value);
+      }
+    };
+    setField("state", profile.state || "");
+    setField("filingStatus", profile.filingStatus || "single");
+    setField("dependents", profile.dependents || 0);
+    setField("additionalWithholding", profile.additionalWithholding || 0);
+    setField("preTaxDeductionsPerCheck", profile.preTaxDeductionsPerCheck || 0);
+    setField("annualOtherIncome", profile.annualOtherIncome || 0);
+    setField("periodGross", employee.currentPeriodGross.toFixed(2));
+    const annualField = taxCalcForm.elements.namedItem("annualGross");
+    if ((annualField instanceof HTMLInputElement) && !annualField.value) {
+      annualField.value = (employee.payRate * 2080).toFixed(2);
+    }
+  });
 
   boot();
 })();

@@ -35,31 +35,58 @@
 
   <a href="#main" class="visually-hidden-focusable">Skip to Main Content</a>
 
-  <header class="hero hero--compact">
-    <div class="container hero-inner">
-    <h1>Daily Hours</h1>
-    <p>See each employee's hours broken down day by day.</p>
-    <div class="cta-row">
-      <a class="button button--primary" href="admin.html">Return to Admin Portal</a>
-      <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
-    </div>
+  <div class="admin-subnav" aria-label="Admin sections">
+    <div class="container admin-subnav__inner">
+      <span class="admin-subnav__brand">Admin</span>
+      <div class="admin-subnav__links">
+        <a class="admin-subnav__link" href="admin.html">Dashboard</a>
+        <a class="admin-subnav__link" href="admin-customers.html">Customers</a>
+        <a class="admin-subnav__link" href="admin-jobs.html">Jobs</a>
+        <a class="admin-subnav__link" href="admin-approvals.html">Approvals</a>
+        <a class="admin-subnav__link" href="admin-time.html">Time Logs</a>
+        <a class="admin-subnav__link" href="admin-pay-periods.html">Pay Periods</a>
+        <a class="admin-subnav__link is-active" href="admin-daily-hours.html"><span class="admin-subnav__dot"></span>Daily Hours</a>
+        <a class="admin-subnav__link" href="admin-pay-rates.html">Pay Rates</a>
+        <a class="admin-subnav__link" href="admin-tax.html">Tax Calculator</a>
       </div>
+    </div>
+  </div>
+
+  <header class="hero hero--compact hero--admin">
+    <div class="container hero-inner">
+      <div>
+        <h1>Daily Hours</h1>
+        <p>Day-by-day breakdown of each employee's hours.</p>
+      </div>
+      <div class="cta-row">
+        <a class="button button--primary" href="admin.html">Dashboard</a>
+        <button class="button button--accent" type="button" id="admin-logout">Log Out</button>
+      </div>
+    </div>
   </header>
 
   <main id="main">
-    <section class="section" style="padding-top: 1.5rem;">
+    <section class="section dashboard-section">
       <div class="container">
-        <p class="login-footer" id="admin-user">Loading admin profile...</p>
-      </div>
-    </section>
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title">Daily Hours</h2>
+            <p class="dashboard-subtitle">Pick a date range and an employee to see hours per day.</p>
+          </div>
+          <div class="dashboard-meta">
+            <p class="login-footer" id="admin-user">Loading admin profile...</p>
+          </div>
+        </div>
 
-    <section class="section">
-      <div class="container">
-        <article class="portal-card portal-card--wide">
-          <div class="portal-icon">DH</div>
-          <h3 class="portal-title">Employee Tabs</h3>
-          <p class="portal-text">Select an employee to view a day-by-day breakdown of their hours.</p>
-          <div class="job-inline" style="margin-bottom: 1rem;">
+        <article class="dashboard-panel dashboard-panel--span-12">
+          <div class="panel-header">
+            <div>
+              <h3>Employee Tabs</h3>
+              <p class="panel-note" id="admin-daily-range"></p>
+            </div>
+            <div class="panel-icon">DH</div>
+          </div>
+          <div class="job-inline" style="margin: 0;">
             <label class="field">
               Range Start
               <input type="date" id="admin-daily-start" />
@@ -73,7 +100,6 @@
               <button class="button button--accent" type="button" id="admin-daily-reset">Current Pay Period</button>
             </label>
           </div>
-          <p class="portal-note" id="admin-daily-range"></p>
           <div class="tab-shell">
             <div class="tab-list" role="tablist" aria-label="Employees" id="admin-daily-tabs"></div>
             <div class="tab-panel" role="tabpanel" id="admin-daily-panel" aria-live="polite">
