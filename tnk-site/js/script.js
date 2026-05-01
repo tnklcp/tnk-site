@@ -217,3 +217,40 @@ document.addEventListener("keydown", (e) => {
     }
   });
 })();
+
+// ===== "Other" referral source — show text input on demand =====
+(function initHeardAboutOther() {
+  const form = document.querySelector('#estimate form');
+  if (!form) return;
+
+  const radios = form.querySelectorAll('input[name="heard_about"]');
+  const wrapper = form.querySelector('.heard-about-other');
+  const textInput = form.querySelector('#heard_about_other');
+  if (!radios.length || !wrapper || !textInput) return;
+
+  const sync = () => {
+    const selected = form.querySelector('input[name="heard_about"]:checked');
+    const isOther = selected && selected.value === 'Other';
+    wrapper.hidden = !isOther;
+    if (isOther) {
+      textInput.setAttribute('required', '');
+      textInput.focus();
+    } else {
+      textInput.removeAttribute('required');
+      textInput.value = '';
+      textInput.setCustomValidity('');
+    }
+  };
+
+  textInput.addEventListener('invalid', () => {
+    if (textInput.validity.valueMissing) {
+      textInput.setCustomValidity('This is a required field.');
+    } else {
+      textInput.setCustomValidity('');
+    }
+  });
+  textInput.addEventListener('input', () => textInput.setCustomValidity(''));
+
+  radios.forEach(radio => radio.addEventListener('change', sync));
+  sync();
+})();
