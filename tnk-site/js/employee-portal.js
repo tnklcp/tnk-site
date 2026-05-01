@@ -243,8 +243,7 @@
       const li = document.createElement("li");
       const label = document.createElement("div");
       const statusLabel = String(job.status || "").replace("_", " ");
-      const customerLabel = job.customerName ? ` — ${job.customerName}` : "";
-      label.textContent = `${job.title}${customerLabel} (${statusLabel})`;
+      label.textContent = `${job.title} (${statusLabel})`;
 
       const meta = document.createElement("div");
       meta.className = "job-meta";

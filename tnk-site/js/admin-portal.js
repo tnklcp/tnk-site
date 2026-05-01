@@ -2,15 +2,9 @@
   const userEl = document.getElementById("admin-user");
   const statusEl = document.getElementById("admin-status");
   const logoutBtn = document.getElementById("admin-logout");
-  const customerForm = document.getElementById("admin-customer-form");
-  const customerList = document.getElementById("admin-customer-list");
-  const jobForm = document.getElementById("admin-job-form");
   const jobList = document.getElementById("admin-job-list");
   const timeList = document.getElementById("admin-time-list");
   const openTimeList = document.getElementById("admin-open-time-list");
-  const recurrenceTypeSelect = document.getElementById("job-recurrence-type");
-  const recurrenceIntervalInput = document.getElementById("job-recurrence-interval");
-  const recurrenceUnitSelect = document.getElementById("job-recurrence-unit");
   const payPeriodRangeEl = document.getElementById("admin-pay-period-range");
   const payPeriodCurrentList = document.getElementById("admin-pay-period-current-list");
   const payPeriodEmployeeList = document.getElementById("admin-pay-period-employee-list");
@@ -36,8 +30,6 @@
   const dailyStartInput = document.getElementById("admin-daily-start");
   const dailyEndInput = document.getElementById("admin-daily-end");
   const dailyResetBtn = document.getElementById("admin-daily-reset");
-  const statCustomers = document.getElementById("admin-stat-customers");
-  const statJobsOpen = document.getElementById("admin-stat-jobs-open");
   const statClockedIn = document.getElementById("admin-stat-clocked-in");
   const statPeriodHours = document.getElementById("admin-stat-period-hours");
   const statPeriodPay = document.getElementById("admin-stat-period-pay");
@@ -232,13 +224,6 @@
     }, 0);
   };
 
-  const applyRecurrenceState = (typeSelect, intervalInput, unitSelect) => {
-    if (!typeSelect || !intervalInput || !unitSelect) return;
-    const isRecurring = typeSelect.value === "recurring";
-    intervalInput.disabled = !isRecurring;
-    unitSelect.disabled = !isRecurring;
-  };
-
   const formatErrorSummary = (error) => {
     if (!error) return "Unknown error.";
     if (typeof error === "string") return error;
@@ -273,46 +258,14 @@
     }
   };
 
-  const loadCustomers = async () => {
-    const data = await apiRequest("/api/customers");
-    const customers = toArray(data?.customers);
-    setStat(statCustomers, customers.filter((c) => c.status !== "archived").length);
-    const items = customers.map((customer) => {
-      const li = document.createElement("li");
-      const label = document.createElement("div");
-      label.textContent = `${customer.name} (${customer.status})`;
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "button button--accent";
-      deleteBtn.type = "button";
-      deleteBtn.textContent = "Delete";
-      deleteBtn.addEventListener("click", async () => {
-        if (!window.confirm(`Delete customer ${customer.name}? This cannot be undone.`)) return;
-        await apiRequest("/api/customers", {
-          method: "DELETE",
-          body: JSON.stringify({ id: customer.id })
-        });
-        loadCustomers();
-      });
-      li.appendChild(label);
-      li.appendChild(deleteBtn);
-      return li;
-    });
-    renderList(customerList, items, "No customers yet.");
-  };
-
   const loadJobs = async () => {
     const data = await apiRequest("/api/jobs");
-    const allJobs = toArray(data?.jobs);
-    setStat(
-      statJobsOpen,
-      allJobs.filter((job) => !["approved", "rejected"].includes(String(job.status))).length
-    );
-    const items = allJobs.map((job) => {
+    const submittedJobs = toArray(data?.jobs).filter((job) => job.status === "submitted");
+    const items = submittedJobs.map((job) => {
       const li = document.createElement("li");
       const label = document.createElement("div");
       const statusLabel = String(job.status || "").replace("_", " ");
-      const customerLabel = job.customerName ? ` — ${job.customerName}` : "";
-      label.textContent = `${job.title}${customerLabel} (${statusLabel})`;
+      label.textContent = `${job.title} (${statusLabel})`;
 
       const meta = document.createElement("div");
       meta.className = "job-meta";
@@ -336,163 +289,49 @@
       if (durationLabel) timingParts.push(`Total: ${durationLabel}`);
       timing.textContent = timingParts.join(" · ");
 
-      const editWrap = document.createElement("div");
-      editWrap.className = "job-inline";
-
-      const customerField = document.createElement("label");
-      customerField.textContent = "Customer";
-      const customerInput = document.createElement("input");
-      customerInput.type = "text";
-      customerInput.value = job.customerName || "";
-      customerField.appendChild(customerInput);
-      const customerWrap = document.createElement("div");
-      customerWrap.className = "field";
-      customerWrap.appendChild(customerField);
-
-      const assignedField = document.createElement("label");
-      assignedField.textContent = "Assigned To";
-      const assignedInput = document.createElement("input");
-      assignedInput.type = "text";
-      assignedInput.value = Array.isArray(job.assignedTo) ? job.assignedTo.join(", ") : "";
-      assignedField.appendChild(assignedInput);
-      const assignedWrap = document.createElement("div");
-      assignedWrap.className = "field";
-      assignedWrap.appendChild(assignedField);
-
-      const serviceField = document.createElement("label");
-      serviceField.textContent = "Service Date";
-      const serviceInput = document.createElement("input");
-      serviceInput.type = "date";
-      serviceInput.value = job.serviceDate || "";
-      serviceField.appendChild(serviceInput);
-      const serviceWrap = document.createElement("div");
-      serviceWrap.className = "field";
-      serviceWrap.appendChild(serviceField);
-
-      const typeField = document.createElement("label");
-      typeField.textContent = "Job Type";
-      const typeSelect = document.createElement("select");
-      [
-        { value: "one_time", label: "One-time" },
-        { value: "recurring", label: "Recurring" }
-      ].forEach((optionData) => {
-        const option = document.createElement("option");
-        option.value = optionData.value;
-        option.textContent = optionData.label;
-        typeSelect.appendChild(option);
-      });
-      typeSelect.value = job.isRecurring ? "recurring" : "one_time";
-      typeField.appendChild(typeSelect);
-      const typeWrap = document.createElement("div");
-      typeWrap.className = "field";
-      typeWrap.appendChild(typeField);
-
-      const intervalField = document.createElement("label");
-      intervalField.textContent = "Interval";
-      const intervalInput = document.createElement("input");
-      intervalInput.type = "number";
-      intervalInput.min = "1";
-      intervalInput.value = String(job.recurrenceInterval || 1);
-      intervalField.appendChild(intervalInput);
-      const intervalWrap = document.createElement("div");
-      intervalWrap.className = "field";
-      intervalWrap.appendChild(intervalField);
-
-      const unitField = document.createElement("label");
-      unitField.textContent = "Unit";
-      const unitSelect = document.createElement("select");
-      [
-        { value: "week", label: "Week(s)" },
-        { value: "day", label: "Day(s)" },
-        { value: "month", label: "Month(s)" }
-      ].forEach((optionData) => {
-        const option = document.createElement("option");
-        option.value = optionData.value;
-        option.textContent = optionData.label;
-        unitSelect.appendChild(option);
-      });
-      unitSelect.value = job.recurrenceUnit || "week";
-      unitField.appendChild(unitSelect);
-      const unitWrap = document.createElement("div");
-      unitWrap.className = "field";
-      unitWrap.appendChild(unitField);
-
-      const statusField = document.createElement("label");
-      statusField.textContent = "Status";
-      const select = document.createElement("select");
-      ["not_started", "in_progress", "submitted", "approved", "rejected"].forEach((status) => {
-        const option = document.createElement("option");
-        option.value = status;
-        option.textContent = status.replace("_", " ");
-        if (status === job.status) option.selected = true;
-        select.appendChild(option);
-      });
-      statusField.appendChild(select);
-      const statusWrap = document.createElement("div");
-      statusWrap.className = "field";
-      statusWrap.appendChild(statusField);
-
       const actionWrap = document.createElement("div");
       actionWrap.className = "portal-actions";
 
-      const button = document.createElement("button");
-      button.className = "button button--primary";
-      button.type = "button";
-      button.textContent = "Update Job";
-      button.addEventListener("click", async () => {
+      const approveBtn = document.createElement("button");
+      approveBtn.className = "button button--primary";
+      approveBtn.type = "button";
+      approveBtn.textContent = "Approve";
+      approveBtn.addEventListener("click", async () => {
         await apiRequest("/api/jobs", {
           method: "PATCH",
           body: JSON.stringify({
             id: job.id,
-            status: select.value,
-            customerName: customerInput.value,
-            assignedTo: assignedInput.value,
-            serviceDate: serviceInput.value,
-            recurrenceType: typeSelect.value,
-            recurrenceInterval: intervalInput.value,
-            recurrenceUnit: unitSelect.value
+            status: "approved"
           })
         });
         loadJobs();
       });
 
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "button button--accent";
-      deleteBtn.type = "button";
-      deleteBtn.textContent = "Delete Job";
-      deleteBtn.addEventListener("click", async () => {
-        if (!window.confirm(`Delete job ${job.title}? This cannot be undone.`)) return;
+      const rejectBtn = document.createElement("button");
+      rejectBtn.className = "button button--accent";
+      rejectBtn.type = "button";
+      rejectBtn.textContent = "Reject";
+      rejectBtn.addEventListener("click", async () => {
         await apiRequest("/api/jobs", {
-          method: "DELETE",
-          body: JSON.stringify({ id: job.id })
+          method: "PATCH",
+          body: JSON.stringify({
+            id: job.id,
+            status: "rejected"
+          })
         });
         loadJobs();
       });
 
-      actionWrap.appendChild(button);
-      actionWrap.appendChild(deleteBtn);
-
-      editWrap.appendChild(customerWrap);
-      editWrap.appendChild(assignedWrap);
-      editWrap.appendChild(serviceWrap);
-      editWrap.appendChild(typeWrap);
-      editWrap.appendChild(intervalWrap);
-      editWrap.appendChild(unitWrap);
-      editWrap.appendChild(statusWrap);
-
-      typeSelect.addEventListener("change", () =>
-        applyRecurrenceState(typeSelect, intervalInput, unitSelect)
-      );
-      applyRecurrenceState(typeSelect, intervalInput, unitSelect);
+      actionWrap.appendChild(approveBtn);
+      actionWrap.appendChild(rejectBtn);
 
       li.appendChild(label);
       li.appendChild(meta);
       if (timingParts.length) li.appendChild(timing);
-      li.appendChild(editWrap);
       li.appendChild(actionWrap);
       return li;
     });
-    renderList(jobList, items, "No jobs created yet.");
+    renderList(jobList, items, "No submitted jobs awaiting review.");
   };
 
   const employeeNameCache = new Map();
@@ -1412,10 +1251,7 @@
 
   const loadAll = async () => {
     const tasks = [];
-    if (customerForm || customerList) {
-      tasks.push(safeLoad(loadCustomers, customerList, "Unable to load customers."));
-    }
-    if (jobForm || jobList) {
+    if (jobList) {
       tasks.push(safeLoad(loadJobs, jobList, "Unable to load jobs."));
     }
     if (timeList || openTimeList) {
@@ -1468,38 +1304,6 @@
 
   logoutBtn.addEventListener("click", () => window.tnkAuth.logout());
 
-  customerForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(customerForm);
-    try {
-      await apiRequest("/api/customers", {
-        method: "POST",
-        body: JSON.stringify(Object.fromEntries(formData.entries()))
-      });
-      customerForm.reset();
-      loadCustomers();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  });
-
-  jobForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const formData = new FormData(jobForm);
-    try {
-      await apiRequest("/api/jobs", {
-        method: "POST",
-        body: JSON.stringify(Object.fromEntries(formData.entries()))
-      });
-      jobForm.reset();
-      if (recurrenceTypeSelect) recurrenceTypeSelect.value = "one_time";
-      applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect);
-      loadJobs();
-    } catch (error) {
-      setStatus(error.message);
-    }
-  });
-
   adjustForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!adjustEmployeeSelect || !adjustDateInput) return;
@@ -1542,11 +1346,6 @@
     const day = String(today.getDate()).padStart(2, "0");
     adjustDateInput.value = `${today.getFullYear()}-${month}-${day}`;
   }
-
-  recurrenceTypeSelect?.addEventListener("change", () =>
-    applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect)
-  );
-  applyRecurrenceState(recurrenceTypeSelect, recurrenceIntervalInput, recurrenceUnitSelect);
 
   taxCalcForm?.addEventListener("submit", (event) => {
     event.preventDefault();
