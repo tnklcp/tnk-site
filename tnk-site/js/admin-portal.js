@@ -2,7 +2,6 @@
   const userEl = document.getElementById("admin-user");
   const statusEl = document.getElementById("admin-status");
   const logoutBtn = document.getElementById("admin-logout");
-  const jobList = document.getElementById("admin-job-list");
   const timeList = document.getElementById("admin-time-list");
   const openTimeList = document.getElementById("admin-open-time-list");
   const payPeriodRangeEl = document.getElementById("admin-pay-period-range");
@@ -120,17 +119,6 @@
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit"
-    }).format(date);
-  };
-
-  const formatServiceDate = (value) => {
-    if (!value) return "";
-    const date = new Date(`${value}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric"
     }).format(date);
   };
 
@@ -256,82 +244,6 @@
       console.error("Dashboard load failed:", error);
       return false;
     }
-  };
-
-  const loadJobs = async () => {
-    const data = await apiRequest("/api/jobs");
-    const submittedJobs = toArray(data?.jobs).filter((job) => job.status === "submitted");
-    const items = submittedJobs.map((job) => {
-      const li = document.createElement("li");
-      const label = document.createElement("div");
-      const statusLabel = String(job.status || "").replace("_", " ");
-      label.textContent = `${job.title} (${statusLabel})`;
-
-      const meta = document.createElement("div");
-      meta.className = "job-meta";
-      const serviceDateLabel = job.serviceDate ? formatServiceDate(job.serviceDate) : "Not scheduled";
-      const recurrenceLabel = job.isRecurring
-        ? `Recurring every ${job.recurrenceInterval || 1} ${job.recurrenceUnit || "week"}(s)`
-        : "One-time job";
-      const nextServiceLabel = job.isRecurring && job.nextServiceDate
-        ? formatServiceDate(job.nextServiceDate)
-        : "Not set";
-      meta.textContent = `Service date: ${serviceDateLabel} · ${recurrenceLabel} · Next: ${nextServiceLabel}`;
-
-      const timing = document.createElement("div");
-      timing.className = "job-meta";
-      const startedLabel = formatDateTime(job.startedAt);
-      const completedLabel = formatDateTime(job.completedAt);
-      const durationLabel = formatDuration(job.startedAt, job.completedAt);
-      const timingParts = [];
-      if (startedLabel) timingParts.push(`Started: ${startedLabel}`);
-      if (completedLabel) timingParts.push(`Completed: ${completedLabel}`);
-      if (durationLabel) timingParts.push(`Total: ${durationLabel}`);
-      timing.textContent = timingParts.join(" · ");
-
-      const actionWrap = document.createElement("div");
-      actionWrap.className = "portal-actions";
-
-      const approveBtn = document.createElement("button");
-      approveBtn.className = "button button--primary";
-      approveBtn.type = "button";
-      approveBtn.textContent = "Approve";
-      approveBtn.addEventListener("click", async () => {
-        await apiRequest("/api/jobs", {
-          method: "PATCH",
-          body: JSON.stringify({
-            id: job.id,
-            status: "approved"
-          })
-        });
-        loadJobs();
-      });
-
-      const rejectBtn = document.createElement("button");
-      rejectBtn.className = "button button--accent";
-      rejectBtn.type = "button";
-      rejectBtn.textContent = "Reject";
-      rejectBtn.addEventListener("click", async () => {
-        await apiRequest("/api/jobs", {
-          method: "PATCH",
-          body: JSON.stringify({
-            id: job.id,
-            status: "rejected"
-          })
-        });
-        loadJobs();
-      });
-
-      actionWrap.appendChild(approveBtn);
-      actionWrap.appendChild(rejectBtn);
-
-      li.appendChild(label);
-      li.appendChild(meta);
-      if (timingParts.length) li.appendChild(timing);
-      li.appendChild(actionWrap);
-      return li;
-    });
-    renderList(jobList, items, "No submitted jobs awaiting review.");
   };
 
   const employeeNameCache = new Map();
@@ -1251,9 +1163,6 @@
 
   const loadAll = async () => {
     const tasks = [];
-    if (jobList) {
-      tasks.push(safeLoad(loadJobs, jobList, "Unable to load jobs."));
-    }
     if (timeList || openTimeList) {
       tasks.push(safeLoad(loadTimeEntries, timeList, "Unable to load time entries."));
     }
