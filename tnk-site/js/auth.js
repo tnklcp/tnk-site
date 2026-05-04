@@ -7,6 +7,7 @@
   };
 
   const TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+  const IDENTITY_INIT_TIMEOUT_MS = 4000;
 
   const setStatus = (el, message) => {
     if (el) {
@@ -39,15 +40,29 @@
     return state.identity;
   };
 
+  const waitForIdentityInit = (identity) =>
+    new Promise((resolve) => {
+      let settled = false;
+      let timer;
+      const finish = (user = null) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        resolve(user);
+      };
+
+      identity.on("init", finish);
+      timer = setTimeout(() => finish(identity.currentUser()), IDENTITY_INIT_TIMEOUT_MS);
+      identity.init();
+    });
+
   const init = async () => {
     if (state.ready) return state.ready;
 
     state.ready = (async () => {
       const config = await loadConfig();
       const identity = getIdentity();
-      identity.init();
       state.config = config;
-      scheduleTokenRefresh();
       identity.on("login", () => {
         scheduleTokenRefresh();
         refreshTokenSafely(true);
@@ -58,6 +73,8 @@
           state.refreshTimer = null;
         }
       });
+      await waitForIdentityInit(identity);
+      scheduleTokenRefresh();
       return { identity, config };
     })();
 
@@ -167,7 +184,10 @@
     const { identity } = await init();
     const user = identity.currentUser();
     if (!user) {
-      window.location.href = redirectTo || "login.html";
+      const loginUrl = redirectTo || "login.html";
+      if (!window.location.pathname.endsWith(loginUrl)) {
+        window.location.replace(loginUrl);
+      }
       return null;
     }
     await refreshTokenSafely(false);
